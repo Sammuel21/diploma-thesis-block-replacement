@@ -1,0 +1,26 @@
+Topics & ideas:
+===
+
+- What could be done in the thesis?
+
+
+The goals of this thesis are:
+
+- 1) Design and implement a methodology to replace individual MLP blocks with smaller substitutes. This involves training smaller, "drop-in" network structures (e.g., shallower MLPs, linear layers, or hybrids) to mimic the original block's function, using local calibration data (input/output pairs) captured from the frozen, pre-trained model.
+
+- 2) Test and evaluate the improvements and trade-offs of this replacement strategy. This includes an analysis of variations in the compression strategy and an evaluation of their impact on model quality.
+
+
+Ideas:
+
+- testing on different model families (sizes) -> are changes significant in general or are specific in certain model families/model sizes?
+- namodelovat relationship zmien parametrov -> ak MLP replacement bude done, potom pozrime ako vysledky sa menia ak pracujeme s dynamickym
+	enviromentom -> budeme menit ostatne layers moelu a uvidime ako MLP replacement meni svoje vysledky -> da sa tu najst nieco general/univerzalne?
+
+
+- Main idea:
+	- replace MLP as an isolated function:
+		0. Simple linear Layer - trivial activations -> expected failure (that's good)
+		1. Shallow MLP - pruned from original block
+		2. Different function classes (other than MLP)
+		3. Mixture of Experts pattern

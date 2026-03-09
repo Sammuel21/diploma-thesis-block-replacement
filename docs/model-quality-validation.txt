@@ -1,0 +1,7 @@
+Model Quality:
+Validation:
+
+Summary:
+- We need to somehow define a set of metrics with which we measure the quality of the model
+for assessment of replacement strategy (before/after 360 view)
+
