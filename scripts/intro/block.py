@@ -19,7 +19,6 @@ def choose_target_mlp_path(model, target_layer_idx: int):
     if expected in paths:
         return expected
 
-    # Fallback: nájdi niečo, kde sa vrstva objaví v stringu
     for p in paths:
         if f".{target_layer_idx}.mlp" in p:
             return p
