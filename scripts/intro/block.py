@@ -26,6 +26,10 @@ def choose_target_mlp_path(model, target_layer_idx: int):
     raise ValueError(f"Nepodarilo sa nájsť MLP pre layer_idx={target_layer_idx}")
 
 
+def get_submodule(model: nn.Module, path: str):
+    return model.get_submodule(path)
+
+
 def replace_submodule(root_model: nn.Module, path: str, new_module: nn.Module):
     parent_path, child_name = path.rsplit(".", 1)
     parent = root_model.get_submodule(parent_path)
