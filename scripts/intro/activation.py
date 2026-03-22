@@ -16,7 +16,6 @@ def collect_block_io(model, block_path: str, loader, max_batches: int, device: s
         y = output.detach().float().cpu()
         x = cache["x"]
 
-        # [B, T, D] -> [B*T, D]
         x_chunks.append(x.reshape(-1, x.shape[-1]))
         y_chunks.append(y.reshape(-1, y.shape[-1]))
 

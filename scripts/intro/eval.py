@@ -1,5 +1,8 @@
 import torch
+import torch.nn.functional as F
 import numpy as np
+
+# model/block scoring
 
 def evaluate_lm(model, loader, max_batches: int, device: str):
     model.eval()
@@ -24,3 +27,12 @@ def evaluate_lm(model, loader, max_batches: int, device: str):
     mean_loss = torch.stack(losses).mean().item()
     ppl = np.exp(mean_loss)
     return mean_loss, ppl
+
+
+# block importance scoring
+
+def bi_cosine_score(X, Y):
+    cos = F.cosine_similarity(X, Y, dim=-1, eps=1e-8)
+    score = 1.0 - cos
+    score = score.mean().item()
+    return float(score)

@@ -50,3 +50,6 @@ def evaluate_block_mse(replacement, X_val: torch.Tensor, Y_val: torch.Tensor, de
         mse = loss_fn(pred, Y_val.to(device)).item()
 
     return mse
+
+
+# NOTE: dalsi fajn jednoduchy (ale silny) replacement je MLP s mensim expansion ratio
