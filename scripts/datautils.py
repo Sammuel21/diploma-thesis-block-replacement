@@ -1,10 +1,11 @@
+# NOTE: cely tento file je prebraty z inej prace, jedna sa o loadery datasetov
+
 import random
 
 import numpy as np
 import torch
 from datasets import load_dataset
 from transformers import AutoTokenizer, LlamaTokenizer
-
 
 def set_seed(seed):
     np.random.seed(seed)
