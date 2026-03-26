@@ -41,15 +41,4 @@ def fit_linear_replacement(X: torch.Tensor, Y: torch.Tensor, hidden_size: int, d
     return replacement
 
 
-def evaluate_block_mse(replacement, X_val: torch.Tensor, Y_val: torch.Tensor, device: str):
-    replacement.eval()
-    loss_fn = nn.MSELoss()
-
-    with torch.no_grad():
-        pred = replacement(X_val.to(device))
-        mse = loss_fn(pred, Y_val.to(device)).item()
-
-    return mse
-
-
 # NOTE: dalsi fajn jednoduchy (ale silny) replacement je MLP s mensim expansion ratio

@@ -29,6 +29,17 @@ def evaluate_lm(model, loader, max_batches: int, device: str):
     return mean_loss, ppl
 
 
+def evaluate_block_mse(replacement, X_val: torch.Tensor, Y_val: torch.Tensor, device: str):
+    replacement.eval()
+    loss_fn = nn.MSELoss()
+
+    with torch.no_grad():
+        pred = replacement(X_val.to(device))
+        mse = loss_fn(pred, Y_val.to(device)).item()
+
+    return mse
+
+
 # block importance scoring
 
 def bi_cosine_score(X, Y):
