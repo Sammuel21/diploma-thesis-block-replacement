@@ -1,9 +1,9 @@
-data
+/data
 .env
 
-docs/llm/
-docs/design/llm/
-docs/design/llm/context/
-docs/vault/
+/docs/llm/
+/docs/design/llm/
+/docs/design/llm/context/
+/docs/vault/
 
-AGENTS.md
+/AGENTS.md
