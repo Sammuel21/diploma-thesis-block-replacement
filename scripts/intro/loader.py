@@ -68,12 +68,34 @@ def get_datautils_backend(dataset: str, n_samples, seq_len, model_id: str, token
 
 
 
-def make_calib_loader(tokenizer, cfg, dataset="Wikitext2"):
+def make_calib_loader(tokenizer, cfg, dataset="C4"):
     n_samples = cfg.num_calib_batches * cfg.batch_size
     train_samples, val_samples = get_datautils_backend(dataset, n_samples, cfg.seq_len, cfg.model_id, tokenizer, cfg.seed)
 
+    sequences = sequences_from_samples(train_samples)
+    ds = TokenSequencesDataset(sequences)
+    return DataLoader(ds, batch_size=cfg.batch_size, shuffle=False)
 
 
-def make_eval_loader(tokenizer, cfg, dataset="C4"):
-    n_samples = cfg.num_calib_batches * cfg.batch_size
-    train_samples, val_samples = get_datautils_backend(dataset, n_samples, cfg.seq_len, cfg.model_id, tokenizer, cfg.seed)
+
+def make_eval_loader(tokenizer, cfg, dataset="Wikitext2"):
+    n_samples = cfg.num_eval_batches * cfg.batch_size
+    train_samples, val_samples = get_datautils_backend(dataset, 1, cfg.seq_len, cfg.model_id, tokenizer, cfg.seed)
+
+    # NOTE: tu spracovavam long token stream z shapu [1, T] -> [B, S] tak aby som po riadkoch zachoval kontinutu T
+    # vraj je vhodne evaluatovat modely (ak robim PPL metriku a pod) tak ze v tom inpute je kontinuita a neni to random sampled window
+
+    stream = val_samples.input_ids.squeeze(0)
+    sequences = []
+
+    max_sequences = n_samples
+    total_sequences = min(stream.numel() // cfg.seq_len, max_sequences)
+
+    for i in range(total_sequences):
+        seq_start = i * cfg.seq_len
+        seq_end = seq_start + cfg.seq_len
+        sequence = stream[seq_start:seq_end].clone()
+        sequences.append(sequence)
+    
+    ds = TokenSequencesDataset(sequences)
+    return DataLoader(ds, batch_size=cfg.batch_size, shuffle=False)

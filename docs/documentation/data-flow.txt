@@ -1,0 +1,27 @@
+# Data Loading
+# Data taken from the datautils.py backend
+
+format:
+
+[
+    (inp, tar),
+    ...
+]
+
+which is equivalent to
+
+[
+    ([1, S], [1, S])
+    ...
+]
+
+using interface TokenSequencesDataset
+
+transforms to ->
+
+{
+    "input_ids" : [B, S],
+    "attention_mask" : [B, S]
+}
+
+# ready for model

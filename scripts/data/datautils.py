@@ -85,6 +85,7 @@ def get_c4(nsamples, seed, seqlen, model, tokenizer):
         tar[:, :-1] = -100
         trainloader.append((inp, tar))
 
+    # NOTE: tuto potom nahradit tych 1100 za konfigurovatelny pocet eval samples (len ak bude treba valenc)
     valenc = tokenizer(' '.join(valdata[:1100]['text']), return_tensors='pt')
     valenc = valenc.input_ids[:, :(256 * seqlen)]
 
