@@ -21,6 +21,8 @@ class CFG:
 @dataclass
 class MCFG:
     model_id = "HuggingFaceTB/SmolLM2-1.7B"
+    seq_len: int = 128
+    batch_size: int = 2
 
     k_blocks: int = 3
     target_layer_idxs = ()
@@ -30,8 +32,8 @@ class MCFG:
     replacement_strategy: Literal["one_shot", "iterative"] = "one_shot"
     replacement_operator: Literal["linear"] = "linear"
 
-    seq_len: int = 128
-    batch_size: int = 2
+    apply_recovery = True
+
     calib_split: str = "train[:5%]"
     eval_split: str = "validation[:1%]"
     num_calib_batches: int = 24
