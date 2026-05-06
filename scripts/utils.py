@@ -2,9 +2,11 @@ import numpy as np
 
 # resolvers
 
-def resolve_target_layers(cfg, n_layers: int, bi_scores: dict):
-    reverse = True
-    k = min(cfg.k_blocks, len(bi_scores))
+def resolve_target_layers(cfg, n_layers: int, bi_scores: dict = None):
+    if bi_scores is None:
+        bi_scores = {}
+    
+    k = min(cfg.k_blocks, n_layers)
 
     if cfg.selection_strategy == "manual":
         if not cfg.target_layer_idxs:
@@ -12,15 +14,17 @@ def resolve_target_layers(cfg, n_layers: int, bi_scores: dict):
         idxs = cfg.target_layer_idxs
 
     elif cfg.selection_strategy == "random_k":
-        idxs = np.random.choice(list(range(n_layers)), size=k)
+        rng = np.random.default_rng(cfg.seed)
+        idxs = rng.choice(np.arange(n_layers), size=k, replace=False).tolist()
 
     elif cfg.selection_strategy == "top_k_bi":
-        reverse = cfg.bi_rank_order == "desc"
         if not bi_scores:
-            raise ValueError(f"BI scores required for this strategy, strategy={cfg.selection_strategy}")
+            raise ValueError("BI scores required for this strategy")
+        reverse = cfg.bi_rank_order == "desc"
         idxs = sorted(bi_scores, key=bi_scores.get, reverse=reverse)[:k]
     
-    return idxs
+    return sorted(int(i) for i in idxs)
+
 
 
 def resolve_replacement_strategy(cfg):

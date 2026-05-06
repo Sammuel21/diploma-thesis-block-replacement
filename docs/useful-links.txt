@@ -1,0 +1,5 @@
+
+direct supervisor source papers:
+- Compact Language Models: https://arxiv.org/pdf/2407.14679
+- ModeGPT: https://arxiv.org/pdf/2408.09632
+- Grafting: https://arxiv.org/pdf/2506.05340
