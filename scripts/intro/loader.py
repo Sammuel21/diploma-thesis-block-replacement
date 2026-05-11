@@ -69,7 +69,8 @@ def get_datautils_backend(dataset: str, n_samples, seq_len, model_id: str, token
 
 
 def make_calib_loader(tokenizer, cfg, dataset="C4"):
-    n_samples = cfg.num_calib_batches * cfg.batch_size
+    n_batches = max(cfg.num_recovery_batches, cfg.num_calib_batches)
+    n_samples = n_batches * cfg.batch_size
     train_samples, val_samples = get_datautils_backend(dataset, n_samples, cfg.seq_len, cfg.model_id, tokenizer, cfg.seed)
 
     sequences = sequences_from_samples(train_samples)

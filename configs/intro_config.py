@@ -32,12 +32,15 @@ class MCFG:
     replacement_strategy: Literal["one_shot", "iterative"] = "one_shot"
     replacement_operator: Literal["linear"] = "linear"
 
-    apply_recovery = True
+    apply_recovery: bool = True
 
     calib_split: str = "train[:5%]"
     eval_split: str = "validation[:1%]"
     num_calib_batches: int = 24
     num_eval_batches: int = 24
+
+    num_recovery_batches: int = 512
+
     replacement_epochs: int = 5
     replacement_lr: float = 1e-3
     replacement_batch_size: int = 2048
