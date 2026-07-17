@@ -85,6 +85,7 @@ Allowed page types are:
 - `concept`
 - `entity`
 - `method`
+- `implementation`
 - `research-question`
 - `hypothesis`
 - `decision`
@@ -104,6 +105,12 @@ Allowed lifecycle states are:
 
 Lifecycle status and scientific confidence are separate. A hypothesis can be a
 well-maintained `verified` page while the hypothesis itself remains uncertain.
+
+An `implementation` page represents a stable project component, pipeline, or
+workflow. Its common metadata describes provenance and research scope, while
+its body records repository paths, version, maturity, interfaces, validation,
+and related experiments. The page documents the artifact but does not itself
+prove correctness or effectiveness.
 
 ## Authorship
 

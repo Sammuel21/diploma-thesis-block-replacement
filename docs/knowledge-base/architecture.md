@@ -22,7 +22,6 @@ lifecycles from the knowledge graph.
 External diploma workspace
 |-- resources/direct/       supervisor-provided core papers
 |-- resources/              supporting papers
-|-- library/                background books and papers
 `-- ideas/                  researcher-authored idea inbox
             |
             | registered by path, origin, priority, and evidence kind
@@ -39,6 +38,7 @@ development/llm-wiki/wiki/
 |-- concepts/               stable terminology and objects
 |-- entities/               models, datasets, software, and named artifacts
 |-- methods/                metrics, architectures, and procedures
+|-- implementations/        project software components and pipelines
 |-- research/               questions, hypotheses, and decisions
 |-- experiments/            designs, results, and findings
 `-- syntheses/              comparisons and integrated analyses
@@ -114,6 +114,12 @@ and `configs/intro_config.py`. Its evidence is preserved under
 Future maintained implementation belongs under a separately reviewed `src/`
 and `pipelines/` architecture. The documentation restructuring does not imply
 that the MVP code has already been productionized.
+
+Stable implementations also receive wiki graph nodes. These nodes explain
+which methods and decisions a component implements, where its code and
+configuration live, and which experiments used it. They operate at component
+or pipeline granularity; individual files and functions remain ordinary code
+references unless they have an independently meaningful architectural role.
 
 ## Wiki lifecycle
 

@@ -8,8 +8,8 @@ and an LLM while remaining readable in ordinary Markdown and Obsidian.
 
 1. `raw/` registers immutable source material and preserved input notes. Raw
    material is evidence or migration input; it is never silently rewritten.
-2. `wiki/` contains maintained source summaries, concepts, methods, research
-   objects, experiments, and syntheses.
+2. `wiki/` contains maintained source summaries, concepts, methods,
+   implementations, research objects, experiments, and syntheses.
 3. `SCHEMA.md` defines the canonical structure, metadata, provenance rules, and
    workflows. `AGENTS.md` applies those rules to agent behavior in this tree.
 
@@ -36,6 +36,6 @@ from the wiki into `docs/` is an explicit distillation operation.
 - **Lint:** check structure, links, provenance, contradictions, and staleness.
 - **Distill:** turn reviewed wiki material into coherent human documentation.
 
-The wiki currently contains no ingested research sources. Its first stage is a
-controlled pilot: one supervisor-provided paper, one supporting paper, and one
-researcher-authored idea.
+The first controlled pilot begins with individually reviewed source ingestion.
+Implementation nodes are added only for stable architectural components, not
+for every source file or function.

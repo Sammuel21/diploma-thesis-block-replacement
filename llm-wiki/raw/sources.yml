@@ -3,4 +3,98 @@ updated: 2026-07-17
 
 # Individual sources are added here only when deliberately registered for
 # ingestion. Collection membership alone does not mean a source was reviewed.
-sources: []
+sources:
+  - id: src-minitron-2024
+    title: Compact Language Models via Pruning and Knowledge Distillation
+    collection_id: primary-papers
+    origin: supervisor-provided
+    evidence_kind: scholarly-primary
+    priority: core
+    authors:
+      - Saurav Muralidharan
+      - Sharath Turuvekere Sreenivas
+      - Raviraj Joshi
+      - Marcin Chochowski
+      - Mostofa Patwary
+      - Mohammad Shoeybi
+      - Bryan Catanzaro
+      - Jan Kautz
+      - Pavlo Molchanov
+    year: 2024
+    canonical_url: https://arxiv.org/abs/2407.14679v2
+    local_path: ../resources/direct/2407.14679v2_pruning.pdf
+    sha256: 907ff63b48fa8a7e87895b2f5584e315cb1d24ac9664166e224114fd9e3a4915
+    added: 2026-07-17
+    ingestion_status: ingested
+    notes: Local file is arXiv version 2.
+
+  - id: src-grafting-2025
+    title: Exploring Diffusion Transformer Designs via Grafting
+    collection_id: primary-papers
+    origin: supervisor-provided
+    evidence_kind: scholarly-primary
+    priority: core
+    authors:
+      - Keshigeyan Chandrasegaran
+      - Michael Poli
+      - Daniel Y. Fu
+      - Dongjun Kim
+      - Lea M. Hadzic
+      - Manling Li
+      - Agrim Gupta
+      - Stefano Massaroli
+      - Azalia Mirhoseini
+      - Juan Carlos Niebles
+      - Stefano Ermon
+      - Li Fei-Fei
+    year: 2025
+    canonical_url: https://arxiv.org/abs/2506.05340v2
+    local_path: ../resources/direct/2506.05340v2_Grafting.pdf
+    sha256: d08950a3b635614646334312ad9fbeb4b0c08c25fd41613dbbd64142cf6e7cc6
+    added: 2026-07-17
+    ingestion_status: ingested
+    notes: Local file is arXiv version 2.
+
+  - id: src-mone-2026
+    title: "MoNE: Replacing Redundant Experts with Lightweight Novices for Structured Pruning of MoE"
+    collection_id: primary-papers
+    origin: supervisor-provided
+    evidence_kind: scholarly-primary
+    priority: core
+    authors:
+      - Geng Zhang
+      - Yuxuan Han
+      - Yuxuan Lou
+      - Yiqi Zhang
+      - Wangbo Zhao
+      - Yang You
+    year: 2026
+    canonical_url: https://arxiv.org/abs/2507.00390v2
+    local_path: ../resources/direct/2507.00390v2_MoE.pdf
+    sha256: 5ae8064df9425663c1d83883be3189ca7340ac5104a8e840694e477d01b825ae
+    added: 2026-07-17
+    ingestion_status: ingested
+    notes: Local file is arXiv version 2 and reports acceptance at ICLR 2026.
+
+  - id: src-modegpt-2025
+    title: "MoDeGPT: Modular Decomposition for Large Language Model Compression"
+    collection_id: primary-papers
+    origin: supervisor-provided
+    evidence_kind: scholarly-primary
+    priority: core
+    authors:
+      - Chi-Heng Lin
+      - Shangqian Gao
+      - James Seale Smith
+      - Abhishek Patel
+      - Shikhar Tuli
+      - Yilin Shen
+      - Hongxia Jin
+      - Yen-Chang Hsu
+    year: 2025
+    canonical_url: https://openreview.net/forum?id=8EfxjTCg2k
+    local_path: ../resources/direct/9191_MoDeGPT_Modular_Decomposi.pdf
+    sha256: 57b8dd8adec65093d54b13f51f66e4726b941b8f8a36e2dfe5b9e6a7751864bf
+    added: 2026-07-17
+    ingestion_status: ingested
+    notes: Local file is the ICLR 2025 Oral conference paper, submission 9191.

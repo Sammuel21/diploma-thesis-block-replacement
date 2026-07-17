@@ -1,6 +1,6 @@
 # Thesis LLM Wiki Schema
 
-- Schema version: 1
+- Schema version: 1.1
 - Effective date: 2026-07-17
 - Status: active
 
@@ -45,6 +45,7 @@ llm-wiki/
     |-- concepts/            stable concepts and definitions
     |-- entities/            models, datasets, software, and named artifacts
     |-- methods/             algorithms, metrics, and procedures
+    |-- implementations/     maintained software components and pipelines
     |-- research/            questions, hypotheses, and decisions
     |-- experiments/         experiments and evidence-bound findings
     `-- syntheses/           comparisons and cross-source synthesis
@@ -62,6 +63,7 @@ folders for every possible classification axis.
 | `concept` | Stable terminology, definitions, or theoretical object | `wiki/concepts/` |
 | `entity` | Model, dataset, software package, organization, or named artifact | `wiki/entities/` |
 | `method` | Algorithm, metric, loss, architecture, or workflow | `wiki/methods/` |
+| `implementation` | Maintained project software component or pipeline linked to methods and evidence | `wiki/implementations/` |
 | `research-question` | Explicit question the thesis may answer | `wiki/research/` |
 | `hypothesis` | Testable researcher proposition | `wiki/research/` |
 | `decision` | Project or methodology decision with rationale | `wiki/research/` |
@@ -74,6 +76,13 @@ Create a new page when the object has a stable identity that other pages should
 link to. Update an existing page when adding evidence, qualification, or an
 attribute of the same object. Do not create a second page merely because a new
 source discusses an existing concept.
+
+Implementation pages use architectural granularity. Create them for stable
+components, pipelines, or complete workflows that connect research methods to
+code and experiments. Do not create a page for every file, class, or function.
+An implementation page documents what exists and where; it does not by itself
+verify that the implementation is scientifically correct or empirically
+effective.
 
 ## 4. Canonical page frontmatter
 
@@ -267,6 +276,10 @@ A bare URL in a wiki page is not a substitute for source registration.
 Relationships are not evidence citations. They provide graph navigation.
 Whenever practical, important relationships should be reciprocal.
 
+For implementation pages, `related` should connect the implemented methods,
+governing decisions, and experiments that use the artifact. Explain the edge
+semantics in the page body because ordinary Obsidian wikilinks are untyped.
+
 ## 6. Source registry
 
 `raw/collections.yml` describes collections. It does not assert that individual
@@ -320,7 +333,7 @@ An individual source entry follows this structure:
 ```yaml
 - id: src-example-2026
   title: Full Source Title
-  collection_id: supervisor-core-papers
+  collection_id: primary-papers
   origin: supervisor-provided
   evidence_kind: scholarly-primary
   priority: core
@@ -402,8 +415,8 @@ Page-level metadata is insufficient for a mixed page. Apply these body rules:
 - Page filenames equal their stable `id` plus `.md`.
 - IDs and topic terms use lowercase kebab-case ASCII.
 - Use descriptive type prefixes, for example `concept-`, `entity-`, `method-`,
-  `rq-`, `hypothesis-`, `decision-`, `experiment-`, `finding-`, `comparison-`,
-  and `synthesis-`.
+  `implementation-`, `rq-`, `hypothesis-`, `decision-`, `experiment-`,
+  `finding-`, `comparison-`, and `synthesis-`.
 - Individual source IDs use the `src-` prefix.
 - Internal page links use `[[page-id]]` or `[[page-id|Readable label]]`.
 - Repository paths use ordinary Markdown links when the target is not a wiki
@@ -427,6 +440,12 @@ and claims that require independent verification.
 Experiment pages additionally contain objective, hypotheses, configuration,
 inputs, procedure, metrics, direct results, interpretation, limitations,
 artifact paths, and reproducibility status.
+
+Implementation pages additionally contain purpose, implemented methods and
+decisions, architecture and responsibilities, interfaces and data flow,
+repository locations and entry points, version and maturity, validation,
+limitations, and experiments that use the implementation. Repository links
+identify artifacts; they are not evidence citations.
 
 ## 10. Operations
 
