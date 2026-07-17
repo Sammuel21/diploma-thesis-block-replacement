@@ -1,17 +1,42 @@
-### Diploma Thesis
+# Compressing Large Language Models via Replacement of MLP Blocks
 
-Thesis: Diploma
-Degree: CS + DS (mAIN)
-Faculty: FMFI UK Bratislava
+Diploma thesis development repository, FMFI UK Bratislava.
 
-Thesis title:
-- Compressing Large Language Models via Replacement of MLP Blocks
+The thesis studies whether selected Transformer MLP blocks can be replaced by
+smaller drop-in operators trained from calibration activations, and how those
+replacements affect model quality and compression. The formal baseline scope is
+defined in [docs/annotation.md](docs/annotation.md).
 
+## Repository map
 
-Thesis annotation and goals:
+| Path | Responsibility |
+| --- | --- |
+| `llm-wiki/` | LLM-maintained, source-linked research knowledge base |
+| `docs/` | Distilled, human-oriented documentation and historical records |
+| `docs/prototype/mvp/` | Frozen documentation and manifest for the completed MVP |
+| `notebooks/mvp/` | Historical MVP execution and analysis notebooks |
+| `scripts/intro/` | Historical MVP helper implementation |
+| `configs/` | MVP configuration modules; future configuration structure is not yet finalized |
+| `data/mvp/results/logs/` | Versioned MVP experiment evidence |
+| `src/` | Reserved for the maintained implementation after code consolidation |
+| `pipelines/` | Reserved for maintained experiment orchestration |
 
-In modern Large Language Models (LLMs) based on the Transformer architecture, Multi-Layer Perceptron (MLP) blocks typically account for approximately 80% of the total parameters. While essential for the model's expressive power, these blocks are significant bottlenecks for memory storage and inference latency. Instead of standard compression techniques such as quantization or unstructured pruning, we plan to use an alternative approach that treats each MLP block as an isolated function and attempts to replace it with a significantly smaller, more efficient approximation trained on calibration data.
+The executable MVP paths remain unchanged to avoid breaking notebook imports.
+New maintained code should not be added to the legacy MVP modules until the
+codebase consolidation phase defines its target architecture.
 
-The goals of this thesis are:
-1) Design and implement a methodology to replace individual MLP blocks with smaller substitutes. This involves training smaller, "drop-in" network structures (e.g., shallower MLPs, linear layers, or hybrids) to mimic the original block's function, using local calibration data (input/output pairs) captured from the frozen, pre-trained model.
-2) Test and evaluate the improvements and trade-offs of this replacement strategy. This includes an analysis of variations in the compression strategy and an evaluation of their impact on model quality.
+## Navigation
+
+- [Human documentation index](docs/README.md)
+- [MVP archive](docs/prototype/mvp/README.md)
+- [LLM-wiki orientation](llm-wiki/README.md)
+- [LLM-wiki schema](llm-wiki/SCHEMA.md)
+- [Repository agent instructions](AGENTS.md)
+
+## Preservation
+
+The pre-restructuring implementation is preserved by the remote branch
+`origin/mvp-archive-freeze` at commit
+`e8e6615ecf1119ec666237e5dbb7de898bb18211`. The archive manifest records
+artifacts that are not part of that original commit, including the experiment
+logs that were previously ignored by Git.

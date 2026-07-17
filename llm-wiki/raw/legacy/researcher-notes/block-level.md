@@ -19,7 +19,7 @@ Several block importance estimation methods exist. Random selection is useful as
 
 TODO: further block importance estimation strategies
 
-## Block Scoring/Eval
+## MLP Operator Importance Analysis
 
 ## Replacement
 
@@ -44,3 +44,6 @@ Both practice and research show that the $\ell \in \{0, L-1\}$ (first, last) blo
 
 ## Mixture-of-Experts (MoE)
 
+### Mixture-of-Novices-and-Experts (MoNE)
+
+## Block Scoring/Eval

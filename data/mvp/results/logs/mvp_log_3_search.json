@@ -1,0 +1,1579 @@
+{
+    "metadata": {
+        "time": "2026-05-08"
+    },
+    "base_loss": 3.0152251720428467,
+    "base_ppl": 20.393682510735303,
+    "1": {
+        "name": "random_k_result_one_shot_no_recovery",
+        "cfg": {
+            "seq_len": 128,
+            "batch_size": 2,
+            "k_blocks": 5,
+            "selection_strategy": "random_k",
+            "bi_rank_order": "desc",
+            "replacement_strategy": "one_shot",
+            "replacement_operator": "linear",
+            "calib_split": "train[:5%]",
+            "eval_split": "validation[:1%]",
+            "num_calib_batches": 24,
+            "num_eval_batches": 24,
+            "replacement_epochs": 5,
+            "replacement_lr": 0.001,
+            "replacement_batch_size": 2048,
+            "seed": 21
+        },
+        "result": {
+            "strategy": "one_shot",
+            "model_loss": 3.8500702381134033,
+            "model_ppl": 46.99636405160404,
+            "logs": [
+                {
+                    "layer_idx": 5,
+                    "layer_path": "model.layers.5.mlp",
+                    "new_operator_mse": 0.5351581573486328
+                },
+                {
+                    "layer_idx": 9,
+                    "layer_path": "model.layers.9.mlp",
+                    "new_operator_mse": 1.5139983892440796
+                },
+                {
+                    "layer_idx": 13,
+                    "layer_path": "model.layers.13.mlp",
+                    "new_operator_mse": 1.9211139678955078
+                },
+                {
+                    "layer_idx": 20,
+                    "layer_path": "model.layers.20.mlp",
+                    "new_operator_mse": 37.54582214355469
+                },
+                {
+                    "layer_idx": 22,
+                    "layer_path": "model.layers.22.mlp",
+                    "new_operator_mse": 521.2157592773438
+                }
+            ]
+        }
+    },
+    "2": {
+        "name": "random_k_result_one_shot_recovery",
+        "cfg": {
+            "seq_len": 128,
+            "batch_size": 2,
+            "k_blocks": 5,
+            "selection_strategy": "random_k",
+            "bi_rank_order": "desc",
+            "replacement_strategy": "one_shot",
+            "replacement_operator": "linear",
+            "calib_split": "train[:5%]",
+            "eval_split": "validation[:1%]",
+            "num_calib_batches": 24,
+            "num_eval_batches": 24,
+            "replacement_epochs": 5,
+            "replacement_lr": 0.001,
+            "replacement_batch_size": 2048,
+            "seed": 21
+        },
+        "result": {
+            "strategy": "one_shot",
+            "model_loss": 3.848187208175659,
+            "model_ppl": 46.90795175875127,
+            "logs": [
+                {
+                    "layer_idx": 5,
+                    "layer_path": "model.layers.5.mlp",
+                    "new_operator_mse": 0.5349805355072021
+                },
+                {
+                    "layer_idx": 9,
+                    "layer_path": "model.layers.9.mlp",
+                    "new_operator_mse": 1.513868808746338
+                },
+                {
+                    "layer_idx": 13,
+                    "layer_path": "model.layers.13.mlp",
+                    "new_operator_mse": 1.9211816787719727
+                },
+                {
+                    "layer_idx": 20,
+                    "layer_path": "model.layers.20.mlp",
+                    "new_operator_mse": 37.547786712646484
+                },
+                {
+                    "layer_idx": 22,
+                    "layer_path": "model.layers.22.mlp",
+                    "new_operator_mse": 521.15673828125
+                }
+            ]
+        }
+    },
+    "3": {
+        "name": "top_k_asc_result_one_shot_no_recovery",
+        "cfg": {
+            "seq_len": 128,
+            "batch_size": 2,
+            "k_blocks": 5,
+            "selection_strategy": "top_k_bi",
+            "bi_rank_order": "asc",
+            "replacement_strategy": "one_shot",
+            "replacement_operator": "linear",
+            "calib_split": "train[:5%]",
+            "eval_split": "validation[:1%]",
+            "num_calib_batches": 24,
+            "num_eval_batches": 24,
+            "replacement_epochs": 5,
+            "replacement_lr": 0.001,
+            "replacement_batch_size": 2048,
+            "seed": 21
+        },
+        "result": {
+            "strategy": "one_shot",
+            "model_loss": 4.278041362762451,
+            "model_ppl": 72.09908566759617,
+            "logs": [
+                {
+                    "layer_idx": 2,
+                    "layer_path": "model.layers.2.mlp",
+                    "new_operator_mse": 0.23695485293865204
+                },
+                {
+                    "layer_idx": 3,
+                    "layer_path": "model.layers.3.mlp",
+                    "new_operator_mse": 0.3687094449996948
+                },
+                {
+                    "layer_idx": 18,
+                    "layer_path": "model.layers.18.mlp",
+                    "new_operator_mse": 19.13276481628418
+                },
+                {
+                    "layer_idx": 19,
+                    "layer_path": "model.layers.19.mlp",
+                    "new_operator_mse": 33.604774475097656
+                },
+                {
+                    "layer_idx": 20,
+                    "layer_path": "model.layers.20.mlp",
+                    "new_operator_mse": 37.549713134765625
+                }
+            ]
+        },
+        "target_layer_idxs": [
+            2,
+            3,
+            18,
+            19,
+            20
+        ]
+    },
+    "4": {
+        "name": "top_k_desc_result_one_shot_no_recovery",
+        "cfg": {
+            "seq_len": 128,
+            "batch_size": 2,
+            "k_blocks": 5,
+            "selection_strategy": "top_k_bi",
+            "bi_rank_order": "desc",
+            "replacement_strategy": "one_shot",
+            "replacement_operator": "linear",
+            "calib_split": "train[:5%]",
+            "eval_split": "validation[:1%]",
+            "num_calib_batches": 24,
+            "num_eval_batches": 24,
+            "replacement_epochs": 5,
+            "replacement_lr": 0.001,
+            "replacement_batch_size": 2048,
+            "seed": 21
+        },
+        "result": {
+            "strategy": "one_shot",
+            "model_loss": 4.674130916595459,
+            "model_ppl": 107.13941353252808,
+            "logs": [
+                {
+                    "layer_idx": 8,
+                    "layer_path": "model.layers.8.mlp",
+                    "new_operator_mse": 1.3481757640838623
+                },
+                {
+                    "layer_idx": 9,
+                    "layer_path": "model.layers.9.mlp",
+                    "new_operator_mse": 1.5135984420776367
+                },
+                {
+                    "layer_idx": 10,
+                    "layer_path": "model.layers.10.mlp",
+                    "new_operator_mse": 1.6466310024261475
+                },
+                {
+                    "layer_idx": 12,
+                    "layer_path": "model.layers.12.mlp",
+                    "new_operator_mse": 1.6771082878112793
+                },
+                {
+                    "layer_idx": 23,
+                    "layer_path": "model.layers.23.mlp",
+                    "new_operator_mse": 1793.4691162109375
+                }
+            ]
+        },
+        "target_layer_idxs": [
+            8,
+            9,
+            10,
+            12,
+            23
+        ]
+    },
+    "5": {
+        "name": "top_k_asc_result_one_shot_recovery",
+        "cfg": {
+            "seq_len": 128,
+            "batch_size": 2,
+            "k_blocks": 5,
+            "selection_strategy": "top_k_bi",
+            "bi_rank_order": "asc",
+            "replacement_strategy": "one_shot",
+            "replacement_operator": "linear",
+            "calib_split": "train[:5%]",
+            "eval_split": "validation[:1%]",
+            "num_calib_batches": 24,
+            "num_eval_batches": 24,
+            "replacement_epochs": 5,
+            "replacement_lr": 0.001,
+            "replacement_batch_size": 2048,
+            "seed": 21
+        },
+        "result": {
+            "strategy": "one_shot",
+            "model_loss": 4.306666374206543,
+            "model_ppl": 74.19274537793368,
+            "logs": [
+                {
+                    "layer_idx": 2,
+                    "layer_path": "model.layers.2.mlp",
+                    "new_operator_mse": 0.23678860068321228
+                },
+                {
+                    "layer_idx": 3,
+                    "layer_path": "model.layers.3.mlp",
+                    "new_operator_mse": 0.36864298582077026
+                },
+                {
+                    "layer_idx": 18,
+                    "layer_path": "model.layers.18.mlp",
+                    "new_operator_mse": 19.131549835205078
+                },
+                {
+                    "layer_idx": 19,
+                    "layer_path": "model.layers.19.mlp",
+                    "new_operator_mse": 33.602394104003906
+                },
+                {
+                    "layer_idx": 20,
+                    "layer_path": "model.layers.20.mlp",
+                    "new_operator_mse": 37.55243682861328
+                }
+            ]
+        },
+        "target_layer_idxs": [
+            2,
+            3,
+            18,
+            19,
+            20
+        ]
+    },
+    "6": {
+        "name": "top_k_desc_result_one_shot_recovery",
+        "cfg": {
+            "seq_len": 128,
+            "batch_size": 2,
+            "k_blocks": 5,
+            "selection_strategy": "top_k_bi",
+            "bi_rank_order": "desc",
+            "replacement_strategy": "one_shot",
+            "replacement_operator": "linear",
+            "calib_split": "train[:5%]",
+            "eval_split": "validation[:1%]",
+            "num_calib_batches": 24,
+            "num_eval_batches": 24,
+            "replacement_epochs": 5,
+            "replacement_lr": 0.001,
+            "replacement_batch_size": 2048,
+            "seed": 21
+        },
+        "result": {
+            "strategy": "one_shot",
+            "model_loss": 4.671571254730225,
+            "model_ppl": 106.86552354386583,
+            "logs": [
+                {
+                    "layer_idx": 8,
+                    "layer_path": "model.layers.8.mlp",
+                    "new_operator_mse": 1.347581386566162
+                },
+                {
+                    "layer_idx": 9,
+                    "layer_path": "model.layers.9.mlp",
+                    "new_operator_mse": 1.513993501663208
+                },
+                {
+                    "layer_idx": 10,
+                    "layer_path": "model.layers.10.mlp",
+                    "new_operator_mse": 1.6461929082870483
+                },
+                {
+                    "layer_idx": 12,
+                    "layer_path": "model.layers.12.mlp",
+                    "new_operator_mse": 1.6769697666168213
+                },
+                {
+                    "layer_idx": 23,
+                    "layer_path": "model.layers.23.mlp",
+                    "new_operator_mse": 1793.52880859375
+                }
+            ]
+        },
+        "target_layer_idxs": [
+            8,
+            9,
+            10,
+            12,
+            23
+        ]
+    },
+    "search": {
+        "1": {
+            "name": "bi_one_shot_search_result",
+            "cfg": {
+                "seq_len": 128,
+                "batch_size": 2,
+                "k_blocks": 6,
+                "selection_strategy": "top_k_bi",
+                "bi_rank_order": "desc",
+                "replacement_strategy": "one_shot",
+                "replacement_operator": "linear",
+                "calib_split": "train[:5%]",
+                "eval_split": "validation[:1%]",
+                "num_calib_batches": 24,
+                "num_eval_batches": 24,
+                "replacement_epochs": 5,
+                "replacement_lr": 0.001,
+                "replacement_batch_size": 2048,
+                "seed": 21
+            },
+            "result": {
+                "one_shot_bi_asc_recovery": [
+                    {
+                        "k": 1,
+                        "target_layer_idxs": [
+                            19
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 1,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "asc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 3.214535713195801,
+                            "model_ppl": 24.891732325039165,
+                            "logs": [
+                                {
+                                    "layer_idx": 19,
+                                    "layer_path": "model.layers.19.mlp",
+                                    "new_operator_mse": 33.60775375366211
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 2,
+                        "target_layer_idxs": [
+                            18,
+                            19
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 2,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "asc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 3.4706485271453857,
+                            "model_ppl": 32.157590754209444,
+                            "logs": [
+                                {
+                                    "layer_idx": 18,
+                                    "layer_path": "model.layers.18.mlp",
+                                    "new_operator_mse": 19.134775161743164
+                                },
+                                {
+                                    "layer_idx": 19,
+                                    "layer_path": "model.layers.19.mlp",
+                                    "new_operator_mse": 33.59682846069336
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 3,
+                        "target_layer_idxs": [
+                            18,
+                            19,
+                            20
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 3,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "asc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 3.8768365383148193,
+                            "model_ppl": 48.271268969449174,
+                            "logs": [
+                                {
+                                    "layer_idx": 18,
+                                    "layer_path": "model.layers.18.mlp",
+                                    "new_operator_mse": 19.135944366455078
+                                },
+                                {
+                                    "layer_idx": 19,
+                                    "layer_path": "model.layers.19.mlp",
+                                    "new_operator_mse": 33.59641647338867
+                                },
+                                {
+                                    "layer_idx": 20,
+                                    "layer_path": "model.layers.20.mlp",
+                                    "new_operator_mse": 37.54966354370117
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 4,
+                        "target_layer_idxs": [
+                            3,
+                            18,
+                            19,
+                            20
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 4,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "asc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 3.965226888656616,
+                            "model_ppl": 52.73223237782741,
+                            "logs": [
+                                {
+                                    "layer_idx": 3,
+                                    "layer_path": "model.layers.3.mlp",
+                                    "new_operator_mse": 0.3687736988067627
+                                },
+                                {
+                                    "layer_idx": 18,
+                                    "layer_path": "model.layers.18.mlp",
+                                    "new_operator_mse": 19.13560676574707
+                                },
+                                {
+                                    "layer_idx": 19,
+                                    "layer_path": "model.layers.19.mlp",
+                                    "new_operator_mse": 33.607421875
+                                },
+                                {
+                                    "layer_idx": 20,
+                                    "layer_path": "model.layers.20.mlp",
+                                    "new_operator_mse": 37.54935836791992
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 5,
+                        "target_layer_idxs": [
+                            2,
+                            3,
+                            18,
+                            19,
+                            20
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 5,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "asc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 4.29284143447876,
+                            "model_ppl": 73.17409277471573,
+                            "logs": [
+                                {
+                                    "layer_idx": 2,
+                                    "layer_path": "model.layers.2.mlp",
+                                    "new_operator_mse": 0.2367950975894928
+                                },
+                                {
+                                    "layer_idx": 3,
+                                    "layer_path": "model.layers.3.mlp",
+                                    "new_operator_mse": 0.36860722303390503
+                                },
+                                {
+                                    "layer_idx": 18,
+                                    "layer_path": "model.layers.18.mlp",
+                                    "new_operator_mse": 19.129039764404297
+                                },
+                                {
+                                    "layer_idx": 19,
+                                    "layer_path": "model.layers.19.mlp",
+                                    "new_operator_mse": 33.6019172668457
+                                },
+                                {
+                                    "layer_idx": 20,
+                                    "layer_path": "model.layers.20.mlp",
+                                    "new_operator_mse": 37.5483512878418
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 6,
+                        "target_layer_idxs": [
+                            1,
+                            2,
+                            3,
+                            18,
+                            19,
+                            20
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 6,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "asc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 14.155789375305176,
+                            "model_ppl": 1405339.3689296641,
+                            "logs": [
+                                {
+                                    "layer_idx": 1,
+                                    "layer_path": "model.layers.1.mlp",
+                                    "new_operator_mse": 54.01002502441406
+                                },
+                                {
+                                    "layer_idx": 2,
+                                    "layer_path": "model.layers.2.mlp",
+                                    "new_operator_mse": 0.23680905997753143
+                                },
+                                {
+                                    "layer_idx": 3,
+                                    "layer_path": "model.layers.3.mlp",
+                                    "new_operator_mse": 0.36864370107650757
+                                },
+                                {
+                                    "layer_idx": 18,
+                                    "layer_path": "model.layers.18.mlp",
+                                    "new_operator_mse": 19.133434295654297
+                                },
+                                {
+                                    "layer_idx": 19,
+                                    "layer_path": "model.layers.19.mlp",
+                                    "new_operator_mse": 33.60772705078125
+                                },
+                                {
+                                    "layer_idx": 20,
+                                    "layer_path": "model.layers.20.mlp",
+                                    "new_operator_mse": 37.54718780517578
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "one_shot_bi_asc_no_recovery": [
+                    {
+                        "k": 1,
+                        "target_layer_idxs": [
+                            19
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 1,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "asc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 3.2149546146392822,
+                            "model_ppl": 24.90216169192679,
+                            "logs": [
+                                {
+                                    "layer_idx": 19,
+                                    "layer_path": "model.layers.19.mlp",
+                                    "new_operator_mse": 33.598854064941406
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 2,
+                        "target_layer_idxs": [
+                            18,
+                            19
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 2,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "asc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 3.470553159713745,
+                            "model_ppl": 32.154524113602605,
+                            "logs": [
+                                {
+                                    "layer_idx": 18,
+                                    "layer_path": "model.layers.18.mlp",
+                                    "new_operator_mse": 19.132720947265625
+                                },
+                                {
+                                    "layer_idx": 19,
+                                    "layer_path": "model.layers.19.mlp",
+                                    "new_operator_mse": 33.60382080078125
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 3,
+                        "target_layer_idxs": [
+                            18,
+                            19,
+                            20
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 3,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "asc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 3.881032705307007,
+                            "model_ppl": 48.47424884586256,
+                            "logs": [
+                                {
+                                    "layer_idx": 18,
+                                    "layer_path": "model.layers.18.mlp",
+                                    "new_operator_mse": 19.132366180419922
+                                },
+                                {
+                                    "layer_idx": 19,
+                                    "layer_path": "model.layers.19.mlp",
+                                    "new_operator_mse": 33.59705352783203
+                                },
+                                {
+                                    "layer_idx": 20,
+                                    "layer_path": "model.layers.20.mlp",
+                                    "new_operator_mse": 37.54462814331055
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 4,
+                        "target_layer_idxs": [
+                            3,
+                            18,
+                            19,
+                            20
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 4,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "asc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 3.969597578048706,
+                            "model_ppl": 52.963212991060075,
+                            "logs": [
+                                {
+                                    "layer_idx": 3,
+                                    "layer_path": "model.layers.3.mlp",
+                                    "new_operator_mse": 0.36849474906921387
+                                },
+                                {
+                                    "layer_idx": 18,
+                                    "layer_path": "model.layers.18.mlp",
+                                    "new_operator_mse": 19.12616539001465
+                                },
+                                {
+                                    "layer_idx": 19,
+                                    "layer_path": "model.layers.19.mlp",
+                                    "new_operator_mse": 33.60010528564453
+                                },
+                                {
+                                    "layer_idx": 20,
+                                    "layer_path": "model.layers.20.mlp",
+                                    "new_operator_mse": 37.549034118652344
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 5,
+                        "target_layer_idxs": [
+                            2,
+                            3,
+                            18,
+                            19,
+                            20
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 5,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "asc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 4.331911563873291,
+                            "model_ppl": 76.08959776534414,
+                            "logs": [
+                                {
+                                    "layer_idx": 2,
+                                    "layer_path": "model.layers.2.mlp",
+                                    "new_operator_mse": 0.23679837584495544
+                                },
+                                {
+                                    "layer_idx": 3,
+                                    "layer_path": "model.layers.3.mlp",
+                                    "new_operator_mse": 0.3686436414718628
+                                },
+                                {
+                                    "layer_idx": 18,
+                                    "layer_path": "model.layers.18.mlp",
+                                    "new_operator_mse": 19.134784698486328
+                                },
+                                {
+                                    "layer_idx": 19,
+                                    "layer_path": "model.layers.19.mlp",
+                                    "new_operator_mse": 33.58879852294922
+                                },
+                                {
+                                    "layer_idx": 20,
+                                    "layer_path": "model.layers.20.mlp",
+                                    "new_operator_mse": 37.54469299316406
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 6,
+                        "target_layer_idxs": [
+                            1,
+                            2,
+                            3,
+                            18,
+                            19,
+                            20
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 6,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "asc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 13.865962028503418,
+                            "model_ppl": 1051745.8214588223,
+                            "logs": [
+                                {
+                                    "layer_idx": 1,
+                                    "layer_path": "model.layers.1.mlp",
+                                    "new_operator_mse": 54.014976501464844
+                                },
+                                {
+                                    "layer_idx": 2,
+                                    "layer_path": "model.layers.2.mlp",
+                                    "new_operator_mse": 0.2367931604385376
+                                },
+                                {
+                                    "layer_idx": 3,
+                                    "layer_path": "model.layers.3.mlp",
+                                    "new_operator_mse": 0.3685948848724365
+                                },
+                                {
+                                    "layer_idx": 18,
+                                    "layer_path": "model.layers.18.mlp",
+                                    "new_operator_mse": 19.132173538208008
+                                },
+                                {
+                                    "layer_idx": 19,
+                                    "layer_path": "model.layers.19.mlp",
+                                    "new_operator_mse": 33.60393142700195
+                                },
+                                {
+                                    "layer_idx": 20,
+                                    "layer_path": "model.layers.20.mlp",
+                                    "new_operator_mse": 37.549251556396484
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "one_shot_bi_desc_recovery": [
+                    {
+                        "k": 1,
+                        "target_layer_idxs": [
+                            23
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 1,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "desc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 4.169034481048584,
+                            "model_ppl": 64.65299826697891,
+                            "logs": [
+                                {
+                                    "layer_idx": 23,
+                                    "layer_path": "model.layers.23.mlp",
+                                    "new_operator_mse": 1793.208984375
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 2,
+                        "target_layer_idxs": [
+                            9,
+                            23
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 2,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "desc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 4.238969326019287,
+                            "model_ppl": 69.33635182473931,
+                            "logs": [
+                                {
+                                    "layer_idx": 9,
+                                    "layer_path": "model.layers.9.mlp",
+                                    "new_operator_mse": 1.5142822265625
+                                },
+                                {
+                                    "layer_idx": 23,
+                                    "layer_path": "model.layers.23.mlp",
+                                    "new_operator_mse": 1793.391357421875
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 3,
+                        "target_layer_idxs": [
+                            9,
+                            10,
+                            23
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 3,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "desc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 4.334874629974365,
+                            "model_ppl": 76.3153906275143,
+                            "logs": [
+                                {
+                                    "layer_idx": 9,
+                                    "layer_path": "model.layers.9.mlp",
+                                    "new_operator_mse": 1.5136487483978271
+                                },
+                                {
+                                    "layer_idx": 10,
+                                    "layer_path": "model.layers.10.mlp",
+                                    "new_operator_mse": 1.6465795040130615
+                                },
+                                {
+                                    "layer_idx": 23,
+                                    "layer_path": "model.layers.23.mlp",
+                                    "new_operator_mse": 1793.244140625
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 4,
+                        "target_layer_idxs": [
+                            8,
+                            9,
+                            10,
+                            23
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 4,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "desc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 4.545659065246582,
+                            "model_ppl": 94.22250552916834,
+                            "logs": [
+                                {
+                                    "layer_idx": 8,
+                                    "layer_path": "model.layers.8.mlp",
+                                    "new_operator_mse": 1.3476483821868896
+                                },
+                                {
+                                    "layer_idx": 9,
+                                    "layer_path": "model.layers.9.mlp",
+                                    "new_operator_mse": 1.5140342712402344
+                                },
+                                {
+                                    "layer_idx": 10,
+                                    "layer_path": "model.layers.10.mlp",
+                                    "new_operator_mse": 1.646635890007019
+                                },
+                                {
+                                    "layer_idx": 23,
+                                    "layer_path": "model.layers.23.mlp",
+                                    "new_operator_mse": 1793.2933349609375
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 5,
+                        "target_layer_idxs": [
+                            8,
+                            9,
+                            10,
+                            12,
+                            23
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 5,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "desc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 4.6728692054748535,
+                            "model_ppl": 107.00431978558184,
+                            "logs": [
+                                {
+                                    "layer_idx": 8,
+                                    "layer_path": "model.layers.8.mlp",
+                                    "new_operator_mse": 1.3483984470367432
+                                },
+                                {
+                                    "layer_idx": 9,
+                                    "layer_path": "model.layers.9.mlp",
+                                    "new_operator_mse": 1.5139074325561523
+                                },
+                                {
+                                    "layer_idx": 10,
+                                    "layer_path": "model.layers.10.mlp",
+                                    "new_operator_mse": 1.6464765071868896
+                                },
+                                {
+                                    "layer_idx": 12,
+                                    "layer_path": "model.layers.12.mlp",
+                                    "new_operator_mse": 1.6768217086791992
+                                },
+                                {
+                                    "layer_idx": 23,
+                                    "layer_path": "model.layers.23.mlp",
+                                    "new_operator_mse": 1793.430419921875
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 6,
+                        "target_layer_idxs": [
+                            8,
+                            9,
+                            10,
+                            11,
+                            12,
+                            23
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 6,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "desc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 5.570766448974609,
+                            "model_ppl": 262.6353186889138,
+                            "logs": [
+                                {
+                                    "layer_idx": 8,
+                                    "layer_path": "model.layers.8.mlp",
+                                    "new_operator_mse": 1.3480043411254883
+                                },
+                                {
+                                    "layer_idx": 9,
+                                    "layer_path": "model.layers.9.mlp",
+                                    "new_operator_mse": 1.5141761302947998
+                                },
+                                {
+                                    "layer_idx": 10,
+                                    "layer_path": "model.layers.10.mlp",
+                                    "new_operator_mse": 1.6464526653289795
+                                },
+                                {
+                                    "layer_idx": 11,
+                                    "layer_path": "model.layers.11.mlp",
+                                    "new_operator_mse": 1.572281837463379
+                                },
+                                {
+                                    "layer_idx": 12,
+                                    "layer_path": "model.layers.12.mlp",
+                                    "new_operator_mse": 1.6770110130310059
+                                },
+                                {
+                                    "layer_idx": 23,
+                                    "layer_path": "model.layers.23.mlp",
+                                    "new_operator_mse": 1792.965576171875
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "one_shot_bi_desc_no_recovery": [
+                    {
+                        "k": 1,
+                        "target_layer_idxs": [
+                            23
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 1,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "desc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 4.168620586395264,
+                            "model_ppl": 64.6262442737244,
+                            "logs": [
+                                {
+                                    "layer_idx": 23,
+                                    "layer_path": "model.layers.23.mlp",
+                                    "new_operator_mse": 1793.3544921875
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 2,
+                        "target_layer_idxs": [
+                            9,
+                            23
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 2,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "desc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 4.238215923309326,
+                            "model_ppl": 69.28413330263379,
+                            "logs": [
+                                {
+                                    "layer_idx": 9,
+                                    "layer_path": "model.layers.9.mlp",
+                                    "new_operator_mse": 1.5140742063522339
+                                },
+                                {
+                                    "layer_idx": 23,
+                                    "layer_path": "model.layers.23.mlp",
+                                    "new_operator_mse": 1793.7493896484375
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 3,
+                        "target_layer_idxs": [
+                            9,
+                            10,
+                            23
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 3,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "desc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 4.336604595184326,
+                            "model_ppl": 76.44752786173875,
+                            "logs": [
+                                {
+                                    "layer_idx": 9,
+                                    "layer_path": "model.layers.9.mlp",
+                                    "new_operator_mse": 1.5142838954925537
+                                },
+                                {
+                                    "layer_idx": 10,
+                                    "layer_path": "model.layers.10.mlp",
+                                    "new_operator_mse": 1.646527647972107
+                                },
+                                {
+                                    "layer_idx": 23,
+                                    "layer_path": "model.layers.23.mlp",
+                                    "new_operator_mse": 1793.3929443359375
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 4,
+                        "target_layer_idxs": [
+                            8,
+                            9,
+                            10,
+                            23
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 4,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "desc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 4.548798561096191,
+                            "model_ppl": 94.51878152950162,
+                            "logs": [
+                                {
+                                    "layer_idx": 8,
+                                    "layer_path": "model.layers.8.mlp",
+                                    "new_operator_mse": 1.3484001159667969
+                                },
+                                {
+                                    "layer_idx": 9,
+                                    "layer_path": "model.layers.9.mlp",
+                                    "new_operator_mse": 1.5141310691833496
+                                },
+                                {
+                                    "layer_idx": 10,
+                                    "layer_path": "model.layers.10.mlp",
+                                    "new_operator_mse": 1.6466219425201416
+                                },
+                                {
+                                    "layer_idx": 23,
+                                    "layer_path": "model.layers.23.mlp",
+                                    "new_operator_mse": 1793.316162109375
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 5,
+                        "target_layer_idxs": [
+                            8,
+                            9,
+                            10,
+                            12,
+                            23
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 5,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "desc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 4.671733379364014,
+                            "model_ppl": 106.88285048225887,
+                            "logs": [
+                                {
+                                    "layer_idx": 8,
+                                    "layer_path": "model.layers.8.mlp",
+                                    "new_operator_mse": 1.3480051755905151
+                                },
+                                {
+                                    "layer_idx": 9,
+                                    "layer_path": "model.layers.9.mlp",
+                                    "new_operator_mse": 1.514013648033142
+                                },
+                                {
+                                    "layer_idx": 10,
+                                    "layer_path": "model.layers.10.mlp",
+                                    "new_operator_mse": 1.6465939283370972
+                                },
+                                {
+                                    "layer_idx": 12,
+                                    "layer_path": "model.layers.12.mlp",
+                                    "new_operator_mse": 1.6767082214355469
+                                },
+                                {
+                                    "layer_idx": 23,
+                                    "layer_path": "model.layers.23.mlp",
+                                    "new_operator_mse": 1793.181396484375
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "k": 6,
+                        "target_layer_idxs": [
+                            8,
+                            9,
+                            10,
+                            11,
+                            12,
+                            23
+                        ],
+                        "cfg": {
+                            "seq_len": 128,
+                            "batch_size": 2,
+                            "k_blocks": 6,
+                            "selection_strategy": "top_k_bi",
+                            "bi_rank_order": "desc",
+                            "replacement_strategy": "one_shot",
+                            "replacement_operator": "linear",
+                            "calib_split": "train[:5%]",
+                            "eval_split": "validation[:1%]",
+                            "num_calib_batches": 24,
+                            "num_eval_batches": 24,
+                            "replacement_epochs": 5,
+                            "replacement_lr": 0.001,
+                            "replacement_batch_size": 2048,
+                            "seed": 21
+                        },
+                        "result": {
+                            "strategy": "one_shot",
+                            "model_loss": 5.5437493324279785,
+                            "model_ppl": 255.6346642470823,
+                            "logs": [
+                                {
+                                    "layer_idx": 8,
+                                    "layer_path": "model.layers.8.mlp",
+                                    "new_operator_mse": 1.3480123281478882
+                                },
+                                {
+                                    "layer_idx": 9,
+                                    "layer_path": "model.layers.9.mlp",
+                                    "new_operator_mse": 1.5140588283538818
+                                },
+                                {
+                                    "layer_idx": 10,
+                                    "layer_path": "model.layers.10.mlp",
+                                    "new_operator_mse": 1.6461477279663086
+                                },
+                                {
+                                    "layer_idx": 11,
+                                    "layer_path": "model.layers.11.mlp",
+                                    "new_operator_mse": 1.5716617107391357
+                                },
+                                {
+                                    "layer_idx": 12,
+                                    "layer_path": "model.layers.12.mlp",
+                                    "new_operator_mse": 1.6770007610321045
+                                },
+                                {
+                                    "layer_idx": 23,
+                                    "layer_path": "model.layers.23.mlp",
+                                    "new_operator_mse": 1793.3231201171875
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}

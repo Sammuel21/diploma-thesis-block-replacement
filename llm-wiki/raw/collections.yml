@@ -1,0 +1,194 @@
+schema_version: 1
+updated: 2026-07-17
+path_base: repository-root
+
+collections:
+  - id: supervisor-core-papers
+    title: Supervisor-provided core papers
+    locations:
+      - ../resources/direct
+    recursive: false
+    storage: external-local
+    origin: supervisor-provided
+    evidence_kinds:
+      - scholarly-primary
+    priority: core
+    mutability: immutable
+    ingestion_policy: one-at-a-time-reviewed
+    notes: Core methodological literature selected directly by the supervisor.
+
+  - id: supporting-papers
+    title: Researcher-collected supporting papers
+    locations:
+      - ../resources
+    include: "*.pdf"
+    recursive: false
+    storage: external-local
+    origin: researcher-found
+    evidence_kinds:
+      - scholarly-primary
+      - scholarly-secondary
+    priority: supporting
+    mutability: immutable
+    ingestion_policy: one-at-a-time-reviewed
+    notes: Supporting literature collected independently by the researcher.
+
+  - id: topic-paper-collections
+    title: Topic-specific supporting collections
+    locations:
+      - ../resources/GoogleGemma4
+    recursive: false
+    storage: external-local
+    origin: researcher-found
+    evidence_kinds:
+      - scholarly-primary
+      - researcher-note
+    priority: exploratory
+    mutability: mixed
+    ingestion_policy: one-at-a-time-reviewed
+    notes: Topic folders may contain both papers and informal notes.
+
+  - id: background-source-lists
+    title: Background reading source lists
+    locations:
+      - ../resources/books
+    recursive: true
+    storage: external-local
+    origin: researcher-authored
+    evidence_kinds:
+      - source-list
+    priority: background
+    mutability: mutable
+    ingestion_policy: selective
+    notes: Reading leads; listed links must be registered and checked individually.
+
+  - id: background-library
+    title: Books and broad background material
+    locations:
+      - ../library
+    recursive: true
+    storage: external-local
+    origin: researcher-found
+    evidence_kinds:
+      - book
+      - scholarly-primary
+      - scholarly-secondary
+    priority: background
+    mutability: immutable
+    ingestion_policy: selective
+    notes: Broad educational material; relevance must be established per item.
+
+  - id: researcher-idea-inbox
+    title: Researcher-authored idea inbox
+    locations:
+      - ../ideas
+    recursive: true
+    storage: external-local
+    origin: researcher-authored
+    evidence_kinds:
+      - researcher-note
+    priority: exploratory
+    mutability: mutable
+    ingestion_policy: one-at-a-time-reviewed
+    notes: Original ideas and shower notes; never treat them as prior work.
+
+  - id: legacy-prompt-records
+    title: Legacy prompts and conversation exports
+    locations:
+      - ../prompts
+    recursive: true
+    storage: external-local
+    origin: mixed
+    evidence_kinds:
+      - researcher-note
+      - llm-summary
+    priority: exploratory
+    mutability: mixed
+    ingestion_policy: selective-with-source-verification
+    notes: Historical reasoning context; not scientific evidence by itself.
+
+  - id: legacy-researcher-notes
+    title: Preserved pre-wiki researcher notes
+    locations:
+      - llm-wiki/raw/legacy/researcher-notes
+    recursive: true
+    storage: repository-tracked
+    origin: researcher-authored
+    evidence_kinds:
+      - researcher-note
+    priority: supporting
+    mutability: immutable-snapshot
+    ingestion_policy: one-at-a-time-reviewed
+    notes: Historical notes moved out of human documentation without rewriting.
+
+  - id: legacy-source-lists
+    title: Preserved pre-wiki source lists
+    locations:
+      - llm-wiki/raw/legacy/source-lists
+    recursive: true
+    storage: repository-tracked
+    origin: researcher-authored
+    evidence_kinds:
+      - source-list
+    priority: supporting
+    mutability: immutable-snapshot
+    ingestion_policy: selective
+    notes: Leads for source registration; links are not evidence by themselves.
+
+  - id: legacy-obsidian-vault
+    title: Legacy Obsidian vault
+    locations:
+      - docs/vault
+    recursive: true
+    storage: repository-local-ignored
+    origin: mixed
+    evidence_kinds:
+      - researcher-note
+      - llm-summary
+    priority: supporting
+    mutability: mutable
+    ingestion_policy: one-at-a-time-reviewed
+    notes: Migration input with mixed authorship and known encoding issues.
+
+  - id: legacy-llm-context
+    title: Legacy LLM-generated context summaries
+    locations:
+      - docs/design/llm/context
+    recursive: true
+    storage: repository-local-ignored
+    origin: llm-generated
+    evidence_kinds:
+      - llm-summary
+    priority: exploratory
+    mutability: immutable-snapshot
+    ingestion_policy: selective-with-source-verification
+    notes: Useful navigation input, but never authoritative evidence.
+
+  - id: project-meetings
+    title: Supervisor meeting records
+    locations:
+      - docs/meetings
+    recursive: true
+    storage: repository-local-ignored
+    origin: collaborative
+    evidence_kinds:
+      - meeting-record
+      - project-decision
+    priority: core
+    mutability: append-only
+    ingestion_policy: one-at-a-time-reviewed
+    notes: Records direction decisions; distinguish proposals from decisions.
+
+  - id: mvp-experiment-evidence
+    title: Versioned MVP experiment logs
+    locations:
+      - data/mvp/results/logs
+    recursive: true
+    storage: repository-tracked
+    origin: project-generated
+    evidence_kinds:
+      - experiment-log
+    priority: core
+    mutability: immutable
+    ingestion_policy: experiment-by-experiment
+    notes: Empirical evidence registered by the MVP archive manifest.

@@ -1,0 +1,78 @@
+schema_version: 1
+
+archive:
+  id: mvp-block-replacement-v1
+  title: Block Replacement MVP
+  status: frozen
+  archived_on: 2026-07-17
+  checkpoint:
+    branch: mvp-archive-freeze
+    remote_branch: origin/mvp-archive-freeze
+    annotated_tag: mvp-v1
+    tag_published: false
+    commit: e8e6615ecf1119ec666237e5dbb7de898bb18211
+
+scope:
+  model: HuggingFaceTB/SmolLM2-1.7B
+  calibration_dataset: C4
+  evaluation_dataset: Wikitext2
+  replacement_operator: linear
+  validated_integration: one-shot
+  unvalidated_integration_drafts:
+    - iterative
+  selection_methods:
+    - manual
+    - random-k
+    - bi-ascending-prefix
+    - bi-descending-prefix
+  recovery: teacher-logit knowledge distillation
+
+implementation:
+  configs:
+    - configs/intro_config.py
+  notebooks:
+    - notebooks/mvp/introduction.ipynb
+    - notebooks/mvp/methods.ipynb
+    - notebooks/mvp/multi-block-replacement.ipynb
+    - notebooks/mvp/analysis.ipynb
+  modules:
+    - scripts/intro/activation.py
+    - scripts/intro/block.py
+    - scripts/intro/eval.py
+    - scripts/intro/loader.py
+    - scripts/intro/metrics.py
+    - scripts/intro/model.py
+    - scripts/intro/replacement.py
+    - scripts/utils.py
+
+evidence:
+  logs:
+    - path: data/mvp/results/logs/mvp_log_1.json
+      recorded_on: 2026-05-06
+      sha256: 502fda1805673185d5aeb64759022089338b825e5cba0b110debd2e05c146de1
+    - path: data/mvp/results/logs/mvp_log_2.json
+      recorded_on: 2026-05-08
+      sha256: f40307eb5dee7ecdb8782b8e5fd5f9f6c1d8c088a5bd2a02e68cf0b13585b70b
+    - path: data/mvp/results/logs/mvp_log_3_search.json
+      recorded_on: 2026-05-08
+      sha256: 07bf2fc8d0bf8fcfa12b68502004cca51b61e702519d2daff84ddf07f29c3954
+    - path: data/mvp/results/logs/mvp_log_4_search_high_recovery_budget.json
+      recorded_on: 2026-05-11
+      sha256: a34f6864ce820c53fffced77a7ba74c29057dcd13a2efaddc2a1ebbc7f3595c3
+
+known_environment:
+  accelerator: NVIDIA RTX 3060 Laptop GPU, 6 GB VRAM
+  torch: 2.11.0+cu128
+  cuda_runtime_reported_by_torch: "12.8"
+  device: cuda
+  sequence_length: 128
+  batch_size: 2
+  calibration_batches: 24
+  evaluation_batches: 24
+  high_recovery_batches: 512
+
+limitations:
+  - No dependency lockfile is preserved.
+  - External model and dataset revisions are not fully pinned.
+  - Notebooks are stateful and are not a clean-run test suite.
+  - Some historical notes contain preliminary or superseded interpretations.

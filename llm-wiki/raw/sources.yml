@@ -1,0 +1,6 @@
+schema_version: 1
+updated: 2026-07-17
+
+# Individual sources are added here only when deliberately registered for
+# ingestion. Collection membership alone does not mean a source was reviewed.
+sources: []

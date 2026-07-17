@@ -1,13 +1,28 @@
-/data
+# Runtime and local environment
 .env
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
 
+# Data is local by default. The small MVP evidence logs are an explicit
+# reproducibility exception and are versioned with the prototype archive.
+/data/*
+!/data/README.md
+!/data/mvp/
+/data/mvp/*
+!/data/mvp/README.md
+!/data/mvp/results/
+/data/mvp/results/*
+!/data/mvp/results/logs/
+/data/mvp/results/logs/*
+!/data/mvp/results/logs/*.json
+
+# Legacy local documentation collections awaiting curated wiki ingestion
 /docs/llm/
 /docs/design/llm/
-/docs/design/llm/context/
 /docs/vault/
 /docs/results/
 /docs/meetings/
 
-/AGENTS.md
 .codex_plot_previews
 
