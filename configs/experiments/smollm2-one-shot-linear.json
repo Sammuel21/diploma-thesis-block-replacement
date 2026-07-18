@@ -1,0 +1,51 @@
+{
+  "model": {
+    "model_id": "HuggingFaceTB/SmolLM2-1.7B",
+    "device": "auto",
+    "dtype": "auto"
+  },
+  "data": {
+    "sequence_length": 128,
+    "batch_size": 2,
+    "num_calibration_batches": 24,
+    "num_operator_validation_batches": 24,
+    "num_recovery_batches": 512,
+    "num_recovery_validation_batches": 24,
+    "num_evaluation_batches": 24,
+    "seed": 21
+  },
+  "selection": {
+    "strategy": "manual",
+    "manual_indices": [3],
+    "k": 1,
+    "protected_prefix": 1,
+    "protected_suffix": 1,
+    "application_order": "layer",
+    "seed": 21
+  },
+  "operator": {
+    "kind": "linear",
+    "epochs": 5,
+    "learning_rate": 0.001,
+    "batch_size": 2048,
+    "weight_decay": 0.0,
+    "scheduler": "constant",
+    "early_stopping_patience": 2,
+    "seed": 21
+  },
+  "recovery": {
+    "enabled": true,
+    "epochs": 1,
+    "learning_rate": 0.00001,
+    "weight_decay": 0.0,
+    "temperature": 1.0,
+    "cache_dtype": "float16",
+    "early_stopping_patience": 1
+  },
+  "workflow": {
+    "strategy": "one_shot",
+    "iterative_teacher": "dense",
+    "iterative_recovery_scope": "current"
+  }
+}
+

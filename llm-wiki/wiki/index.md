@@ -28,6 +28,9 @@ All currently registered supervisor-provided papers have been ingested.
 - [[concept-moe-parameter-accounting|MoE parameter accounting]]: Separates
   total stored parameters, measured memory, and routing-dependent active
   parameters.
+- [[concept-model-compression-evaluation-axes|Model compression evaluation axes]]:
+  Distinguishes structural footprint, storage, memory, computation,
+  compatibility, cost, and quality.
 
 ## Entities
 
@@ -57,6 +60,9 @@ No model, dataset, software, or other entity pages have been created yet.
 - [[method-modegpt-global-sparsity-allocation|MoDeGPT global sparsity allocation]]:
   Maps BI scores to a smoothed per-layer sparsity distribution under a global
   compression target.
+- [[method-quality-preservation-evaluation|Quality preservation evaluation]]:
+  Defines routine, confirmation, and optional profiles for intrinsic and
+  downstream model evaluation.
 
 ## Implementations
 
@@ -65,7 +71,9 @@ available for stable components and pipelines during codebase consolidation.
 
 ## Research
 
-No research-question, hypothesis, or decision pages have been created yet.
+- [[decision-primary-compression-evaluation-scope|Primary compression evaluation scope]]:
+  Makes footprint-quality trade-offs primary and limits systems metrics to
+  optional controlled observations.
 
 ## Experiments and Findings
 
@@ -79,7 +87,7 @@ No synthesis pages have been created yet.
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-07-17 (all registered source-paper ingestions)
+- Last structural lint: 2026-07-18 (evaluation framework update)
 - Orphan pages: none detected
 - Registered source collections: 3
 - Registered individual sources: 4

@@ -42,6 +42,7 @@ sources:
 related:
   - "[[source-summary-mone-2026]]"
   - "[[method-mone-novice-expert-replacement]]"
+  - "[[concept-model-compression-evaluation-axes]]"
 supersedes: []
 superseded_by: []
 ---
@@ -106,6 +107,8 @@ nominal or measured from routing traces.
 - [[source-summary-mone-2026]] provides the source evidence and model examples.
 - [[method-mone-novice-expert-replacement]] changes both stored and
   routing-dependent active parameters.
+- [[concept-model-compression-evaluation-axes]] places MoE-specific accounting
+  inside the broader model-compression evaluation taxonomy.
 
 ## Sources
 

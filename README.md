@@ -16,14 +16,14 @@ defined in [docs/annotation.md](docs/annotation.md).
 | `docs/prototype/mvp/` | Frozen documentation and manifest for the completed MVP |
 | `notebooks/mvp/` | Historical MVP execution and analysis notebooks |
 | `scripts/intro/` | Historical MVP helper implementation |
-| `configs/` | MVP configuration modules; future configuration structure is not yet finalized |
+| `configs/` | Historical MVP configuration and maintained experiment configuration files |
 | `data/mvp/results/logs/` | Versioned MVP experiment evidence |
-| `src/` | Reserved for the maintained implementation after code consolidation |
-| `pipelines/` | Reserved for maintained experiment orchestration |
+| `src/mlp_replacement/` | Maintained replacement, recovery, and evaluation implementation |
+| `pipelines/` | Thin maintained experiment process entry points |
 
 The executable MVP paths remain unchanged to avoid breaking notebook imports.
-New maintained code should not be added to the legacy MVP modules until the
-codebase consolidation phase defines its target architecture.
+New work belongs to the maintained package; historical modules are evidence of
+the prototype rather than dependencies of the production architecture.
 
 ## Navigation
 

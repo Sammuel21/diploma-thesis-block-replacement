@@ -15,6 +15,12 @@ LLM-maintained research knowledge base.
 - [Metadata reference](knowledge-base/metadata.md) explains the YAML
   frontmatter, provenance model, and allowed values.
 
+## Methodology
+
+- [Model compression evaluation framework](methodology/evaluation-framework.md)
+  defines the current footprint, memory, quality, benchmark, and reporting
+  contract.
+
 ## Historical prototype
 
 - [MVP archive](prototype/mvp/README.md) records the completed prototype,

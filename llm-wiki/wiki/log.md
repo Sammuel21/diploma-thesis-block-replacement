@@ -85,3 +85,46 @@ This file is append-only. Entries use the format:
 - Recorded the separation between calibration and optional LoRA recovery,
   module-normalized sensitivity, calibration dependence, and temporary
   compression memory cost.
+
+## [2026-07-18] distill | Model compression evaluation framework
+
+- Created a taxonomy separating parameters, storage, runtime memory, compute,
+  systems behavior, compatibility, cost, and quality.
+- Recorded the supervisor-reviewed direction to prioritize footprint-quality
+  trade-offs and keep inference systems metrics outside the primary scope.
+- Proposed a three-task routine suite and a five-task confirmation suite aligned
+  with MoDeGPT, with WikiText-2 loss and perplexity evaluated separately.
+- Distilled the resulting measurement and reporting contract to
+  `docs/methodology/evaluation-framework.md`.
+- Left the benchmark protocol at `review` pending researcher approval and
+  registration of canonical benchmark and evaluation-harness sources.
+
+## [2026-07-18] lint | Evaluation framework update
+
+- Checked required frontmatter fields and filename-to-ID agreement for all 18
+  maintained wiki pages.
+- Checked internal wikilinks and references to the four registered source IDs.
+- Checked changed files for whitespace errors.
+- No broken wiki links, unregistered source references, or structural errors
+  were found.
+
+## [2026-07-18] update | Benchmark option catalogue
+
+- Preserved PIQA, ARC-Easy, and WinoGrande as the routine downstream suite and
+  ARC-Challenge and HellaSwag as confirmation additions.
+- Defined MMLU, BoolQ, OpenBookQA, and GSM8K as optional or conditional choices
+  with explicit inclusion rules and trade-offs.
+- Added named smoke, routine, confirmation, extended-knowledge, and
+  conditional-math profiles to the wiki and human methodology document.
+- Kept optional tasks outside the canonical five-task macro average to prevent
+  changing the primary comparison after results are observed.
+
+## [2026-07-18] lint | Benchmark option catalogue
+
+- Rechecked required metadata and filename-to-ID agreement for all 18
+  maintained wiki pages after the benchmark update.
+- Rechecked internal wikilinks and references to the four registered source
+  IDs.
+- Rechecked changed files for whitespace errors.
+- No broken wiki links, unregistered source references, or structural errors
+  were found.

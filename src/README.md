@@ -1,8 +1,10 @@
 # Maintained Source Package
 
-This directory is reserved for the maintained implementation that will emerge
-from the codebase consolidation phase.
+`mlp_replacement/` is the maintained implementation of the thesis workflow.
+The historical MVP remains under `scripts/intro/` and `notebooks/mvp/` and is
+not imported by this package.
 
-No MVP code has been migrated here yet. Its package boundaries, public APIs,
-configuration model, and tests must be reviewed before implementation files
-are moved from `scripts/intro/` or extracted from notebooks.
+The package follows a functional-core design. Configuration and result objects
+are immutable dataclasses, model mutation is isolated in `surgery.py`, and
+experiment orchestration is isolated in `workflows.py`. Stateful experiment
+logging and artifact persistence are intentionally deferred.
