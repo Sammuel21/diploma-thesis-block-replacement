@@ -1,18 +1,16 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from ..capture import ActivationPairs
-from ..config import OperatorConfig
 from .modules import make_replacement_operator
 
 
 @dataclass(frozen=True)
 class OperatorTrainingEpoch:
+    """Record local fitting and validation MSE for one epoch."""
+
     epoch: int
     train_mse: float
     validation_mse: float
@@ -21,18 +19,17 @@ class OperatorTrainingEpoch:
 
 @dataclass(frozen=True)
 class OperatorFitResult:
+    """Return the fitted operator together with its validation history."""
+
     module: nn.Module
     history: tuple[OperatorTrainingEpoch, ...]
     best_epoch: int
     best_validation_mse: float
 
 
-def evaluate_operator_mse(
-    module: nn.Module,
-    pairs: ActivationPairs,
-    device: torch.device | str,
-    batch_size: int,
-) -> float:
+def evaluate_operator_mse(module, pairs, device, batch_size):
+    """Measure mean squared approximation error on held-out activation pairs."""
+
     dataset = TensorDataset(pairs.inputs, pairs.targets)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     parameter = next(module.parameters())
@@ -51,12 +48,9 @@ def evaluate_operator_mse(
     return squared_error / element_count
 
 
-def fit_replacement_operator(
-    training_pairs: ActivationPairs,
-    validation_pairs: ActivationPairs,
-    config: OperatorConfig,
-    device: torch.device | str,
-) -> OperatorFitResult:
+def fit_replacement_operator(training_pairs, validation_pairs, config, device):
+    """Fit one replacement operator and retain its best validation state."""
+
     if training_pairs.hidden_size != validation_pairs.hidden_size:
         raise ValueError("Training and validation hidden sizes differ")
 
@@ -79,10 +73,10 @@ def fit_replacement_operator(
     if config.scheduler == "cosine":
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.epochs)
 
-    history: list[OperatorTrainingEpoch] = []
+    history = []
     best_validation = float("inf")
     best_epoch = 0
-    best_state: dict[str, torch.Tensor] | None = None
+    best_state = None
     stale_epochs = 0
     parameter_dtype = next(module.parameters()).dtype
 
@@ -138,4 +132,3 @@ def fit_replacement_operator(
     module.to(device)
     module.eval()
     return OperatorFitResult(module, tuple(history), best_epoch, best_validation)
-

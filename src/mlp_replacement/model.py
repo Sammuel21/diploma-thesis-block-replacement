@@ -1,22 +1,31 @@
-from __future__ import annotations
-
 import re
 from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
 
-from .config import ModelConfig
-
 
 @dataclass(frozen=True)
 class BlockRef:
+    """Connect a Transformer layer index with its discovered MLP module path."""
+
     index: int
     path: str
     module: nn.Module
 
 
-def resolve_device(requested: str) -> torch.device:
+@dataclass(frozen=True)
+class LayerRef:
+    """Connect a Transformer layer index with its complete layer module."""
+
+    index: int
+    path: str
+    module: nn.Module
+
+
+def resolve_device(requested):
+    """Resolve an explicit or automatic Torch execution device."""
+
     if requested == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = torch.device(requested)
@@ -25,7 +34,9 @@ def resolve_device(requested: str) -> torch.device:
     return device
 
 
-def resolve_dtype(requested: str, device: torch.device) -> torch.dtype:
+def resolve_dtype(requested, device):
+    """Resolve the requested numerical precision for the selected device."""
+
     if requested == "auto":
         if device.type != "cuda":
             return torch.float32
@@ -44,7 +55,9 @@ def resolve_dtype(requested: str, device: torch.device) -> torch.dtype:
         raise ValueError(f"Unsupported dtype: {requested}") from exc
 
 
-def load_model_and_tokenizer(config: ModelConfig):
+def load_model_and_tokenizer(config):
+    """Load a causal language model and tokenizer using the experiment settings."""
+
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     device = resolve_device(config.device)
@@ -73,27 +86,31 @@ def load_model_and_tokenizer(config: ModelConfig):
     return model, tokenizer
 
 
-_LAYER_PATTERNS = (
+LAYER_PATTERNS = (
     re.compile(r"(?:^|\.)layers\.(\d+)\.mlp$"),
     re.compile(r"(?:^|\.)h\.(\d+)\.mlp$"),
     re.compile(r"(?:^|\.)blocks\.(\d+)\.mlp$"),
 )
 
 
-def _extract_layer_index(path: str) -> int | None:
-    for pattern in _LAYER_PATTERNS:
+def extract_layer_index(path):
+    """Extract the numerical layer index from a known Transformer MLP path."""
+
+    for pattern in LAYER_PATTERNS:
         match = pattern.search(path)
         if match:
             return int(match.group(1))
     return None
 
 
-def discover_mlp_blocks(model: nn.Module) -> tuple[BlockRef, ...]:
+def discover_mlp_blocks(model):
+    """Discover indexed MLP sublayers without assuming one model-specific root path."""
+
     candidates = [(name, module) for name, module in model.named_modules() if name.endswith(".mlp")]
     if not candidates:
         raise ValueError("No modules ending in '.mlp' were found in the model")
 
-    parsed = [(_extract_layer_index(path), path, module) for path, module in candidates]
+    parsed = [(extract_layer_index(path), path, module) for path, module in candidates]
     if all(index is not None for index, _, _ in parsed):
         parsed.sort(key=lambda item: int(item[0]))
     else:
@@ -106,10 +123,21 @@ def discover_mlp_blocks(model: nn.Module) -> tuple[BlockRef, ...]:
     return refs
 
 
-def get_mlp_block(model: nn.Module, layer_index: int) -> BlockRef:
+def discover_transformer_layers(model):
+    """Discover the complete Transformer layers that contain the model's MLPs."""
+
+    refs = []
+    for mlp_ref in discover_mlp_blocks(model):
+        layer_path = mlp_ref.path.rsplit(".", 1)[0]
+        refs.append(LayerRef(mlp_ref.index, layer_path, model.get_submodule(layer_path)))
+    return tuple(refs)
+
+
+def get_mlp_block(model, layer_index):
+    """Return the discovered MLP reference for one layer index."""
+
     refs = {ref.index: ref for ref in discover_mlp_blocks(model)}
     try:
         return refs[layer_index]
     except KeyError as exc:
         raise ValueError(f"No MLP block found for layer index {layer_index}") from exc
-

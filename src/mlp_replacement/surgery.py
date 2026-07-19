@@ -1,36 +1,40 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import Mapping
 
-import torch
-import torch.nn as nn
-
-from .model import BlockRef, discover_mlp_blocks
+from .model import discover_mlp_blocks
 
 
 @dataclass(frozen=True)
 class ReplacementRecord:
+    """Describe one applied replacement and its parameter reduction."""
+
     layer_index: int
     path: str
     original_parameters: int
     replacement_parameters: int
 
     @property
-    def removed_parameters(self) -> int:
+    def removed_parameters(self):
+        """Return the parameter count removed by this replacement."""
+
         return self.original_parameters - self.replacement_parameters
 
 
 @dataclass(frozen=True)
 class ReplacementManifest:
+    """Group the structural changes made during one replacement step."""
+
     records: tuple[ReplacementRecord, ...]
 
     @property
-    def removed_parameters(self) -> int:
+    def removed_parameters(self):
+        """Return the total parameter reduction across all recorded replacements."""
+
         return sum(record.removed_parameters for record in self.records)
 
 
-def count_parameters(module: nn.Module, trainable_only: bool = False) -> int:
+def count_parameters(module, trainable_only=False):
+    """Count all or only trainable parameters in a module."""
+
     return sum(
         parameter.numel()
         for parameter in module.parameters()
@@ -38,7 +42,9 @@ def count_parameters(module: nn.Module, trainable_only: bool = False) -> int:
     )
 
 
-def replace_submodule(model: nn.Module, path: str, replacement: nn.Module) -> None:
+def replace_submodule(model, path, replacement):
+    """Replace one registered child module at a dotted model path."""
+
     try:
         parent_path, child_name = path.rsplit(".", 1)
     except ValueError as exc:
@@ -49,27 +55,21 @@ def replace_submodule(model: nn.Module, path: str, replacement: nn.Module) -> No
     setattr(parent, child_name, replacement)
 
 
-def _module_device_dtype(module: nn.Module, model: nn.Module) -> tuple[torch.device, torch.dtype]:
-    parameter = next(module.parameters(), None)
-    if parameter is None:
-        parameter = next(model.parameters())
-    return parameter.device, parameter.dtype
+def apply_replacements(model, replacements):
+    """Cast and insert indexed MLP replacements while recording parameter changes."""
 
-
-def apply_replacements(
-    model: nn.Module,
-    replacements: Mapping[int, nn.Module],
-) -> ReplacementManifest:
-    refs: dict[int, BlockRef] = {ref.index: ref for ref in discover_mlp_blocks(model)}
+    refs = {ref.index: ref for ref in discover_mlp_blocks(model)}
     unknown = set(replacements) - set(refs)
     if unknown:
         raise ValueError(f"Cannot replace unknown MLP layers: {sorted(unknown)}")
 
-    records: list[ReplacementRecord] = []
+    records = []
     for layer_index, replacement in replacements.items():
         ref = refs[layer_index]
-        device, dtype = _module_device_dtype(ref.module, model)
-        replacement.to(device=device, dtype=dtype)
+        parameter = next(ref.module.parameters(), None)
+        if parameter is None:
+            parameter = next(model.parameters())
+        replacement.to(device=parameter.device, dtype=parameter.dtype)
         record = ReplacementRecord(
             layer_index=layer_index,
             path=ref.path,
@@ -79,4 +79,3 @@ def apply_replacements(
         replace_submodule(model, ref.path, replacement)
         records.append(record)
     return ReplacementManifest(tuple(records))
-

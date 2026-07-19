@@ -1,22 +1,19 @@
-from __future__ import annotations
-
 import random
 from dataclasses import dataclass
-from typing import Mapping, Sequence
-
-from .config import SelectionConfig
 
 
 @dataclass(frozen=True)
 class LayerSelection:
+    """Record the eligible layers and the final ordered replacement selection."""
+
     strategy: str
     indices: tuple[int, ...]
     eligible_indices: tuple[int, ...]
 
 
-def eligible_layer_indices(
-    available_indices: Sequence[int], protected_prefix: int, protected_suffix: int
-) -> tuple[int, ...]:
+def eligible_layer_indices(available_indices, protected_prefix, protected_suffix):
+    """Remove protected boundary blocks from the replacement candidate set."""
+
     ordered = tuple(sorted(int(index) for index in available_indices))
     stop = len(ordered) - protected_suffix if protected_suffix else len(ordered)
     eligible = ordered[protected_prefix:stop]
@@ -25,11 +22,9 @@ def eligible_layer_indices(
     return eligible
 
 
-def select_layers(
-    available_indices: Sequence[int],
-    config: SelectionConfig,
-    bi_scores: Mapping[int, float] | None = None,
-) -> LayerSelection:
+def select_layers(available_indices, config, bi_scores=None):
+    """Select replacement layers using manual, positional, random, or BI ranking."""
+
     eligible = eligible_layer_indices(
         available_indices, config.protected_prefix, config.protected_suffix
     )
@@ -63,4 +58,3 @@ def select_layers(
     if config.application_order == "layer":
         selected.sort()
     return LayerSelection(config.strategy, tuple(selected), eligible)
-

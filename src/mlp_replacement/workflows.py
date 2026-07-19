@@ -1,31 +1,22 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import Mapping
 
 import torch
-import torch.nn as nn
 
 from .capture import collect_module_io
-from .config import ExperimentConfig
-from .data import DataLoaders
 from .evaluation.footprint import ParameterFootprint, parameter_footprint
 from .evaluation.language_model import LanguageModelMetrics, evaluate_language_model
-from .model import BlockRef, discover_mlp_blocks, get_mlp_block, resolve_dtype
-from .operators.training import OperatorFitResult, OperatorTrainingEpoch, fit_replacement_operator
-from .recovery import (
-    RecoveryResult,
-    TeacherCache,
-    cache_teacher_logits,
-    recover_replacements,
-)
+from .model import discover_mlp_blocks, resolve_dtype
+from .operators.training import OperatorTrainingEpoch, fit_replacement_operator
+from .recovery import RecoveryResult, cache_teacher_logits, recover_replacements
 from .screening import ScreeningResult, compute_bi_scores
 from .selection import LayerSelection, select_layers
-from .surgery import ReplacementRecord, apply_replacements
+from .surgery import apply_replacements
 
 
 @dataclass(frozen=True)
 class BlockReplacementResult:
+    """Summarize local fitting and parameter reduction for one replaced MLP."""
+
     layer_index: int
     path: str
     operator_kind: str
@@ -34,100 +25,65 @@ class BlockReplacementResult:
     operator_validation_mse: float
     original_parameters: int
     replacement_parameters: int
-    model_metrics_after: LanguageModelMetrics | None = None
 
     @property
-    def removed_parameters(self) -> int:
+    def removed_parameters(self):
+        """Return the parameter reduction achieved by this block replacement."""
+
         return self.original_parameters - self.replacement_parameters
 
 
 @dataclass(frozen=True)
 class WorkflowResult:
+    """Collect model-level and block-level results from one replacement workflow."""
+
     strategy: str
     selection: LayerSelection
     screening: ScreeningResult | None
-    baseline_metrics: LanguageModelMetrics
-    final_metrics: LanguageModelMetrics
+    baseline_validation_metrics: LanguageModelMetrics
+    final_validation_metrics: LanguageModelMetrics
+    baseline_test_metrics: LanguageModelMetrics | None
+    final_test_metrics: LanguageModelMetrics | None
     footprint_before: ParameterFootprint
     footprint_after: ParameterFootprint
     blocks: tuple[BlockReplacementResult, ...]
     recovery_steps: tuple[RecoveryResult, ...]
 
 
-def _model_device(model: nn.Module) -> torch.device:
-    return next(model.parameters()).device
+def fit_layer_replacement(model, ref, loaders, config, device):
+    """Capture one MLP's data and fit its configured replacement operator."""
 
-
-def _fit_layer(
-    model: nn.Module,
-    ref: BlockRef,
-    loaders: DataLoaders,
-    config: ExperimentConfig,
-    device: torch.device,
-) -> OperatorFitResult:
     storage_device = torch.device(config.capture.storage_device)
     storage_dtype = resolve_dtype(config.capture.storage_dtype, storage_device)
     training_pairs = collect_module_io(
-        model=model,
-        module_path=ref.path,
-        loader=loaders.calibration,
-        max_batches=config.data.num_calibration_batches,
-        device=device,
-        storage_device=storage_device,
-        storage_dtype=storage_dtype,
+        model, ref.path, loaders.calibration, config.data.num_calibration_batches,
+        device, storage_device, storage_dtype
     )
     validation_pairs = collect_module_io(
-        model=model,
-        module_path=ref.path,
-        loader=loaders.operator_validation,
-        max_batches=config.data.num_operator_validation_batches,
-        device=device,
-        storage_device=storage_device,
-        storage_dtype=storage_dtype,
+        model, ref.path, loaders.operator_validation, config.data.num_operator_validation_batches,
+        device, storage_device, storage_dtype
     )
-    return fit_replacement_operator(
-        training_pairs=training_pairs,
-        validation_pairs=validation_pairs,
-        config=config.operator,
-        device=device,
-    )
+    return fit_replacement_operator(training_pairs, validation_pairs, config.operator, device)
 
 
-def _teacher_caches(
-    model: nn.Module,
-    loaders: DataLoaders,
-    config: ExperimentConfig,
-    device: torch.device,
-) -> tuple[TeacherCache, TeacherCache | None]:
+def create_teacher_caches(model, loaders, config, device):
+    """Cache dense predictions for recovery training and validation."""
+
     if loaders.recovery is None:
         raise ValueError("Recovery is enabled but no recovery loader was provided")
-    training_cache = cache_teacher_logits(
-        model,
-        loaders.recovery,
-        config.data.num_recovery_batches,
-        device,
-        config.recovery.cache_dtype,
-    )
+    training_cache = cache_teacher_logits(model, loaders.recovery, config.data.num_recovery_batches,
+                                           device, config.recovery.cache_dtype)
     validation_cache = None
     if loaders.recovery_validation is not None and config.data.num_recovery_validation_batches > 0:
-        validation_cache = cache_teacher_logits(
-            model,
-            loaders.recovery_validation,
-            config.data.num_recovery_validation_batches,
-            device,
-            config.recovery.cache_dtype,
-        )
+        validation_cache = cache_teacher_logits(model, loaders.recovery_validation,
+                                                 config.data.num_recovery_validation_batches,
+                                                 device, config.recovery.cache_dtype)
     return training_cache, validation_cache
 
 
-def _block_result(
-    layer_index: int,
-    path: str,
-    fit: OperatorFitResult,
-    record: ReplacementRecord,
-    config: ExperimentConfig,
-    model_metrics_after: LanguageModelMetrics | None = None,
-) -> BlockReplacementResult:
+def create_block_result(layer_index, path, fit, record, config):
+    """Combine local fitting and structural information into one block result."""
+
     return BlockReplacementResult(
         layer_index=layer_index,
         path=path,
@@ -137,174 +93,160 @@ def _block_result(
         operator_validation_mse=fit.best_validation_mse,
         original_parameters=record.original_parameters,
         replacement_parameters=record.replacement_parameters,
-        model_metrics_after=model_metrics_after,
     )
 
 
-def run_one_shot_replacement(
-    model: nn.Module,
-    loaders: DataLoaders,
-    selection: LayerSelection,
-    config: ExperimentConfig,
-    screening: ScreeningResult | None = None,
-) -> WorkflowResult:
+def run_one_shot_replacement(model, loaders, selection, config, screening=None, run_log=None):
     """Fit every replacement against the same dense model, then apply them together."""
 
-    device = _model_device(model)
+    device = next(model.parameters()).device
     footprint_before = parameter_footprint(model)
-    baseline = evaluate_language_model(
-        model, loaders.evaluation, device, config.data.num_evaluation_batches
+    if run_log is not None:
+        run_log.record("footprint_before", footprint_before)
+        run_log.begin("baseline_model_validation")
+    baseline_validation = evaluate_language_model(
+        model, loaders.model_validation, device, config.data.num_model_validation_batches
     )
+    baseline_test = None
+    if loaders.test is not None:
+        if run_log is not None:
+            run_log.begin("baseline_final_test")
+        baseline_test = evaluate_language_model(model, loaders.test, device, config.data.num_test_batches)
+    if run_log is not None:
+        run_log.record("baseline_metrics", {
+            "model_validation": baseline_validation,
+            "final_test": baseline_test,
+        })
+
     training_cache = validation_cache = None
     if config.recovery.enabled:
-        training_cache, validation_cache = _teacher_caches(model, loaders, config, device)
+        if run_log is not None:
+            run_log.begin("teacher_cache")
+        training_cache, validation_cache = create_teacher_caches(model, loaders, config, device)
+        if run_log is not None:
+            run_log.record("teacher_cache", {
+                "training_batches": len(training_cache),
+                "validation_batches": len(validation_cache) if validation_cache is not None else 0,
+                "dtype": config.recovery.cache_dtype,
+            })
 
     refs = {ref.index: ref for ref in discover_mlp_blocks(model)}
     target_paths = {index: refs[index].path for index in selection.indices}
-    fits: dict[int, OperatorFitResult] = {}
-    replacements: dict[int, nn.Module] = {}
+    fits = {}
+    replacements = {}
+    operator_progress = {}
     for layer_index in selection.indices:
-        fit = _fit_layer(model, refs[layer_index], loaders, config, device)
+        if run_log is not None:
+            run_log.begin(f"operator_fit_layer_{layer_index}")
+        fit = fit_layer_replacement(model, refs[layer_index], loaders, config, device)
         fits[layer_index] = fit
         replacements[layer_index] = fit.module
+        operator_progress[str(layer_index)] = {
+            "path": refs[layer_index].path,
+            "kind": config.operator.kind,
+            "history": fit.history,
+            "best_epoch": fit.best_epoch,
+            "best_validation_mse": fit.best_validation_mse,
+        }
+        if run_log is not None:
+            run_log.record("operators", operator_progress)
 
+    if run_log is not None:
+        run_log.begin("apply_replacements")
     manifest = apply_replacements(model, replacements)
+    if run_log is not None:
+        run_log.record("replacement_manifest", manifest)
     records = {record.layer_index: record for record in manifest.records}
     del refs
-    recovery_steps: tuple[RecoveryResult, ...] = ()
+    recovery_steps = ()
     if config.recovery.enabled:
-        recovery = recover_replacements(
-            student=model,
-            training_cache=training_cache,
-            validation_cache=validation_cache,
-            target_paths=[records[index].path for index in selection.indices],
-            config=config.recovery,
-            device=device,
-        )
+        if run_log is not None:
+            run_log.begin("model_recovery")
+        recovery_paths = [records[index].path for index in selection.indices]
+        recovery = recover_replacements(model, training_cache, validation_cache,
+                                          recovery_paths, config.recovery, device)
         recovery_steps = (recovery,)
+        if run_log is not None:
+            run_log.record("recovery", recovery_steps)
 
-    final = evaluate_language_model(
-        model, loaders.evaluation, device, config.data.num_evaluation_batches
+    if run_log is not None:
+        run_log.begin("final_model_validation")
+    final_validation = evaluate_language_model(
+        model, loaders.model_validation, device, config.data.num_model_validation_batches
     )
+    final_test = None
+    if loaders.test is not None:
+        if run_log is not None:
+            run_log.begin("final_test")
+        final_test = evaluate_language_model(model, loaders.test, device, config.data.num_test_batches)
+    if run_log is not None:
+        run_log.record("final_metrics", {
+            "model_validation": final_validation,
+            "final_test": final_test,
+        })
+
     blocks = tuple(
-        _block_result(index, target_paths[index], fits[index], records[index], config)
+        create_block_result(index, target_paths[index], fits[index], records[index], config)
         for index in selection.indices
     )
+    footprint_after = parameter_footprint(model)
+    if run_log is not None:
+        run_log.record("footprint_after", footprint_after)
     return WorkflowResult(
         strategy="one_shot",
         selection=selection,
         screening=screening,
-        baseline_metrics=baseline,
-        final_metrics=final,
+        baseline_validation_metrics=baseline_validation,
+        final_validation_metrics=final_validation,
+        baseline_test_metrics=baseline_test,
+        final_test_metrics=final_test,
         footprint_before=footprint_before,
-        footprint_after=parameter_footprint(model),
+        footprint_after=footprint_after,
         blocks=blocks,
         recovery_steps=recovery_steps,
     )
 
 
-def run_iterative_replacement(
-    model: nn.Module,
-    loaders: DataLoaders,
-    selection: LayerSelection,
-    config: ExperimentConfig,
-    screening: ScreeningResult | None = None,
-) -> WorkflowResult:
-    """Fit, apply, optionally recover, and evaluate one selected MLP at a time."""
+def run_iterative_replacement(model, loaders, selection, config, screening=None):
+    """Reject the deprecated iterative replacement workflow."""
 
-    device = _model_device(model)
-    footprint_before = parameter_footprint(model)
-    baseline = evaluate_language_model(
-        model, loaders.evaluation, device, config.data.num_evaluation_batches
-    )
-    dense_caches: tuple[TeacherCache, TeacherCache | None] | None = None
-    if config.recovery.enabled and config.workflow.iterative_teacher == "dense":
-        dense_caches = _teacher_caches(model, loaders, config, device)
-
-    replaced_paths: list[str] = []
-    block_results: list[BlockReplacementResult] = []
-    recovery_results: list[RecoveryResult] = []
-
-    for layer_index in selection.indices:
-        ref = get_mlp_block(model, layer_index)
-        target_path = ref.path
-        fit = _fit_layer(model, ref, loaders, config, device)
-        step_caches = dense_caches
-        if config.recovery.enabled and config.workflow.iterative_teacher == "previous":
-            step_caches = _teacher_caches(model, loaders, config, device)
-
-        manifest = apply_replacements(model, {layer_index: fit.module})
-        record = manifest.records[0]
-        replaced_paths.append(record.path)
-        del ref
-
-        if config.recovery.enabled:
-            if step_caches is None:
-                raise RuntimeError("Iterative recovery teacher cache was not created")
-            recovery_paths = (
-                [record.path]
-                if config.workflow.iterative_recovery_scope == "current"
-                else list(replaced_paths)
-            )
-            recovery_results.append(
-                recover_replacements(
-                    student=model,
-                    training_cache=step_caches[0],
-                    validation_cache=step_caches[1],
-                    target_paths=recovery_paths,
-                    config=config.recovery,
-                    device=device,
-                )
-            )
-
-        step_metrics = evaluate_language_model(
-            model, loaders.evaluation, device, config.data.num_evaluation_batches
-        )
-        block_results.append(
-            _block_result(layer_index, target_path, fit, record, config, step_metrics)
-        )
-
-    final = block_results[-1].model_metrics_after if block_results else baseline
-    if final is None:
-        raise RuntimeError("Iterative workflow did not produce final metrics")
-    return WorkflowResult(
-        strategy="iterative",
-        selection=selection,
-        screening=screening,
-        baseline_metrics=baseline,
-        final_metrics=final,
-        footprint_before=footprint_before,
-        footprint_after=parameter_footprint(model),
-        blocks=tuple(block_results),
-        recovery_steps=tuple(recovery_results),
+    raise RuntimeError(
+        "Iterative replacement is deprecated and disabled. Use workflow.strategy='one_shot'. "
+        "Minitron found no benefit from repeated within-stage importance/pruning iterations, "
+        "and this replacement variant multiplies local fitting and recovery cost."
     )
 
 
-def run_replacement_experiment(
-    model: nn.Module,
-    loaders: DataLoaders,
-    config: ExperimentConfig,
-    bi_scores: Mapping[int, float] | None = None,
-) -> WorkflowResult:
+def run_replacement_experiment(model, loaders, config, bi_scores=None, run_log=None):
+    """Resolve screening and selection before dispatching the configured workflow."""
+
     refs = discover_mlp_blocks(model)
     screening = None
     scores = bi_scores
     if config.selection.strategy == "top_k_bi" and scores is None:
+        device = next(model.parameters()).device
+        if run_log is not None:
+            run_log.begin("bi_screening")
         screening = compute_bi_scores(
-            model=model,
-            loader=loaders.calibration,
-            max_batches=config.data.num_calibration_batches,
-            device=_model_device(model),
+            model, loaders.calibration, config.data.num_calibration_batches,
+            device, scope=config.selection.bi_scope
         )
         scores = screening.scores
+        if run_log is not None:
+            run_log.record("screening", screening)
+    elif config.selection.strategy == "top_k_bi" and run_log is not None:
+        run_log.record("screening", {
+            "metric": f"external_{config.selection.bi_scope}_bi",
+            "scores": scores,
+            "num_batches": None,
+        })
 
-    selection = select_layers(
-        available_indices=[ref.index for ref in refs],
-        config=config.selection,
-        bi_scores=scores,
-    )
+    available_indices = [ref.index for ref in refs]
+    selection = select_layers(available_indices, config.selection, scores)
+    if run_log is not None:
+        run_log.record("selection", selection)
     if config.workflow.strategy == "one_shot":
-        return run_one_shot_replacement(model, loaders, selection, config, screening)
+        return run_one_shot_replacement(model, loaders, selection, config, screening, run_log)
     if config.workflow.strategy == "iterative":
         return run_iterative_replacement(model, loaders, selection, config, screening)
     raise ValueError(f"Unsupported workflow strategy: {config.workflow.strategy}")

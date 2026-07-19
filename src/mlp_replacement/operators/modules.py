@@ -1,20 +1,22 @@
-from __future__ import annotations
-
 import torch.nn as nn
-
-from ..config import OperatorConfig
 
 
 class LinearReplacement(nn.Module):
-    def __init__(self, hidden_size: int, bias: bool = False):
+    """Approximate an MLP sublayer with one hidden-size linear projection."""
+
+    def __init__(self, hidden_size, bias=False):
         super().__init__()
         self.projection = nn.Linear(hidden_size, hidden_size, bias=bias)
 
     def forward(self, inputs):
+        """Apply the learned linear approximation."""
+
         return self.projection(inputs)
 
 
-def _activation(name: str) -> nn.Module:
+def create_activation(name):
+    """Construct the activation requested for a bottleneck replacement."""
+
     activations = {
         "gelu": nn.GELU,
         "silu": nn.SiLU,
@@ -27,24 +29,24 @@ def _activation(name: str) -> nn.Module:
 
 
 class BottleneckMLPReplacement(nn.Module):
-    def __init__(
-        self,
-        hidden_size: int,
-        bottleneck_ratio: float,
-        activation: str = "gelu",
-        bias: bool = False,
-    ):
+    """Approximate an MLP with a smaller two-layer bottleneck network."""
+
+    def __init__(self, hidden_size, bottleneck_ratio, activation="gelu", bias=False):
         super().__init__()
         bottleneck_size = max(1, round(hidden_size * bottleneck_ratio))
         self.up_projection = nn.Linear(hidden_size, bottleneck_size, bias=bias)
-        self.activation = _activation(activation)
+        self.activation = create_activation(activation)
         self.down_projection = nn.Linear(bottleneck_size, hidden_size, bias=bias)
 
     def forward(self, inputs):
+        """Project through the reduced hidden representation and back."""
+
         return self.down_projection(self.activation(self.up_projection(inputs)))
 
 
-def make_replacement_operator(hidden_size: int, config: OperatorConfig) -> nn.Module:
+def make_replacement_operator(hidden_size, config):
+    """Construct the replacement architecture selected in the configuration."""
+
     if config.kind == "linear":
         return LinearReplacement(hidden_size, bias=config.bias)
     if config.kind == "bottleneck_mlp":
@@ -55,4 +57,3 @@ def make_replacement_operator(hidden_size: int, config: OperatorConfig) -> nn.Mo
             bias=config.bias,
         )
     raise ValueError(f"Unsupported replacement operator: {config.kind}")
-

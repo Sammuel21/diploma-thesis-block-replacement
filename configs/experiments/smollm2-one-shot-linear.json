@@ -11,13 +11,15 @@
     "num_operator_validation_batches": 24,
     "num_recovery_batches": 512,
     "num_recovery_validation_batches": 24,
-    "num_evaluation_batches": 24,
+    "num_model_validation_batches": 24,
+    "num_test_batches": 0,
     "seed": 21
   },
   "selection": {
     "strategy": "manual",
     "manual_indices": [3],
     "k": 1,
+    "bi_scope": "transformer_layer",
     "protected_prefix": 1,
     "protected_suffix": 1,
     "application_order": "layer",
@@ -43,9 +45,6 @@
     "early_stopping_patience": 1
   },
   "workflow": {
-    "strategy": "one_shot",
-    "iterative_teacher": "dense",
-    "iterative_recovery_scope": "current"
+    "strategy": "one_shot"
   }
 }
-

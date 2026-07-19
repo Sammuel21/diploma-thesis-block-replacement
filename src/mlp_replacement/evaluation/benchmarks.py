@@ -1,10 +1,8 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 
-BENCHMARK_PROFILES: dict[str, tuple[str, ...]] = {
+BENCHMARK_PROFILES = {
     "smoke": ("piqa",),
     "routine": ("piqa", "arc_easy", "winogrande"),
     "confirmation": ("piqa", "arc_easy", "winogrande", "arc_challenge", "hellaswag"),
@@ -29,12 +27,16 @@ BENCHMARK_PROFILES: dict[str, tuple[str, ...]] = {
 
 @dataclass(frozen=True)
 class BenchmarkResult:
+    """Store benchmark task results and the harness version that produced them."""
+
     tasks: tuple[str, ...]
     results: Mapping[str, Any]
     harness_version: str
 
 
-def resolve_benchmark_tasks(profile: str, additions: Sequence[str] = ()) -> tuple[str, ...]:
+def resolve_benchmark_tasks(profile, additions=()):
+    """Expand a named evaluation profile and any explicitly requested additions."""
+
     try:
         base = BENCHMARK_PROFILES[profile]
     except KeyError as exc:
@@ -42,15 +44,7 @@ def resolve_benchmark_tasks(profile: str, additions: Sequence[str] = ()) -> tupl
     return tuple(dict.fromkeys((*base, *additions)))
 
 
-def evaluate_benchmarks(
-    model,
-    tokenizer,
-    profile: str,
-    additions: Sequence[str] = (),
-    batch_size: int | str = "auto",
-    limit: int | None = None,
-    device: str | None = None,
-) -> BenchmarkResult:
+def evaluate_benchmarks(model, tokenizer, profile, additions=(), batch_size="auto", limit=None, device=None):
     """Run a pinned lm-evaluation-harness installation without reimplementing tasks."""
 
     try:
@@ -69,4 +63,3 @@ def evaluate_benchmarks(
     output = lm_eval.simple_evaluate(model=lm, tasks=list(tasks), limit=limit)
     version = getattr(lm_eval, "__version__", "unknown")
     return BenchmarkResult(tasks, output, version)
-

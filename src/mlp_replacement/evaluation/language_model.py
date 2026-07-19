@@ -1,27 +1,23 @@
-from __future__ import annotations
-
 import math
 from dataclasses import dataclass
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 
 @dataclass(frozen=True)
 class LanguageModelMetrics:
+    """Record token-weighted language-model loss and perplexity."""
+
     loss: float
     perplexity: float
     predicted_tokens: int
     batches: int
 
 
-def evaluate_language_model(
-    model: nn.Module,
-    loader,
-    device: torch.device | str,
-    max_batches: int | None = None,
-) -> LanguageModelMetrics:
+def evaluate_language_model(model, loader, device, max_batches=None):
+    """Evaluate causal language-model loss over all valid predicted tokens."""
+
     was_training = model.training
     model.eval()
     total_nll = 0.0
@@ -59,4 +55,3 @@ def evaluate_language_model(
     mean_loss = total_nll / predicted_tokens
     perplexity = math.exp(mean_loss) if mean_loss < 709 else float("inf")
     return LanguageModelMetrics(mean_loss, perplexity, predicted_tokens, batches)
-

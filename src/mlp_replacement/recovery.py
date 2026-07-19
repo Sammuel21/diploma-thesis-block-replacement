@@ -1,18 +1,15 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import Sequence
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
-from .config import RecoveryConfig
 from .model import resolve_dtype
 
 
 @dataclass(frozen=True)
 class TeacherBatch:
+    """Store one recovery batch and its cached dense-model predictions."""
+
     input_ids: torch.Tensor
     attention_mask: torch.Tensor
     logits: torch.Tensor
@@ -20,14 +17,18 @@ class TeacherBatch:
 
 @dataclass(frozen=True)
 class TeacherCache:
+    """Keep dense-model predictions available after its MLPs are replaced."""
+
     batches: tuple[TeacherBatch, ...]
 
-    def __len__(self) -> int:
+    def __len__(self):
         return len(self.batches)
 
 
 @dataclass(frozen=True)
 class RecoveryEpoch:
+    """Record training and validation KL divergence for one recovery epoch."""
+
     epoch: int
     train_kl: float
     validation_kl: float | None
@@ -35,21 +36,19 @@ class RecoveryEpoch:
 
 @dataclass(frozen=True)
 class RecoveryResult:
+    """Return recovery history and the epoch whose replacement state was retained."""
+
     history: tuple[RecoveryEpoch, ...]
     best_epoch: int | None
 
 
-def cache_teacher_logits(
-    model: nn.Module,
-    loader,
-    max_batches: int,
-    device: torch.device | str,
-    cache_dtype: str = "float16",
-) -> TeacherCache:
+def cache_teacher_logits(model, loader, max_batches, device, cache_dtype="float16"):
+    """Cache dense-model logits on CPU for later knowledge-distillation recovery."""
+
     if max_batches < 1:
         raise ValueError("Teacher-cache max_batches must be positive")
     dtype = resolve_dtype(cache_dtype, torch.device(device))
-    batches: list[TeacherBatch] = []
+    batches = []
     was_training = model.training
     model.eval()
     try:
@@ -74,12 +73,9 @@ def cache_teacher_logits(
     return TeacherCache(tuple(batches))
 
 
-def _distillation_loss(
-    student: nn.Module,
-    batch: TeacherBatch,
-    temperature: float,
-    device: torch.device | str,
-) -> torch.Tensor:
+def distillation_loss(student, batch, temperature, device):
+    """Compute temperature-scaled KL divergence from teacher to student predictions."""
+
     input_ids = batch.input_ids.to(device)
     attention_mask = batch.attention_mask.to(device)
     teacher_logits = batch.logits.to(device=device, dtype=torch.float32)
@@ -87,30 +83,25 @@ def _distillation_loss(
     mask = attention_mask.bool()
     teacher_probabilities = torch.softmax(teacher_logits[mask] / temperature, dim=-1)
     student_log_probabilities = torch.log_softmax(student_logits[mask] / temperature, dim=-1)
-    return F.kl_div(
-        student_log_probabilities,
-        teacher_probabilities,
-        reduction="batchmean",
-    ) * (temperature**2)
+    return F.kl_div(student_log_probabilities, teacher_probabilities, reduction="batchmean") * (temperature**2)
 
 
-def _mean_cache_loss(
-    student: nn.Module,
-    cache: TeacherCache,
-    temperature: float,
-    device: torch.device | str,
-) -> float:
+def mean_cache_loss(student, cache, temperature, device):
+    """Average KL divergence across a cached recovery-validation set."""
+
     losses = []
     student.eval()
     with torch.no_grad():
         for batch in cache.batches:
-            losses.append(float(_distillation_loss(student, batch, temperature, device).item()))
+            losses.append(float(distillation_loss(student, batch, temperature, device).item()))
     return sum(losses) / len(losses)
 
 
-def _replacement_parameters(student: nn.Module, target_paths: Sequence[str]) -> list[nn.Parameter]:
-    parameters: list[nn.Parameter] = []
-    seen: set[int] = set()
+def replacement_parameters(student, target_paths):
+    """Collect unique parameters belonging to the replacement modules."""
+
+    parameters = []
+    seen = set()
     for path in target_paths:
         for parameter in student.get_submodule(path).parameters():
             if id(parameter) not in seen:
@@ -121,21 +112,16 @@ def _replacement_parameters(student: nn.Module, target_paths: Sequence[str]) -> 
     return parameters
 
 
-def recover_replacements(
-    student: nn.Module,
-    training_cache: TeacherCache,
-    validation_cache: TeacherCache | None,
-    target_paths: Sequence[str],
-    config: RecoveryConfig,
-    device: torch.device | str,
-) -> RecoveryResult:
+def recover_replacements(student, training_cache, validation_cache, target_paths, config, device):
+    """Fine-tune only replacement modules against cached teacher predictions."""
+
     if not config.enabled:
         return RecoveryResult((), None)
 
     original_flags = [(parameter, parameter.requires_grad) for parameter in student.parameters()]
     for parameter, _ in original_flags:
         parameter.requires_grad = False
-    trainable = _replacement_parameters(student, target_paths)
+    trainable = replacement_parameters(student, target_paths)
     for parameter in trainable:
         parameter.requires_grad = True
 
@@ -145,11 +131,11 @@ def recover_replacements(
         weight_decay=config.weight_decay,
     )
     target_modules = [student.get_submodule(path) for path in target_paths]
-    best_state: list[dict[str, torch.Tensor]] | None = None
+    best_state = None
     best_validation = float("inf")
-    best_epoch: int | None = None
+    best_epoch = None
     stale_epochs = 0
-    history: list[RecoveryEpoch] = []
+    history = []
 
     try:
         for epoch in range(1, config.epochs + 1):
@@ -158,7 +144,7 @@ def recover_replacements(
                 module.train()
             losses = []
             for batch in training_cache.batches:
-                loss = _distillation_loss(student, batch, config.temperature, device)
+                loss = distillation_loss(student, batch, config.temperature, device)
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward()
                 optimizer.step()
@@ -166,7 +152,7 @@ def recover_replacements(
 
             train_kl = sum(losses) / len(losses)
             validation_kl = (
-                _mean_cache_loss(student, validation_cache, config.temperature, device)
+                mean_cache_loss(student, validation_cache, config.temperature, device)
                 if validation_cache is not None
                 else None
             )
@@ -202,4 +188,3 @@ def recover_replacements(
             parameter.requires_grad = requires_grad
 
     return RecoveryResult(tuple(history), best_epoch)
-

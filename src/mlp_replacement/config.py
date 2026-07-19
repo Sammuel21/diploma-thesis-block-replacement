@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 from dataclasses import asdict, dataclass, field
-from typing import Any, Literal, Mapping
+from typing import Literal
 
 
 @dataclass(frozen=True)
 class DatasetSpec:
+    """Identifies one dataset split and the text field consumed by the workflow."""
+
     path: str
     name: str | None
     split: str
@@ -15,7 +15,9 @@ class DatasetSpec:
     streaming: bool = False
 
 
-def _default_calibration_source() -> DatasetSpec:
+def default_calibration_source():
+    """Return the default C4 shard used for fitting and recovery data."""
+
     return DatasetSpec(
         path="allenai/c4",
         name=None,
@@ -24,7 +26,19 @@ def _default_calibration_source() -> DatasetSpec:
     )
 
 
-def _default_evaluation_source() -> DatasetSpec:
+def default_model_validation_source():
+    """Return the WikiText-2 validation stream used to compare experiments."""
+
+    return DatasetSpec(
+        path="wikitext",
+        name="wikitext-2-raw-v1",
+        split="validation",
+    )
+
+
+def default_test_source():
+    """Return the WikiText-2 test stream reserved for frozen final candidates."""
+
     return DatasetSpec(
         path="wikitext",
         name="wikitext-2-raw-v1",
@@ -34,6 +48,8 @@ def _default_evaluation_source() -> DatasetSpec:
 
 @dataclass(frozen=True)
 class ModelConfig:
+    """Controls model loading, numerical precision, and execution device."""
+
     model_id: str = "HuggingFaceTB/SmolLM2-1.7B"
     revision: str | None = None
     tokenizer_revision: str | None = None
@@ -44,18 +60,24 @@ class ModelConfig:
 
 @dataclass(frozen=True)
 class DataConfig:
-    calibration_source: DatasetSpec = field(default_factory=_default_calibration_source)
-    evaluation_source: DatasetSpec = field(default_factory=_default_evaluation_source)
+    """Defines the data sources and independent batch budgets for every stage."""
+
+    calibration_source: DatasetSpec = field(default_factory=default_calibration_source)
+    model_validation_source: DatasetSpec = field(default_factory=default_model_validation_source)
+    test_source: DatasetSpec = field(default_factory=default_test_source)
     sequence_length: int = 128
     batch_size: int = 2
     num_calibration_batches: int = 24
     num_operator_validation_batches: int = 24
     num_recovery_batches: int = 512
     num_recovery_validation_batches: int = 24
-    num_evaluation_batches: int = 24
+    num_model_validation_batches: int | None = 24
+    num_test_batches: int | None = 0
     seed: int = 21
 
-    def __post_init__(self) -> None:
+    def __post_init__(self):
+        """Reject data budgets that cannot form valid token batches."""
+
         if self.sequence_length < 2:
             raise ValueError("sequence_length must be at least 2")
         if self.batch_size < 1:
@@ -65,30 +87,41 @@ class DataConfig:
             "num_operator_validation_batches",
             "num_recovery_batches",
             "num_recovery_validation_batches",
-            "num_evaluation_batches",
+            "num_model_validation_batches",
+            "num_test_batches",
         ):
-            if getattr(self, name) < 0:
+            value = getattr(self, name)
+            if value is not None and value < 0:
                 raise ValueError(f"{name} cannot be negative")
+        if self.num_model_validation_batches == 0:
+            raise ValueError("num_model_validation_batches must be positive")
 
 
 @dataclass(frozen=True)
 class CaptureConfig:
+    """Controls where captured MLP activations are stored and in what precision."""
+
     storage_device: str = "cpu"
     storage_dtype: Literal["float32", "float16", "bfloat16"] = "float32"
 
 
 @dataclass(frozen=True)
 class SelectionConfig:
+    """Defines how replacement candidates are selected and ordered."""
+
     strategy: Literal["manual", "first_k", "random_k", "top_k_bi"] = "manual"
     k: int = 1
     manual_indices: tuple[int, ...] = (3,)
+    bi_scope: Literal["transformer_layer", "mlp_sublayer"] = "transformer_layer"
     bi_order: Literal["asc", "desc"] = "asc"
     application_order: Literal["layer", "selection"] = "layer"
     protected_prefix: int = 1
     protected_suffix: int = 1
     seed: int = 21
 
-    def __post_init__(self) -> None:
+    def __post_init__(self):
+        """Validate the requested number of layers and protected boundaries."""
+
         if self.k < 1:
             raise ValueError("selection k must be positive")
         if self.protected_prefix < 0 or self.protected_suffix < 0:
@@ -97,6 +130,8 @@ class SelectionConfig:
 
 @dataclass(frozen=True)
 class OperatorConfig:
+    """Defines the replacement architecture and its local fitting procedure."""
+
     kind: Literal["linear", "bottleneck_mlp"] = "linear"
     bottleneck_ratio: float = 0.25
     activation: Literal["gelu", "silu", "relu"] = "gelu"
@@ -111,7 +146,9 @@ class OperatorConfig:
     early_stopping_min_delta: float = 0.0
     seed: int = 21
 
-    def __post_init__(self) -> None:
+    def __post_init__(self):
+        """Validate operator capacity and optimization settings."""
+
         if not 0.0 < self.bottleneck_ratio <= 1.0:
             raise ValueError("bottleneck_ratio must be in (0, 1]")
         if self.epochs < 1 or self.batch_size < 1:
@@ -124,6 +161,8 @@ class OperatorConfig:
 
 @dataclass(frozen=True)
 class RecoveryConfig:
+    """Defines model-level knowledge-distillation recovery after replacement."""
+
     enabled: bool = True
     epochs: int = 1
     learning_rate: float = 1e-5
@@ -133,7 +172,9 @@ class RecoveryConfig:
     early_stopping_patience: int | None = 1
     early_stopping_min_delta: float = 0.0
 
-    def __post_init__(self) -> None:
+    def __post_init__(self):
+        """Validate recovery optimization and distillation temperature."""
+
         if self.epochs < 1:
             raise ValueError("recovery epochs must be positive")
         if self.learning_rate <= 0 or self.weight_decay < 0:
@@ -144,13 +185,15 @@ class RecoveryConfig:
 
 @dataclass(frozen=True)
 class WorkflowConfig:
+    """Select integration strategy; iterative replacement is deprecated."""
+
     strategy: Literal["one_shot", "iterative"] = "one_shot"
-    iterative_teacher: Literal["dense", "previous"] = "dense"
-    iterative_recovery_scope: Literal["current", "all_replacements"] = "current"
 
 
 @dataclass(frozen=True)
 class ExperimentConfig:
+    """Groups the complete configuration of one replacement experiment."""
+
     model: ModelConfig = field(default_factory=ModelConfig)
     data: DataConfig = field(default_factory=DataConfig)
     capture: CaptureConfig = field(default_factory=CaptureConfig)
@@ -159,18 +202,24 @@ class ExperimentConfig:
     recovery: RecoveryConfig = field(default_factory=RecoveryConfig)
     workflow: WorkflowConfig = field(default_factory=WorkflowConfig)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self):
+        """Convert the nested dataclass configuration into plain dictionaries."""
+
         return asdict(self)
 
 
-def experiment_config_from_dict(data: Mapping[str, Any]) -> ExperimentConfig:
+def experiment_config_from_dict(data):
+    """Reconstruct an experiment configuration from JSON-compatible data."""
+
     model = ModelConfig(**data.get("model", {}))
 
     data_values = dict(data.get("data", {}))
     if "calibration_source" in data_values:
         data_values["calibration_source"] = DatasetSpec(**data_values["calibration_source"])
-    if "evaluation_source" in data_values:
-        data_values["evaluation_source"] = DatasetSpec(**data_values["evaluation_source"])
+    if "model_validation_source" in data_values:
+        data_values["model_validation_source"] = DatasetSpec(**data_values["model_validation_source"])
+    if "test_source" in data_values:
+        data_values["test_source"] = DatasetSpec(**data_values["test_source"])
     data_config = DataConfig(**data_values)
 
     selection_values = dict(data.get("selection", {}))
@@ -186,4 +235,3 @@ def experiment_config_from_dict(data: Mapping[str, Any]) -> ExperimentConfig:
         recovery=RecoveryConfig(**data.get("recovery", {})),
         workflow=WorkflowConfig(**data.get("workflow", {})),
     )
-

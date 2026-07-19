@@ -47,11 +47,40 @@ Quality requires both intrinsic language-model evaluation and downstream task
 evaluation. Local operator MSE and model-level distillation loss are training or
 diagnostic signals; neither replaces evaluation on held-out data.
 
+## Data Roles
+
+Each data partition has one declared purpose. C4 supplies pretraining-like text
+for fitting and recovery, while WikiText-2 measures integrated language-model
+quality without contributing optimization gradients.
+
+| Stage | Data | Objective |
+| --- | --- | --- |
+| BI screening | C4 calibration partition | Measure canonical layer BI or the declared MLP-local BI adaptation |
+| Operator fitting | C4 calibration partition | Minimize training MSE between the replacement output and original MLP output |
+| Operator validation | Separate C4 partition | Select the best operator epoch using held-out MSE |
+| Model recovery | Separate C4 recovery partition | Minimize teacher-to-student KL divergence by updating replacement parameters |
+| Recovery validation | Separate C4 partition | Select the recovery epoch using held-out KL divergence |
+| Experiment validation | WikiText-2 validation split | Compare integrated replacement configurations using model loss and perplexity |
+| Final evaluation | WikiText-2 test split | Report a frozen final configuration without further selection or tuning |
+
+The four C4 roles may use the same source corpus because the implementation
+samples each token window from a different source document before assigning
+windows to roles. Operator-validation MSE decides how well one substitute fits
+locally; WikiText-2 validation decides whether the complete replacement
+strategy works at model level.
+
+Routine experiments leave `num_test_batches` at zero. The test split is enabled
+only after the configuration and analysis decisions are frozen. Enabling the
+test split produces matched dense-baseline and compressed-model test metrics in
+the same run. For WikiText model validation or testing, a batch budget of
+`null` means the complete available split; a positive integer requests a fixed
+prefix and zero disables only the final test role.
+
 ### Routine screening
 
-Run on every model-level candidate:
+Run on every model-level candidate using the WikiText-2 validation split:
 
-- full fixed WikiText-2 loss and perplexity evaluation;
+- full fixed WikiText-2 validation loss and perplexity evaluation;
 - zero-shot PIQA;
 - zero-shot ARC-Easy; and
 - zero-shot WinoGrande.
