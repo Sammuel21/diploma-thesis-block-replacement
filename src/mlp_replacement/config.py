@@ -30,7 +30,7 @@ def default_model_validation_source():
     """Return the WikiText-2 validation stream used to compare experiments."""
 
     return DatasetSpec(
-        path="wikitext",
+        path="Salesforce/wikitext",
         name="wikitext-2-raw-v1",
         split="validation",
     )
@@ -40,7 +40,7 @@ def default_test_source():
     """Return the WikiText-2 test stream reserved for frozen final candidates."""
 
     return DatasetSpec(
-        path="wikitext",
+        path="Salesforce/wikitext",
         name="wikitext-2-raw-v1",
         split="test",
     )
