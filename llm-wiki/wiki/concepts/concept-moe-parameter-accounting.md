@@ -5,7 +5,7 @@ summary: Separates total stored parameters, model memory, and routing-dependent 
 type: concept
 status: review
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-07-27
 
 authorship:
   created_by: collaborative
@@ -43,6 +43,7 @@ related:
   - "[[source-summary-mone-2026]]"
   - "[[method-mone-novice-expert-replacement]]"
   - "[[concept-model-compression-evaluation-axes]]"
+  - "[[decision-primary-compression-evaluation-scope]]"
 supersedes: []
 superseded_by: []
 ---
@@ -109,6 +110,8 @@ nominal or measured from routing traces.
   routing-dependent active parameters.
 - [[concept-model-compression-evaluation-axes]] places MoE-specific accounting
   inside the broader model-compression evaluation taxonomy.
+- [[decision-primary-compression-evaluation-scope]] makes explicit total and
+  active MoE parameter reporting part of the primary measurement contract.
 
 ## Sources
 

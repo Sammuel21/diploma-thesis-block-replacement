@@ -5,7 +5,7 @@ summary: Distinguishes structural footprint, storage, memory, computation, compa
 type: concept
 status: review
 created: 2026-07-18
-updated: 2026-07-18
+updated: 2026-07-27
 
 authorship:
   created_by: collaborative
@@ -50,6 +50,7 @@ related:
   - "[[concept-moe-parameter-accounting]]"
   - "[[decision-primary-compression-evaluation-scope]]"
   - "[[method-quality-preservation-evaluation]]"
+  - "[[implementation-compute-environments]]"
 supersedes: []
 superseded_by: []
 ---
@@ -206,6 +207,8 @@ and benchmark protocol.
   primary, secondary, optional, or outside the thesis scope.
 - [[method-quality-preservation-evaluation]] defines the proposed quality
   benchmark protocol.
+- [[implementation-compute-environments]] records which evaluation axes can be
+  observed in the available project environments and under what limits.
 
 ## Sources
 

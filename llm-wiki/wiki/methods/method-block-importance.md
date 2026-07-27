@@ -5,7 +5,7 @@ summary: Estimates Transformer-layer sensitivity from cosine distance between th
 type: method
 status: review
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-07-27
 
 authorship:
   created_by: collaborative
@@ -44,6 +44,7 @@ related:
   - "[[source-summary-modegpt-2025]]"
   - "[[method-minitron-activation-based-importance]]"
   - "[[method-modegpt-global-sparsity-allocation]]"
+  - "[[experiment-initial-block-compression-study]]"
 supersedes: []
 superseded_by: []
 ---
@@ -117,6 +118,8 @@ definition and experiments are ingested.
   scores used for heads, neurons, and embedding channels.
 - [[method-modegpt-global-sparsity-allocation]] converts BI into per-layer
   sparsity rather than a discrete pruning or replacement order.
+- [[experiment-initial-block-compression-study]] uses canonical BI as a layer
+  selection baseline and keeps its MLP-local adaptation separately named.
 
 ## Sources
 

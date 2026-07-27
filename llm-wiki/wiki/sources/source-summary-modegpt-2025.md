@@ -5,7 +5,7 @@ summary: MoDeGPT jointly compresses matrix pairs within Transformer modules and 
 type: source-summary
 status: review
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-07-27
 
 authorship:
   created_by: collaborative
@@ -51,6 +51,7 @@ related:
   - "[[method-modegpt-modular-decomposition]]"
   - "[[method-modegpt-global-sparsity-allocation]]"
   - "[[method-block-importance]]"
+  - "[[method-quality-preservation-evaluation]]"
 supersedes: []
 superseded_by: []
 ---
@@ -208,6 +209,8 @@ sensitive primarily because it contains most of the compressible parameters.
 - [[method-modegpt-global-sparsity-allocation]] records the model-level mapping
   from importance to per-layer sparsity.
 - [[method-block-importance]] is the layer score reused for that allocation.
+- [[method-quality-preservation-evaluation]] uses MoDeGPT's reported tasks and
+  metrics as context for the project evaluation profiles.
 
 ## Sources
 

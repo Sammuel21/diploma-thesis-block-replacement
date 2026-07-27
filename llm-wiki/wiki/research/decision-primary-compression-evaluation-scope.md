@@ -5,7 +5,7 @@ summary: Defines the thesis objective as a footprint-quality trade-off while tre
 type: decision
 status: review
 created: 2026-07-18
-updated: 2026-07-21
+updated: 2026-07-27
 
 authorship:
   created_by: collaborative
@@ -51,6 +51,7 @@ related:
   - "[[concept-moe-parameter-accounting]]"
   - "[[method-quality-preservation-evaluation]]"
   - "[[implementation-compute-environments]]"
+  - "[[experiment-initial-block-compression-study]]"
 supersedes: []
 superseded_by: []
 ---
@@ -171,6 +172,8 @@ and should be linked to a meeting note if one is later created.
   and downstream quality protocol.
 - [[implementation-compute-environments]] records the available project
   environments and the limits on interpreting hardware-specific observations.
+- [[experiment-initial-block-compression-study]] applies the footprint-quality
+  boundary to working block-level and model-level experiments.
 
 ## Sources
 

@@ -5,7 +5,7 @@ summary: Records the local MVP and shared remote execution environments, their v
 type: implementation
 status: review
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-27
 
 authorship:
   created_by: collaborative
@@ -36,6 +36,8 @@ sources: []
 related:
   - "[[concept-model-compression-evaluation-axes]]"
   - "[[decision-primary-compression-evaluation-scope]]"
+  - "[[experiment-initial-block-compression-study]]"
+  - "[[decision-working-experiment-code-standards]]"
 supersedes: []
 superseded_by: []
 ---
@@ -147,6 +149,10 @@ configuration and result artifact through a canonical experiment page.
 - [[decision-primary-compression-evaluation-scope]] explains why this page
   records capacity constraints without treating this hardware as a latency or
   deployment benchmark.
+- [[experiment-initial-block-compression-study]] records the working notebooks
+  intended for the shared remote GPU environment.
+- [[decision-working-experiment-code-standards]] separates execution capacity
+  from the maturity and hardening level of experimental code.
 
 ## Sources
 

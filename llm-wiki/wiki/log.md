@@ -138,3 +138,29 @@ This file is append-only. Entries use the format:
   names, supervisor information, or other-user details.
 - Linked the record to the primary footprint-quality evaluation decision and
   explicitly excluded latency and deployment-performance interpretation.
+
+## [2026-07-27] update | Working initial block-compression experiments
+
+- Added one draft experiment page for the activation-analysis,
+  baseline-testing, and degradation-analysis notebook progression.
+- Recorded the scientific rationale, current configuration, PCA/effective-rank
+  distinction, intended artifacts, and interpretation limits without claiming
+  unexecuted results.
+- Added a project decision for direct working-experiment code, natural
+  multiline formatting, brief docstrings, restrained abstraction, and tests
+  only on explicit researcher request.
+- Recorded the GPT Sol X-high overengineering lesson as a researcher assessment
+  and linked the new pages to BI, error propagation, evaluation scope, and the
+  compute environment.
+
+## [2026-07-27] lint | Initial experiments and code standards
+
+- Checked all 21 maintained pages for frontmatter structure, controlled values,
+  dates, filename-to-ID agreement, required body sections, and registered
+  source references.
+- Checked internal wikilinks, repository artifact links, orphan pages, trailing
+  whitespace, and reciprocal `related` edges.
+- Repaired four pre-existing one-way relationship edges involving evaluation
+  axes, source summaries, compute environments, and MoE parameter accounting.
+- Found no remaining structural, graph, or provenance errors or warnings. This
+  mechanical lint does not verify scientific claims or unexecuted experiments.

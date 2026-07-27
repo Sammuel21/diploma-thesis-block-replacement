@@ -75,11 +75,19 @@ No model, dataset, software, or other entity pages have been created yet.
 - [[decision-primary-compression-evaluation-scope|Primary compression evaluation scope]]:
   Makes footprint-quality trade-offs primary and limits systems metrics to
   optional controlled observations.
+- [[decision-working-experiment-code-standards|Working experiment code standards]]:
+  Keeps initial notebook code direct and readable while deferring tests and
+  production abstractions until explicitly requested.
 
 ## Experiments and Findings
 
-No MVP evidence has been ingested into canonical experiment pages yet. The
-historical archive is available at `docs/prototype/mvp/`.
+- [[experiment-initial-block-compression-study|Initial block-compression study]]:
+  Working three-notebook design covering activation geometry, matched-budget
+  single-block operators, and multi-block degradation. Status: `draft`; no
+  direct results are recorded.
+
+No MVP evidence has been ingested into canonical experiment pages. The
+historical archive remains available at `docs/prototype/mvp/`.
 
 ## Syntheses and Comparisons
 
@@ -88,7 +96,7 @@ No synthesis pages have been created yet.
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-07-18 (evaluation framework update)
+- Last structural lint: 2026-07-27 (initial experiments and code standards)
 - Orphan pages: none detected
 - Registered source collections: 3
 - Registered individual sources: 4

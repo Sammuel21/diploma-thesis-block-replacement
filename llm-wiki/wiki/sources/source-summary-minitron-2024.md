@@ -5,7 +5,7 @@ summary: Minitron derives smaller LLMs through structured pruning, activation-ba
 type: source-summary
 status: review
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-07-27
 
 authorship:
   created_by: collaborative
@@ -50,6 +50,7 @@ related:
   - "[[method-block-importance]]"
   - "[[method-post-pruning-knowledge-distillation]]"
   - "[[method-retraining-assisted-architecture-search]]"
+  - "[[method-quality-preservation-evaluation]]"
 supersedes: []
 superseded_by: []
 ---
@@ -208,6 +209,8 @@ prior-work evidence.
   and loss ablations.
 - [[method-retraining-assisted-architecture-search]] captures candidate search
   under a shared lightweight recovery budget.
+- [[method-quality-preservation-evaluation]] uses Minitron's model-quality
+  reporting as context for the project evaluation protocol.
 
 ## Sources
 

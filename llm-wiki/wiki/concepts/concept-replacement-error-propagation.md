@@ -5,7 +5,7 @@ summary: Local approximation errors alter downstream activation distributions an
 type: concept
 status: review
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-07-27
 
 authorship:
   created_by: collaborative
@@ -42,6 +42,7 @@ sources:
 related:
   - "[[source-summary-grafting-2025]]"
   - "[[method-two-stage-operator-grafting]]"
+  - "[[experiment-initial-block-compression-study]]"
 supersedes: []
 superseded_by: []
 ---
@@ -100,6 +101,8 @@ The thesis should test that relationship directly and report both levels.
 - [[source-summary-grafting-2025]] supplies the primary prior-work evidence.
 - [[method-two-stage-operator-grafting]] addresses propagation through
   integrated model-level recovery.
+- [[experiment-initial-block-compression-study]] measures whether simultaneous
+  replacement degradation is additive or shows interaction.
 
 ## Sources
 
