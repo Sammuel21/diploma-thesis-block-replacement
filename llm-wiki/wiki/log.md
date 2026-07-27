@@ -128,3 +128,13 @@ This file is append-only. Entries use the format:
 - Rechecked changed files for whitespace errors.
 - No broken wiki links, unregistered source references, or structural errors
   were found.
+
+## [2026-07-21] update | Research compute environments
+
+- Added a sanitized implementation record for the local MVP and shared remote
+  experiment environments.
+- Recorded reproducible user-level setup, capacity constraints, and the
+  successful remote smoke run without host identifiers, network data, account
+  names, supervisor information, or other-user details.
+- Linked the record to the primary footprint-quality evaluation decision and
+  explicitly excluded latency and deployment-performance interpretation.

@@ -91,3 +91,86 @@ def collect_module_io(model, module_path, loader, max_batches, device, storage_d
         inputs=torch.cat(input_chunks, dim=0),
         targets=torch.cat(target_chunks, dim=0),
     )
+
+
+def collect_modules_io(
+    model,
+    module_paths,
+    loader,
+    max_batches,
+    device,
+    storage_device="cpu",
+    storage_dtype=torch.float32,
+):
+    """Capture corresponding inputs and outputs for several modules in one pass."""
+
+    if max_batches < 1:
+        raise ValueError("max_batches must be positive")
+    paths = tuple(dict.fromkeys(str(path) for path in module_paths))
+    if not paths:
+        raise ValueError("At least one module path is required")
+
+    input_chunks = {path: [] for path in paths}
+    target_chunks = {path: [] for path in paths}
+    pending = {path: [] for path in paths}
+    handles = []
+
+    for path in paths:
+        module = model.get_submodule(path)
+
+        def pre_hook(_module, args, module_path=path):
+            pending[module_path].append(first_tensor(args).detach())
+
+        def post_hook(_module, _args, output, module_path=path):
+            if not pending[module_path]:
+                raise RuntimeError(
+                    f"Module output for {module_path} has no matching input"
+                )
+            inputs = pending[module_path].pop()
+            targets = first_tensor(output).detach()
+            input_chunks[module_path].append(
+                inputs.reshape(-1, inputs.shape[-1]).to(
+                    device=storage_device,
+                    dtype=storage_dtype,
+                )
+            )
+            target_chunks[module_path].append(
+                targets.reshape(-1, targets.shape[-1]).to(
+                    device=storage_device,
+                    dtype=storage_dtype,
+                )
+            )
+
+        handles.append(module.register_forward_pre_hook(pre_hook))
+        handles.append(module.register_forward_hook(post_hook))
+
+    was_training = model.training
+    model.eval()
+    try:
+        with torch.no_grad():
+            for batch_index, batch in enumerate(loader):
+                if batch_index >= max_batches:
+                    break
+                device_batch = {
+                    key: value.to(device) if isinstance(value, torch.Tensor) else value
+                    for key, value in batch.items()
+                }
+                model(**device_batch)
+    finally:
+        for handle in handles:
+            handle.remove()
+        model.train(was_training)
+
+    unmatched = [path for path in paths if pending[path]]
+    if unmatched:
+        raise RuntimeError(f"Activation capture ended with unmatched modules: {unmatched}")
+    missing = [path for path in paths if not input_chunks[path]]
+    if missing:
+        raise ValueError(f"No activations were captured for modules: {missing}")
+    return {
+        path: ActivationPairs(
+            inputs=torch.cat(input_chunks[path], dim=0),
+            targets=torch.cat(target_chunks[path], dim=0),
+        )
+        for path in paths
+    }

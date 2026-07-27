@@ -66,8 +66,9 @@ No model, dataset, software, or other entity pages have been created yet.
 
 ## Implementations
 
-No implementation pages have been created yet. The page type and template are
-available for stable components and pipelines during codebase consolidation.
+- [[implementation-compute-environments|Research compute environments]]:
+  Records the local MVP and shared remote experiment capacity, setup, and
+  constraints without identifying the remote host or its owner.
 
 ## Research
 
