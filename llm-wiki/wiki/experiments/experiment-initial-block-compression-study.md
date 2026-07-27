@@ -1,7 +1,7 @@
 ---
 id: experiment-initial-block-compression-study
 title: Initial Block-Compression Study
-summary: Defines the working three-notebook progression from activation geometry through single-block operator comparison to multi-block degradation.
+summary: Defines the working three-notebook block-compression study and an optional quantization baseline for numerical compression.
 type: experiment
 status: draft
 created: 2026-07-27
@@ -28,6 +28,7 @@ scope:
     - mlp-block-replacement
     - operator-comparison
     - pca
+    - quantization
   granularities:
     - mlp-block
     - transformer-layer
@@ -76,6 +77,9 @@ The study asks three progressively broader questions:
    one frozen MLP block most effectively?
 3. With one simple operator fixed, how do layer selection and the number of
    simultaneous replacements affect complete-model degradation?
+4. At a comparable storage budget, how competitive is simple MLP quantization
+   with learned operator replacement, and does quantizing a replacement add a
+   useful final compression step?
 
 This progression deliberately separates representation diagnostics, operator
 expressivity, and model-level composition.
@@ -92,7 +96,10 @@ establishing, the following propositions:
 - BI, local approximation error, and layer depth may describe different parts
   of block replaceability; and
 - degradation from several replacements may be non-additive because upstream
-  approximation errors change downstream inputs.
+  approximation errors change downstream inputs; and
+- uniform MLP quantization may be a strong numerical baseline at matched
+  storage cost, while importance-aware mixed precision may improve its
+  footprint-quality trade-off.
 
 ## Rationale for the Three-Notebook Progression
 
@@ -160,6 +167,32 @@ linear-plus-nonlinear-residual replacements. Evaluate four approximately
 matched parameter tiers. Report local approximation metrics and complete-model
 WikiText-2 degradation without recovery.
 
+### Working Numerical Baseline Extension
+
+**Researcher baseline idea.** Quantization is retained as an optional numerical
+compression comparison around the operator-replacement study, not as another
+replacement operator or a required fourth notebook.
+
+The simplest baseline should apply uniform weight quantization to the MLP
+weights, initially at 8-bit and 4-bit precision. It should be evaluated before
+adding importance estimation so that the contribution of quantization itself
+remains visible. A stronger follow-up may use importance-aware mixed precision,
+assigning different bit widths under one fixed total storage budget. Because
+that variant combines numerical compression with component selection, its
+importance metric and allocation rule must be reported separately from the
+uniform baseline.
+
+Comparisons with learned replacements must match stored footprint rather than
+parameter count: quantization normally changes bytes per parameter while
+retaining the number of parameters. Report the quantized MLP footprint and
+complete-model footprint separately. After selecting a promising replacement,
+quantizing its fitted weights can serve as a small combined structural and
+numerical compression experiment.
+
+The exact quantization implementation, calibration convention, importance
+estimator, and supported precisions remain open design choices. This extension
+should stay small unless its initial results justify deeper investigation.
+
 ### Stage 3: Multi-Block Degradation Analysis
 
 Fit one bias-free dense linear replacement for every eligible layer. Compute
@@ -224,6 +257,8 @@ low-BI, or low-local-error blocks are generally replaceable.
 - The adapted MLP-local BI is not canonical whole-layer BI.
 - The advanced multi-block comparison is deferred until the single-block stage
   identifies a stronger equal-cost operator.
+- Quantization is currently a baseline idea only; no implementation, matched
+  storage protocol, or result artifact has been selected.
 
 ## Reproducibility Status
 

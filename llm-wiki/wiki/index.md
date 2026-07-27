@@ -83,8 +83,8 @@ No model, dataset, software, or other entity pages have been created yet.
 
 - [[experiment-initial-block-compression-study|Initial block-compression study]]:
   Working three-notebook design covering activation geometry, matched-budget
-  single-block operators, and multi-block degradation. Status: `draft`; no
-  direct results are recorded.
+  single-block operators, multi-block degradation, and an optional quantization
+  baseline. Status: `draft`; no direct results are recorded.
 
 No MVP evidence has been ingested into canonical experiment pages. The
 historical archive remains available at `docs/prototype/mvp/`.

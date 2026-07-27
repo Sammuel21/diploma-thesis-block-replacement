@@ -164,3 +164,31 @@ This file is append-only. Entries use the format:
   axes, source summaries, compute environments, and MoE parameter accounting.
 - Found no remaining structural, graph, or provenance errors or warnings. This
   mechanical lint does not verify scientific claims or unexecuted experiments.
+
+## [2026-07-27] update | Quantization baseline idea
+
+- Added uniform MLP weight quantization as an optional numerical baseline for
+  the initial block-compression study, beginning with 8-bit and 4-bit variants.
+- Recorded importance-aware mixed precision as a stronger follow-up and kept
+  its selection contribution distinct from the uniform baseline.
+- Required storage-footprint matching rather than parameter-count matching and
+  retained quantization of the best fitted replacement as a small combined
+  compression experiment.
+- Left implementation, calibration, importance estimation, and precise budget
+  choices unresolved; no empirical result is claimed.
+
+## [2026-07-27] lint | Quantization baseline update
+
+- Checked the changed experiment page, index entry, and operation log for
+  conflict markers and trailing whitespace.
+- Confirmed that the update introduces no new wiki links or source claims and
+  preserves the experiment page's draft, unverified status.
+
+## [2026-07-27] governance | Scoped wiki instructions
+
+- Condensed `llm-wiki/AGENTS.md` by routing detailed metadata and operation
+  procedures to the authoritative `SCHEMA.md` instead of repeating them.
+- Preserved the source boundary, evidence discipline, historical-MVP boundary,
+  explicit-operation requirement, and wiki completion checklist.
+- Limited source-registry consultation to operations involving source identity
+  or provenance.
