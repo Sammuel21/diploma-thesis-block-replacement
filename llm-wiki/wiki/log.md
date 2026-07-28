@@ -192,3 +192,12 @@ This file is append-only. Entries use the format:
   explicit-operation requirement, and wiki completion checklist.
 - Limited source-registry consultation to operations involving source identity
   or provenance.
+
+## [2026-07-27] update | Human-readable call formatting
+
+- Revised the working experiment code standard so definitions and calls with
+  five or fewer items remain compact or use row-like continuation lines.
+- Reserved one-parameter-or-argument-per-line formatting for calls with more
+  than five items or individually complex expressions.
+- Removed the mechanical one-item-per-line expectation for containers in favor
+  of natural grouping based on structure and readability.

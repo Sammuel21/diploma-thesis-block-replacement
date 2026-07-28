@@ -88,28 +88,50 @@ an experiment change.
    columns or use tabs.
 2. Keep a short definition or call on one line when it remains naturally
    readable.
-3. Once a function definition or call is split across lines, put one parameter
-   or argument on each line, use a trailing comma, and align the closing
-   delimiter with the beginning of the expression.
-4. Apply the same one-item-per-line rule to multiline dictionaries, lists, and
-   configuration blocks when several values would otherwise be compressed
-   together.
-5. Prefer readable lines around the existing 88-to-100-character convention,
+3. For definitions or calls with five or fewer parameters or arguments, prefer
+   a compact row-like layout. If the expression must wrap, group the arguments
+   naturally on one or a small number of continuation lines instead of placing
+   every argument on its own line.
+4. One-parameter-or-argument-per-line formatting is appropriate by default
+   only for longer definitions or calls with more than five items, or when the
+   individual expressions are themselves too complex to scan as a group.
+5. Format dictionaries, lists, and configuration blocks according to their
+   structure. Keep short related values together and expand genuinely long or
+   nested content; do not apply a mechanical one-item-per-line rule.
+6. Prefer readable lines around the existing 88-to-100-character convention,
    but do not contort simple expressions solely to satisfy a number.
 
-Preferred multiline form:
+Preferred short-call form:
+
+```python
+result = evaluate_candidate(model, replacement, validation_loader, max_batches=24)
+```
+
+If the surrounding names make that line too long, retain the row-like grouping:
+
+```python
+result = evaluate_candidate(
+    model, replacement, validation_loader, max_batches=24
+)
+```
+
+Reserve the expanded form for calls that are genuinely long:
 
 ```python
 result = evaluate_candidate(
     model,
     replacement,
+    calibration_loader,
     validation_loader,
+    metrics,
+    output_path,
     max_batches=24,
 )
 ```
 
-Avoid mixing several parameters on one continuation line or using arbitrary
-extra indentation to visually align values.
+The threshold is a readability default rather than a formatter rule. Prefer
+the layout a researcher can scan and edit naturally, without arbitrary manual
+alignment.
 
 ## Docstrings and Comments
 
