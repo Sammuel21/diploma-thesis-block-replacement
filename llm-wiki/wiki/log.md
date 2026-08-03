@@ -201,3 +201,23 @@ This file is append-only. Entries use the format:
   than five items or individually complex expressions.
 - Removed the mechanical one-item-per-line expectation for containers in favor
   of natural grouping based on structure and readability.
+
+## [2026-08-02] update | Focused block-notebook baseline
+
+- Reframed activation analysis as a concise descriptive report while retaining
+  its covariance, reconstruction, and local JSON artifact calculations.
+- Replaced the matched-budget operator-family grid with one fixed bias-free
+  narrow SwiGLU at `r = d_model / 2`, plus original, zero, and mean controls.
+- Kept dense-linear multi-block degradation as an independent diagnostic and
+  removed B4 and stronger-equal-cost dependency language.
+- Updated the experiment page and index without recording empirical findings;
+  clean remote execution and result review remain pending.
+
+## [2026-08-02] lint | Focused block-notebook baseline
+
+- Parsed all code cells in the three block-study notebooks and validated their
+  notebook structure, unique cell IDs, cleared execution state, and outputs.
+- Checked all 21 maintained wiki pages for required metadata, filename-to-ID
+  agreement, verification-state validity, required sections, and internal links.
+- Confirmed that the experiment remains `draft` and `unverified`, with no direct
+  numerical result recorded before the planned remote execution.

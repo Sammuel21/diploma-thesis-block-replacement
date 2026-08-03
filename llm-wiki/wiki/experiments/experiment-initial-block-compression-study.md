@@ -1,11 +1,11 @@
 ---
 id: experiment-initial-block-compression-study
 title: Initial Block-Compression Study
-summary: Defines the working three-notebook block-compression study and an optional quantization baseline for numerical compression.
+summary: Defines the working activation, practical single-block replacement, and multi-block degradation studies with an optional quantization baseline.
 type: experiment
 status: draft
 created: 2026-07-27
-updated: 2026-07-27
+updated: 2026-08-02
 
 authorship:
   created_by: collaborative
@@ -70,11 +70,11 @@ preserved and reviewed.
 
 ## Objective
 
-The study asks three progressively broader questions:
+The study asks four progressively broader questions:
 
 1. Do MLP activations exhibit low-dimensional structure on calibration data?
-2. At matched parameter budgets, which smaller operator families approximate
-   one frozen MLP block most effectively?
+2. Can one fixed reduced-width SwiGLU approximate a frozen MLP block better
+   than complete-removal and constant-output controls?
 3. With one simple operator fixed, how do layer selection and the number of
    simultaneous replacements affect complete-model degradation?
 4. At a comparable storage budget, how competitive is simple MLP quantization
@@ -91,8 +91,9 @@ establishing, the following propositions:
 
 - post-gating activations may concentrate most variance in substantially fewer
   directions than their nominal intermediate width;
-- a compact nonlinear or hybrid operator may outperform a simpler linear
-  operator at the same parameter cost;
+- a reduced-width SwiGLU with `r = d_model / 2` may preserve more of one MLP's
+  function than zero and mean-output controls while retaining only 12.5% of
+  that block's parameters;
 - BI, local approximation error, and layer depth may describe different parts
   of block replaceability; and
 - degradation from several replacements may be non-additive because upstream
@@ -106,7 +107,7 @@ establishing, the following propositions:
 | Stage | Experimental unit | Rationale |
 | --- | --- | --- |
 | Activation analysis | Representations from one untouched block | Establish descriptive geometry before changing the model. |
-| Baseline testing | One replacement at one layer | Separate operator family from capacity under matched budgets. |
+| Baseline testing | One fixed learned replacement and controls at one layer | Establish a practical reference before considering architecture or width search. |
 | Degradation analysis | Several simultaneously replaced layers | Measure selection effects, accumulation, and interaction after a simple operator is understood. |
 
 The degradation analysis remains separate because BI is a layer-selection
@@ -128,6 +129,8 @@ Current defaults are exploratory:
 - operator validation: 24 document-disjoint batches;
 - model validation: WikiText-2 validation batches where required;
 - seed: 21;
+- single-block replacement: bias-free SwiGLU with `r = d_model / 2`;
+- single-block conditions: original MLP, zero, mean, and narrow SwiGLU;
 - recovery: disabled; and
 - intended execution environment: the shared RTX 4090 environment documented
   in [[implementation-compute-environments]].
@@ -161,11 +164,12 @@ after the original down projection.
 
 ### Stage 2: Single-Block Baseline Testing
 
-Capture dense-model `(x, y)` pairs for layer 11 and compare zero, mean,
-low-rank linear, dense linear, standard MLP, narrow gated MLP, and
-linear-plus-nonlinear-residual replacements. Evaluate four approximately
-matched parameter tiers. Report local approximation metrics and complete-model
-WikiText-2 degradation without recovery.
+Capture dense-model `(x, y)` pairs for layer 11. Compare the original MLP, a
+zero-output removal control, a calibration-output mean control, and one
+bias-free SwiGLU replacement with width `r = d_model / 2`. Fit only the narrow
+SwiGLU using activation MSE. Report its optimization history, exact footprint,
+held-out local approximation metrics, and complete-model WikiText-2 degradation
+without recovery. This stage does not search widths or operator families.
 
 ### Working Numerical Baseline Extension
 
@@ -230,8 +234,9 @@ reconstruction.
 The post-down-projection PCA error also depends on how discarded directions
 align with the original down-projection weights; effective rank cannot express
 that relationship. Neither measurement directly determines a deployable
-replacement width. Replacement rank or hidden width must still be selected
-from quality-versus-budget experiments.
+replacement width. The fixed `d_model / 2` width is a practical baseline
+decision; a later controlled ablation would be required to compare widths or
+support an optimality claim.
 
 ## Direct Results
 
@@ -247,24 +252,25 @@ low-BI, or low-local-error blocks are generally replaceable.
 
 ## Limitations
 
-- The activation and operator-family stages currently study only layer 11.
-- The operator comparison uses one model and one training seed.
-- The parameter tiers are aggressive and may all lie below an acceptable
-  quality threshold.
+- The activation and practical replacement stages currently study only layer 11.
+- The practical replacement baseline uses one model, one layer, and one
+  training seed.
+- The selected `d_model / 2` width is not claimed to be optimal or minimal.
 - Runtime, latency, and downstream benchmark evaluation are not part of these
   initial notebooks.
 - PCA is a reconstruction oracle, not a deployable compressed SwiGLU.
 - The adapted MLP-local BI is not canonical whole-layer BI.
-- The advanced multi-block comparison is deferred until the single-block stage
-  identifies a stronger equal-cost operator.
+- The degradation notebook's dense-linear replacement is an independent
+  diagnostic; comparing its selection curves with the narrow SwiGLU would
+  require a separate replication.
 - Quantization is currently a baseline idea only; no implementation, matched
   storage protocol, or result artifact has been selected.
 
 ## Reproducibility Status
 
 Status: working and unverified. The current notebooks expose their main model,
-data, seed, budget, and output-path choices, but clean-kernel executions and
-preserved result artifacts remain pending. Production hardening and automated
+data, seed, fixed replacement, and output-path choices, but clean-kernel
+executions and preserved result artifacts remain pending. Production hardening and automated
 tests are intentionally deferred under
 [[decision-working-experiment-code-standards]].
 

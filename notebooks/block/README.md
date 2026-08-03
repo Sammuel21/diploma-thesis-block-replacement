@@ -5,10 +5,10 @@ experiments. Run them in this order:
 
 1. `activation-analysis.ipynb` studies activation geometry without modifying
    the model.
-2. `baseline-testing.ipynb` compares one-block replacement families at matched
-   parameter budgets.
-3. `degradation-analysis.ipynb` freezes the dense-linear baseline and varies
-   BI-based or random layer selection and the number of replacements.
+2. `baseline-testing.ipynb` evaluates one fixed reduced-width SwiGLU against
+   the original MLP and zero/mean controls at layer 11.
+3. `degradation-analysis.ipynb` independently freezes a dense-linear diagnostic
+   operator and varies BI-based or random layer selection and replacement count.
 
 The notebooks import scientific logic from `src/mlp_replacement/`. They should
 be restartable and runnable from a clean kernel. Their default configuration is
@@ -20,10 +20,9 @@ Generated summaries are written below `data/results/notebook-block-study/`,
 which is local experiment storage and is ignored by Git. Raw activation tensors
 are not persisted by these notebooks.
 
-The final degradation section simply reserves the later comparison with a
-stronger operator. Its implementation should be added only after the
-single-block results identify which operator and budget are worth carrying
-forward.
+The degradation notebook does not treat the dense-linear operator as the winner
+of the single-block baseline. A later cross-operator replication may reuse its
+selection protocol only after the narrow-SwiGLU result has been reviewed.
 
 All outputs are exploratory until repeated with frozen model/data revisions,
 additional layers and seeds, and the confirmation evaluation protocol.

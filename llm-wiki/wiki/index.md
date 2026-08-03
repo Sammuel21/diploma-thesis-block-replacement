@@ -82,9 +82,10 @@ No model, dataset, software, or other entity pages have been created yet.
 ## Experiments and Findings
 
 - [[experiment-initial-block-compression-study|Initial block-compression study]]:
-  Working three-notebook design covering activation geometry, matched-budget
-  single-block operators, multi-block degradation, and an optional quantization
-  baseline. Status: `draft`; no direct results are recorded.
+  Working three-notebook design covering activation geometry, one practical
+  narrow-SwiGLU baseline, independent dense-linear multi-block degradation, and
+  an optional quantization baseline. Status: `draft`; no direct results are
+  recorded.
 
 No MVP evidence has been ingested into canonical experiment pages. The
 historical archive remains available at `docs/prototype/mvp/`.
@@ -96,7 +97,7 @@ No synthesis pages have been created yet.
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-07-27 (initial experiments and code standards)
+- Last structural lint: 2026-08-02 (focused block-notebook baseline)
 - Orphan pages: none detected
 - Registered source collections: 3
 - Registered individual sources: 4
