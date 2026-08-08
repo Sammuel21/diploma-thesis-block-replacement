@@ -5,7 +5,7 @@ summary: Converts layer importance scores into a smoothed nonuniform sparsity di
 type: method
 status: review
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-08-08
 
 authorship:
   created_by: collaborative
@@ -45,6 +45,7 @@ related:
   - "[[source-summary-modegpt-2025]]"
   - "[[method-modegpt-modular-decomposition]]"
   - "[[method-block-importance]]"
+  - "[[method-global-to-local-operator-budget-allocation]]"
 supersedes: []
 superseded_by: []
 ---
@@ -116,9 +117,12 @@ a proxy even when it outperforms uniform sparsity.
   inside the layer's functional modules.
 - [[method-block-importance]] defines the layer score used by the source; the
   allocation uses BI continuously rather than only selecting a top-k set.
+- [[method-global-to-local-operator-budget-allocation]] uses MoDeGPT as a
+  precedent but defines a distinct project method for whole-model parameter
+  accounting, per-block replacement caps, configurable importance inputs, and
+  optional reconciliation of unused local budgets.
 
 ## Sources
 
 - `src-modegpt-2025` - Section 3.3, Section 4.5, Figure 6, Table 9, and
   Appendices B.10-B.11
-

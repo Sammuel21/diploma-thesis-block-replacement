@@ -5,7 +5,7 @@ summary: Defines the working activation, practical single-block replacement, and
 type: experiment
 status: draft
 created: 2026-07-27
-updated: 2026-08-02
+updated: 2026-08-03
 
 authorship:
   created_by: collaborative
@@ -259,7 +259,9 @@ low-BI, or low-local-error blocks are generally replaceable.
 - Runtime, latency, and downstream benchmark evaluation are not part of these
   initial notebooks.
 - PCA is a reconstruction oracle, not a deployable compressed SwiGLU.
-- The adapted MLP-local BI is not canonical whole-layer BI.
+- The current adapted MLP-local score compares the normalized MLP input with
+  the raw MLP output. It is not canonical whole-layer BI or the proposed
+  residual-aware MLP influence score.
 - The degradation notebook's dense-linear replacement is an independent
   diagnostic; comparing its selection curves with the narrow SwiGLU would
   require a separate replication.

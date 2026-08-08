@@ -221,3 +221,103 @@ This file is append-only. Entries use the format:
   agreement, verification-state validity, required sections, and internal links.
 - Confirmed that the experiment remains `draft` and `unverified`, with no direct
   numerical result recorded before the planned remote execution.
+
+## [2026-08-03] governance | Equation provenance and notebook delivery choice
+
+- Extended claim-level provenance rules to require explicit classification of
+  introduced equations and a clear statement of their citation requirements.
+- Added a repository-wide requirement to confirm whether Jupyter notebook work
+  should be applied to the `.ipynb` file or returned as chat code blocks when
+  the user has not already specified the delivery form.
+- Kept schema version 1.1 because the change adds non-breaking evidence guidance
+  and requires no page migration.
+
+## [2026-08-03] update | BI and MLP screening boundaries
+
+- Extended the existing Block Importance method page instead of creating a
+  duplicate importance-screening page.
+- Kept canonical complete-layer BI as the source-derived baseline and separated
+  it from the project's raw MLP input-output cosine-distance implementation.
+- Added a residual-stream decomposition and a residual-aware MLP influence
+  score explicitly labelled as synthesis and a project-proposed definition.
+- Clarified that proxy agreement does not establish model-level importance
+  without a controlled model-loss outcome.
+- Aligned the initial experiment page with the more precise raw-MLP-score
+  terminology without recording a new empirical result.
+
+## [2026-08-08] update | Global-to-local operator budget methodology
+
+- Added a draft project method that converts one whole-model parameter-
+  sparsity target into bounded per-block replacement-budget caps without
+  selecting local operators.
+- Separated fixed accounting and conservation rules from configurable
+  importance, normalization, allocation-temperature, local-construction, and
+  recovery policies.
+- Defined a rank-normalized, size-weighted softmax reference allocator and
+  distinguished normalized global removal shares from local retention caps
+  and realized sparsities.
+- Added optional leftover-budget reconciliation based on feasible marginal
+  utility, followed by recovery only after the architecture is finalized.
+- Connected the method to BI, MoDeGPT allocation, replacement-error
+  propagation, footprint-quality evaluation, and MoE parameter accounting.
+- Did not promote exploratory importance-notebook output to an empirical
+  finding and made no notebook, source-registry, or production-code change.
+
+## [2026-08-08] lint | Global-to-local operator budget methodology
+
+- Checked all 22 maintained pages for required metadata, controlled values,
+  valid dates, filename-to-ID agreement, verification states, required body
+  sections, and registered source locators and relations.
+- Checked internal wikilinks, repository artifact links, index coverage,
+  duplicate IDs and relationships, orphan pages, reciprocal `related` edges,
+  exact conflict markers, trailing whitespace, and changed-file whitespace.
+- Reviewed the changed methodology surfaces for consistent use of global
+  target, initial cap, hard ceiling, actual use, retention, and realized
+  sparsity, and checked that every new equation states its provenance class.
+- Found no remaining structural, graph, or provenance errors or warnings. The
+  new method remains `draft` and `unverified`; lint does not establish its
+  empirical effectiveness.
+
+## [2026-08-08] update | Portable Markdown math rendering
+
+- Replaced all 11 plain-text equation blocks in the global-to-local operator
+  budget method with `$$`-delimited MathJax supported by both GitHub Markdown
+  and Obsidian.
+- Used `aligned` environments for multi-line systems and ordinary `$...$`
+  delimiters for mathematical notation in prose and tables.
+- Preserved the method's equations, epistemic labels, source attribution, and
+  unverified status; no methodological or empirical claim was added.
+
+## [2026-08-08] lint | Portable Markdown math rendering
+
+- Rechecked all 22 maintained pages for required metadata, registered sources,
+  internal links, index coverage, and reciprocal `related` edges.
+- Confirmed 11 balanced display-math blocks, balanced `aligned` environments,
+  no unmatched inline-math delimiters, and no remaining plain-text equation
+  fences in the changed method page.
+- Found no structural, graph, math-delimiter, or changed-file whitespace
+  errors or warnings. Rendering was expressed in the shared GitHub-and-Obsidian
+  MathJax syntax without introducing platform-specific HTML or equation images.
+
+## [2026-08-08] distill | Global-to-local operator budget methodology
+
+- Created a compact human-facing methodology document under `docs/methodology/` with a
+  variable table and six numbered steps from global accounting through
+  evaluation.
+- Preserved the distinction between fixed accounting, configurable importance,
+  downstream operator construction, and optional unused-budget reconciliation.
+- Kept the method explicitly project-proposed and unverified, retained the
+  MoDeGPT motivation boundary, and added traceability to the maintained wiki.
+- Added the document to `docs/README.md` and linked it back from the detailed method
+  page.
+
+## [2026-08-08] lint | Distilled operator budget methodology
+
+- Checked the distilled document's numbered structure, balanced inline and
+  display math, relative links, documentation navigation, and wiki backlink.
+- Rechecked the 22-page maintained wiki graph after the backlink addition,
+  including metadata structure, registered sources, internal links, index
+  coverage, and reciprocal `related` relationships.
+- Found no documentation-link, math-delimiter, structural, graph, or
+  changed-file whitespace errors or warnings. This lint does not establish the
+  proposed allocator's empirical effectiveness.

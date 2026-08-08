@@ -1,11 +1,11 @@
 ---
 id: method-block-importance
-title: Block Importance
-summary: Estimates Transformer-layer sensitivity from cosine distance between the layer input and output residual representations.
+title: Block Importance and MLP Screening Adaptations
+summary: Documents canonical Transformer-layer BI and distinguishes raw MLP input-output cosine distance from a proposed residual-aware MLP adaptation.
 type: method
 status: review
 created: 2026-07-17
-updated: 2026-07-27
+updated: 2026-08-08
 
 authorship:
   created_by: collaborative
@@ -14,7 +14,7 @@ authorship:
     - llm
 
 epistemic:
-  role: prior-work
+  role: mixed
   confidence: medium
   verification:
     - source-checked
@@ -22,9 +22,11 @@ epistemic:
 scope:
   topics:
     - block-importance
+    - importance-screening
     - depth-pruning
     - activation-based-importance
   granularities:
+    - mlp-block
     - transformer-layer
     - model
   pipeline_stages:
@@ -44,12 +46,13 @@ related:
   - "[[source-summary-modegpt-2025]]"
   - "[[method-minitron-activation-based-importance]]"
   - "[[method-modegpt-global-sparsity-allocation]]"
+  - "[[method-global-to-local-operator-budget-allocation]]"
   - "[[experiment-initial-block-compression-study]]"
 supersedes: []
 superseded_by: []
 ---
 
-# Block Importance
+# Block Importance and MLP Screening Adaptations
 
 ## Overview
 
@@ -58,11 +61,11 @@ Minitron to rank complete Transformer layers for depth pruning. Minitron adopts
 the metric from ShortGPT; the original source has not yet been registered or
 ingested in this wiki. [src-minitron-2024, Sections 2.2 and 5]
 
-## Definition or Description
+## Canonical Transformer-Layer BI
 
-For layer `i`, BI is one minus the expected cosine similarity between residual
-representations entering and leaving that layer, evaluated across calibration
-samples and token positions:
+**Source-derived equation.** For layer `i`, BI is one minus the expected cosine
+similarity between residual representations entering and leaving that complete
+Transformer layer, evaluated across calibration samples and token positions:
 
 ```text
 BI_i = 1 - E[cos(X_i,t, X_i+1,t)]
@@ -73,6 +76,96 @@ little under this metric; a larger score means a larger directional change.
 Minitron interprets this as layer sensitivity and removes layers with the
 lowest scores. All layer scores can be collected in one forward pass.
 [src-minitron-2024, Section 2.2]
+
+Canonical BI spans the complete decoder layer. It therefore combines changes
+from attention, the attention residual connection, the MLP, and the MLP
+residual connection. It is the prior-work baseline for importance screening in
+this thesis, but it is not an MLP-specific score.
+
+## Residual-Stream Boundaries
+
+**Standard architectural notation.** The following decomposition is
+explanatory notation for a pre-normalized residual Transformer, not a new
+method claim:
+
+```text
+a_i = Attention(Norm_1(h_i))
+u_i = h_i + a_i
+m_i = MLP(Norm_2(u_i))
+h_i+1 = u_i + m_i
+```
+
+Here, `h_i` is the complete layer input, `u_i` is the residual representation
+after the attention update, `m_i` is the raw MLP update, and `h_i+1` is the
+complete layer output. Ordinary use of this decomposition does not require a
+method citation, although a thesis description of a specific model should cite
+that model's architecture or implementation.
+
+The residual boundary matters because `m_i` is an update added to the ongoing
+representation, not the representation passed onward by itself. Comparing an
+MLP input directly with `m_i` therefore does not measure the actual
+before-versus-after change in the residual stream. Direction also does not
+encode update magnitude: a small orthogonal update can change the residual
+state little, while a large aligned update can change its magnitude
+substantially.
+
+## MLP-Specific Screening Candidates
+
+### Raw MLP Input-Output Cosine Distance
+
+**Project implementation description.** The current optional `mlp_sublayer`
+scope compares the normalized MLP input with the raw MLP output:
+
+```text
+raw_mlp_score_i = 1 - E[cos(Norm_2(u_i), m_i)]
+```
+
+This equation describes the maintained implementation and requires no external
+literature citation. The implementation is located in
+[`src/mlp_replacement/screening.py`](../../../src/mlp_replacement/screening.py).
+
+This score is not canonical BI. Its values can exceed one when the average
+cosine similarity is negative, which means the raw update tends to point partly
+against the normalized input. Such a value does not by itself establish that
+the MLP is more important. To prevent overinterpretation, results should call
+this quantity `raw MLP input-output cosine distance` or `adapted raw MLP score`,
+not unqualified MLP BI.
+
+### Residual-Aware MLP Influence
+
+**Synthesis and project-proposed definition.** Applying the before-versus-after
+logic of BI specifically around the MLP residual addition gives:
+
+```text
+MLP-BI-res_i = 1 - E[cos(u_i, u_i + m_i)]
+```
+
+This proposed formalization is not attributed to the registered papers and
+does not require a prior-work citation as currently stated. It must remain
+labelled as an adapted project metric unless an original source defining the
+same quantity is registered and checked.
+
+The residual-aware form isolates the directional change observed immediately
+before and after the MLP update. It is better aligned with MLP influence than
+the raw input-output score, but it remains a cosine heuristic: it ignores pure
+norm changes and does not directly measure downstream loss, replacement
+sensitivity, or recovery potential.
+
+## Screening Interpretation
+
+The thesis should keep three questions distinct:
+
+- canonical BI asks how much the complete Transformer layer changes residual
+  direction;
+- a residual-aware MLP score asks how much the MLP addition changes residual
+  direction; and
+- held-out operator regression error asks how accurately a chosen replacement
+  family approximates the original MLP mapping.
+
+Correlation between these quantities measures agreement between proxies. It
+does not establish that either proxy reliably predicts model-level importance.
+That requires a model-level reference outcome, such as the validation-loss
+change caused by a controlled singleton replacement.
 
 ## Evidence and Rationale
 
@@ -96,9 +189,9 @@ checked in this wiki. [src-minitron-2024, Section 2.2]
 ## Limitations and Open Issues
 
 Minitron's `block` is a complete Transformer layer in the depth-pruning
-setting. The thesis currently studies replacement of an MLP sublayer/operator.
-Computing cosine distance around only the MLP sublayer is a related adaptation,
-not the exact object evaluated by Minitron.
+setting. The thesis studies replacement of an MLP sublayer/operator. Both the
+raw MLP score and residual-aware MLP score are project-level adaptations, not
+the exact object evaluated by Minitron.
 
 BI measures directional representational change, not direct redundancy,
 approximability, downstream causal importance, or expected post-recovery loss.
@@ -118,8 +211,11 @@ definition and experiments are ingested.
   scores used for heads, neurons, and embedding channels.
 - [[method-modegpt-global-sparsity-allocation]] converts BI into per-layer
   sparsity rather than a discrete pruning or replacement order.
+- [[method-global-to-local-operator-budget-allocation]] accepts BI or another
+  direction-corrected importance score as a configurable input for assigning
+  per-block replacement caps without using that score to select an operator.
 - [[experiment-initial-block-compression-study]] uses canonical BI as a layer
-  selection baseline and keeps its MLP-local adaptation separately named.
+  selection baseline and keeps MLP-local adaptations separately named.
 
 ## Sources
 

@@ -20,6 +20,9 @@ LLM-maintained research knowledge base.
 - [Model compression evaluation framework](methodology/evaluation-framework.md)
   defines the current footprint, memory, quality, benchmark, and reporting
   contract.
+- [Global-to-local MLP operator budget allocation](methodology/global-to-local-operator-budget-allocation.md)
+  summarizes the numbered procedure for converting one model-level parameter
+  target into block-specific replacement caps and reconciling unused budget.
 
 ## Historical prototype
 

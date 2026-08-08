@@ -40,9 +40,9 @@ No model, dataset, software, or other entity pages have been created yet.
 
 - [[method-minitron-activation-based-importance|Minitron activation-based importance]]:
   Forward-only width-component ranking from calibration activations.
-- [[method-block-importance|Block Importance]] - Transformer-layer sensitivity
-  from input-output cosine distance, currently documented through Minitron's
-  use of the metric.
+- [[method-block-importance|Block Importance and MLP screening adaptations]] -
+  Canonical Transformer-layer BI, raw MLP input-output cosine distance, and a
+  proposed residual-aware MLP influence score with their boundaries separated.
 - [[method-post-pruning-knowledge-distillation|Post-pruning knowledge distillation]]:
   Recovery of a pruned student from uncompressed-teacher outputs and optional
   intermediate states.
@@ -60,6 +60,9 @@ No model, dataset, software, or other entity pages have been created yet.
 - [[method-modegpt-global-sparsity-allocation|MoDeGPT global sparsity allocation]]:
   Maps BI scores to a smoothed per-layer sparsity distribution under a global
   compression target.
+- [[method-global-to-local-operator-budget-allocation|Global-to-local operator budget allocation]]:
+  Converts one whole-model parameter-sparsity target into configurable
+  importance-aware MLP replacement caps without selecting local operators.
 - [[method-quality-preservation-evaluation|Quality preservation evaluation]]:
   Defines routine, confirmation, and optional profiles for intrinsic and
   downstream model evaluation.
@@ -97,7 +100,7 @@ No synthesis pages have been created yet.
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-08-02 (focused block-notebook baseline)
+- Last structural lint: 2026-08-08 (global-to-local operator budget methodology)
 - Orphan pages: none detected
 - Registered source collections: 3
 - Registered individual sources: 4

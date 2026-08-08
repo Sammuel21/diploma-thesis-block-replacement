@@ -5,7 +5,7 @@ summary: Defines the thesis objective as a footprint-quality trade-off while tre
 type: decision
 status: review
 created: 2026-07-18
-updated: 2026-07-27
+updated: 2026-08-08
 
 authorship:
   created_by: collaborative
@@ -50,6 +50,7 @@ related:
   - "[[concept-model-compression-evaluation-axes]]"
   - "[[concept-moe-parameter-accounting]]"
   - "[[method-quality-preservation-evaluation]]"
+  - "[[method-global-to-local-operator-budget-allocation]]"
   - "[[implementation-compute-environments]]"
   - "[[experiment-initial-block-compression-study]]"
 supersedes: []
@@ -170,6 +171,9 @@ and should be linked to a meeting note if one is later created.
   parameter accounting.
 - [[method-quality-preservation-evaluation]] specifies the proposed intrinsic
   and downstream quality protocol.
+- [[method-global-to-local-operator-budget-allocation]] operationalizes a
+  whole-model parameter target as local replacement caps and requires final
+  comparisons to report actual rather than only allocated footprint.
 - [[implementation-compute-environments]] records the available project
   environments and the limits on interpreting hardware-specific observations.
 - [[experiment-initial-block-compression-study]] applies the footprint-quality

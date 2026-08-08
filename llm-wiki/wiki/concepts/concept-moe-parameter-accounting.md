@@ -5,7 +5,7 @@ summary: Separates total stored parameters, model memory, and routing-dependent 
 type: concept
 status: review
 created: 2026-07-17
-updated: 2026-07-27
+updated: 2026-08-08
 
 authorship:
   created_by: collaborative
@@ -42,6 +42,7 @@ sources:
 related:
   - "[[source-summary-mone-2026]]"
   - "[[method-mone-novice-expert-replacement]]"
+  - "[[method-global-to-local-operator-budget-allocation]]"
   - "[[concept-model-compression-evaluation-axes]]"
   - "[[decision-primary-compression-evaluation-scope]]"
 supersedes: []
@@ -108,6 +109,9 @@ nominal or measured from routing traces.
 - [[source-summary-mone-2026]] provides the source evidence and model examples.
 - [[method-mone-novice-expert-replacement]] changes both stored and
   routing-dependent active parameters.
+- [[method-global-to-local-operator-budget-allocation]] is defined first for
+  dense per-layer MLPs; an MoE extension must declare whether its global and
+  local budgets refer to stored parameters, active parameters, or both.
 - [[concept-model-compression-evaluation-axes]] places MoE-specific accounting
   inside the broader model-compression evaluation taxonomy.
 - [[decision-primary-compression-evaluation-scope]] makes explicit total and

@@ -1,7 +1,7 @@
 # Thesis LLM Wiki Schema
 
 - Schema version: 1.1
-- Effective date: 2026-07-17
+- Effective date: 2026-08-03
 - Status: active
 
 This file is the canonical specification for the thesis knowledge base. It
@@ -409,6 +409,13 @@ Page-level metadata is insufficient for a mixed page. Apply these body rules:
    claim. Check the original source before setting `source-checked`.
 8. Preserve meaningful disagreement. State which sources or experiments
    conflict and do not silently choose a winner.
+9. Apply the same provenance discipline to equations. Identify each introduced
+   equation as source-derived, standard mathematical notation, synthesis or
+   explanatory formalization, or a project-proposed definition or hypothesis.
+   State whether a citation is required, and give a registered source ID and
+   locator for every source-derived equation. A newly proposed formalization
+   does not require a citation merely because it uses ordinary mathematical
+   notation, but its project or synthesis status must be explicit.
 
 ## 8. Naming and linking
 

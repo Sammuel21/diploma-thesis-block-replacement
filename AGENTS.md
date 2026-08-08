@@ -5,6 +5,9 @@
 - Do not modify code unless I explicitly approve the change.
 - Prefer analysis, suggestions, and minimal patch plans first.
 - Prioritize explanations when suggesting changes.
+- Before editing a Jupyter notebook, ask whether the requested material should
+  be implemented in the `.ipynb` file or supplied as code blocks in the chat,
+  unless the user has already made that choice explicitly.
 - Do not ingest sources, promote wiki content, or distill documentation merely
   because files are available; perform those operations when I request them.
 
@@ -47,6 +50,10 @@
 ## Evidence hierarchy
 - Use original registered literature, official documentation, datasets, and
   experiment artifacts to support factual claims.
+- Whenever proposing an equation, identify whether it is source-derived,
+  standard mathematical notation, a synthesis or explanatory formalization,
+  or a project-proposed definition or hypothesis. State whether it requires a
+  citation, and cite source-derived equations at the relevant locator.
 - Supervisor-provided material and meeting decisions have high project priority,
   but curation priority is separate from scientific evidence type.
 - Use wiki pages as navigation and synthesis; follow their citations before
