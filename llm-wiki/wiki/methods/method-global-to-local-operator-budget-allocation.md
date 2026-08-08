@@ -1,11 +1,11 @@
 ---
 id: method-global-to-local-operator-budget-allocation
 title: Global-to-Local Operator Budget Allocation
-summary: Converts a whole-model parameter-sparsity target into importance-aware per-block replacement-budget caps without choosing local operators.
+summary: Converts a declared whole-model or eligible-MLP parameter-reduction target into importance-aware per-block replacement-budget caps without choosing local operators.
 type: method
 status: draft
 created: 2026-08-08
-updated: 2026-08-08
+updated: 2026-08-09
 
 authorship:
   created_by: collaborative
@@ -26,6 +26,8 @@ scope:
     - operator-budget
     - nonuniform-compression
     - budget-reconciliation
+    - parameter-reduction-accounting
+    - discrete-operator-sizing
   granularities:
     - mlp-block
     - transformer-layer
@@ -59,11 +61,13 @@ superseded_by: []
 
 ## Overview
 
-**Project-proposed method.** This method converts one whole-model parameter-
-sparsity target into an initial maximum parameter budget for every eligible
-MLP replacement. It is a first-stage screener and allocator: it decides how
-much capacity each block may initially receive, not which replacement
-architecture, fitting algorithm, or recovery procedure should be used.
+**Project-proposed method.** This method converts one declared parameter-
+reduction target into an initial maximum parameter budget for every eligible
+MLP replacement. The target may be stated over the eligible MLP scope or the
+whole model; both forms are converted to the same eligible-operator removal
+quota. It is a first-stage screener and allocator: it decides how much capacity
+each block may initially receive, not which replacement architecture, fitting
+algorithm, or recovery procedure should be used.
 
 The fixed method skeleton covers parameter accounting, feasibility, budget
 conservation, cap semantics, and actual-footprint reporting. Importance
@@ -71,12 +75,21 @@ estimation and downstream operator construction remain replaceable policies.
 The method is currently unverified and makes no empirical claim that its
 nonuniform allocation outperforms a uniform budget.
 
+**Project terminology.** Because a replacement may be a smaller dense
+operator rather than a zero-masked version of the original operator, this page
+uses *parameter-reduction fraction* for the fraction of parameters removed
+relative to an explicitly named scope. When *sparsity* is used as shorthand,
+it has this same meaning. The complementary retained fraction is the retention
+ratio. This terminology rule is project-defined and requires no external
+citation.
+
 ## Method Boundary and Contract
 
 The allocator receives:
 
 - a dense model and a declared set of eligible MLP blocks;
-- one whole-model parameter-sparsity target;
+- one parameter-reduction target declared over either the eligible MLPs or the
+  whole model;
 - one scalar importance value per eligible block;
 - score-direction and normalization rules;
 - a positive allocation temperature; and
@@ -88,31 +101,105 @@ A downstream block-specific method may replace a complete SwiGLU MLP, replace
 only internal components, or use another parameterized construction, provided
 that the resulting trainable and stored parameters are counted consistently.
 
-## Global Parameter-Budget Formalization
+## Reduction Scope and Global Budget Formalization
+
+### Accounting scopes
 
 **Standard parameter-accounting notation.** Let $E$ be the declared set of
 eligible MLP blocks, $P_0$ the original whole-model parameter count, and
-$F_\ell$ the original parameter count of eligible MLP block $\ell$.
-Parameters outside $E$ are fixed for this allocation:
+$F_\ell$ the original parameter count of eligible MLP block $\ell$. Define
+the original eligible-MLP footprint $P_E$ and the fixed footprint as:
 
 $$
 \begin{aligned}
+P_E
+    &= \sum_{\ell \in E}F_\ell, \\
 P_{\mathrm{fixed}}
-    &= P_0 - \sum_{\ell \in E} F_\ell, \\
-P^\star
-    &= (1-s_{\mathrm{global}})P_0, \\
-B^\star
-    &= P^\star-P_{\mathrm{fixed}}, \\
-R^\star
-    &= \sum_{\ell \in E}F_\ell-B^\star.
+    &= P_0-P_E.
 \end{aligned}
 $$
 
-Here, $s_{\mathrm{global}}$ is the desired fraction of the original
-whole-model parameters removed, $P^\star$ is the corresponding maximum final
-model size, $B^\star$ is the total budget available to eligible replacements,
-and $R^\star$ is the removal quota that must be distributed across them. These
-bookkeeping identities require no external citation.
+Parameters outside $E$ are unchanged by this allocator. A protected MLP may
+remain inside $E$ with fixed bounds or be excluded and counted in
+$P_{\mathrm{fixed}}$; the choice must be reported.
+
+After local construction, let $P_\ell$ be the actual replacement footprint.
+The local, eligible-MLP, and whole-model realized reduction fractions are:
+
+$$
+\begin{aligned}
+s_{\ell,\mathrm{actual}}
+    &= 1-\frac{P_\ell}{F_\ell}, \\
+s_{E,\mathrm{actual}}
+    &= 1-\frac{\sum_{\ell \in E}P_\ell}{P_E}, \\
+P_{\mathrm{actual}}
+    &= P_{\mathrm{fixed}}+\sum_{\ell \in E}P_\ell, \\
+s_{\mathrm{model},\mathrm{actual}}
+    &= 1-\frac{P_{\mathrm{actual}}}{P_0}
+     = \frac{P_E}{P_0}s_{E,\mathrm{actual}}.
+\end{aligned}
+$$
+
+These are standard accounting identities and require no external citation.
+They show that, when only eligible MLPs change, whole-model reduction is
+scaled from eligible-MLP reduction by the original footprint fraction
+$P_E/P_0$ and is strictly smaller whenever $P_E<P_0$.
+
+### Target-scope conversion
+
+**Standard parameter-accounting notation.** The allocator accepts exactly one
+of two equivalent target declarations. For an eligible-MLP target
+$s_E^\star$, compute:
+
+$$
+\begin{aligned}
+R^\star
+    &= s_E^\star P_E, \\
+B^\star
+    &= (1-s_E^\star)P_E, \\
+P^\star
+    &= P_{\mathrm{fixed}}+B^\star, \\
+s_{\mathrm{model}}^\star
+    &= \frac{R^\star}{P_0}
+     = \frac{P_E}{P_0}s_E^\star.
+\end{aligned}
+$$
+
+For a whole-model target $s_{\mathrm{model}}^\star$, compute:
+
+$$
+\begin{aligned}
+R^\star
+    &= s_{\mathrm{model}}^\star P_0, \\
+B^\star
+    &= P_E-R^\star, \\
+P^\star
+    &= (1-s_{\mathrm{model}}^\star)P_0, \\
+s_E^\star
+    &= \frac{R^\star}{P_E}
+     = \frac{P_0}{P_E}s_{\mathrm{model}}^\star.
+\end{aligned}
+$$
+
+In both forms, $B^\star$ is the total budget available to eligible
+replacements and $R^\star$ is the parameter-removal quota distributed across
+them. The allocation stage is unchanged after this conversion. An
+eligible-MLP target is the direct internal control for an MLP-only thesis
+method; the corresponding whole-model target and achieved footprint remain
+necessary for comparisons with other compression methods.
+
+For example, if eligible MLPs contain $60\%$ of the original model and the
+eligible-MLP reduction is $50\%$, the corresponding whole-model reduction is
+$30\%$. Conversely, a $30\%$ whole-model target requires a $50\%$ reduction
+within that eligible MLP scope. Before configured local bounds are considered,
+a whole-model target is feasible only when:
+
+$$
+0\le s_{\mathrm{model}}^\star\le\frac{P_E}{P_0}.
+$$
+
+This is a standard consequence of the accounting identities and requires no
+external citation.
 
 **Standard parameter-accounting notation.** For every block, let
 $C_{\min,\ell}$ be its minimum permitted retained budget and $H_\ell$ its
@@ -143,7 +230,7 @@ $$
 $$
 
 An infeasible target must be rejected or explicitly revised rather than
-silently changing the requested sparsity.
+silently changing the requested reduction.
 
 ## Configurable Importance Interface
 
@@ -210,16 +297,17 @@ $$
 
 $\rho_\ell$ is a local retention-cap ratio. Since a downstream replacement
 may use fewer than $C_\ell^{(0)}$ parameters, $1-\rho_\ell$ is a minimum
-assigned local sparsity, not necessarily the realized sparsity. Neither
-$\rho_\ell$ nor the realized local sparsities are probability weights, and
-they need not sum to one. If earlier notation writes
+assigned local parameter-reduction fraction, not necessarily the realized
+reduction. Neither $\rho_\ell$ nor the realized local reductions are
+probability weights, and they need not sum to one. If earlier notation writes
 $C_\ell^{(0)}=w_\ell(F_\ell)$, $w_\ell$
 denotes this derived local mapping; $q_\ell$ is the separately normalized
 global share.
 
 Temperature controls concentration. Large $\tau$ approaches uniform local
-sparsity, while smaller values direct more removal toward lower-importance
-blocks. No numerical temperature is currently claimed to be optimal.
+parameter reduction, while smaller values direct more removal toward lower-
+importance blocks. No numerical temperature is currently claimed to be
+optimal.
 
 ### Bound-Aware Redistribution
 
@@ -246,7 +334,7 @@ discarding or inventing global budget.
 
 | Component | Fixed contract | Configurable choice |
 | --- | --- | --- |
-| Global target | Whole-model parameter count and exact feasibility accounting | Target sparsity and eligible block set |
+| Reduction target | Declared target scope and exact feasibility accounting | Eligible-MLP or whole-model reduction target and eligible block set |
 | Importance | One direction-corrected scalar per block | BI, residual-aware MLP influence, ablation score, or another estimator |
 | Normalization | Report the transformation from $I_\ell$ to $z_\ell$ | Rank normalization is the reference; alternatives may preserve magnitude |
 | Allocation | Conserve $B^\star$ and respect hard bounds | Temperature and a declared alternative allocator |
@@ -259,28 +347,81 @@ be studied independently. In particular, failure of BI to predict one
 operator family's approximation error would not invalidate the budget-
 allocation interface; it would challenge that score as an allocation input.
 
-## Local Construction and Realized Sparsity
+## Local Construction and Realized Parameter Reduction
 
 **Project-proposed downstream contract.** A local construction method receives
 $C_\ell^{(0)}$ and returns a replacement $g_\ell$ with actual parameter count
 $P_\ell$:
 
 $$
-\begin{aligned}
 P_\ell
-    &\le C_\ell^{(0)}, \\
-P_{\mathrm{actual}}
-    &= P_{\mathrm{fixed}}+\sum_{\ell \in E}P_\ell, \\
-s_{\mathrm{actual}}
-    &= 1-\frac{P_{\mathrm{actual}}}{P_0}.
+    \le C_\ell^{(0)}.
+$$
+
+The realized scope-specific reductions are calculated using the accounting
+definitions above. In cap-only mode, $P_{\mathrm{actual}}\le P^\star$, so the
+final model may be smaller than the nominal target. Consequently,
+$s_{E,\mathrm{actual}}\ge s_E^\star$ and
+$s_{\mathrm{model},\mathrm{actual}}\ge s_{\mathrm{model}}^\star$. The target
+is therefore a hard maximum footprint, not a guarantee that downstream
+discrete operator families will consume every available parameter.
+
+## Discrete Feasible Operator Sizes
+
+The replacement must accept and return the model width $d_{\mathrm{model}}$ so
+that it remains compatible with the surrounding residual path. Its internal
+width may differ from the original MLP width, but every matrix dimension must
+be an integer and every declared implementation constraint must be satisfied.
+
+**Standard parameter-counting notation.** A bias-free SwiGLU replacement with
+model width $d=d_{\mathrm{model}}$ and internal width $h_\ell$ has two
+$d$-to-$h_\ell$ projections and one $h_\ell$-to-$d$ projection. Its parameter
+count is therefore:
+
+$$
+P_\ell(h_\ell)=3d h_\ell,
+\qquad h_\ell\in\mathbb{Z}_{>0}.
+$$
+
+This identity requires no external citation. Bias terms, if present, must be
+added to the count. If an experiment additionally requires widths to be
+multiples of a positive integer $m$ for its chosen kernel or sharding layout,
+the largest positive aligned width below a cap is, provided
+$C_\ell^{(0)}\ge 3dm$:
+
+$$
+\begin{aligned}
+h_\ell(C_\ell^{(0)})
+    &=m\left\lfloor
+      \frac{C_\ell^{(0)}}{3dm}
+      \right\rfloor, \\
+P_\ell
+    &=3d h_\ell(C_\ell^{(0)})
+     \le C_\ell^{(0)}.
 \end{aligned}
 $$
 
-In cap-only mode, $P_{\mathrm{actual}}\le P^\star$, so the final model may be
-smaller than the nominal target and
-$s_{\mathrm{actual}}\ge s_{\mathrm{global}}$. The global target is therefore
-a hard maximum footprint, not a guarantee that downstream discrete operator
-families will consume every available parameter.
+Integer dimensions are mandatory; the additional alignment multiple $m$ is a
+configurable implementation policy, not a universal architectural rule. If
+$C_\ell^{(0)}<3dm$, no positive width satisfies that aligned SwiGLU policy.
+
+**Project-proposed discrete projection.** More generally, let
+$\mathcal{S}_\ell$ be the parameter counts of all locally feasible candidates,
+including their interface, integer-dimension, operator-family, and configured
+alignment constraints. A cap-seeking local method selects:
+
+$$
+P_\ell
+=\max\left\{p\in\mathcal{S}_\ell:p\le C_\ell^{(0)}\right\}.
+$$
+
+If this set is empty, the cap is locally infeasible. Otherwise, the selected
+count can still be strictly below the continuous cap because the next feasible
+width or rank increment does not fit. This is one concrete source of unused
+budget even when the local method tries to consume as much of its cap as
+possible. The practical sequence is therefore continuous cap allocation,
+projection to a feasible operator size, unused-budget accounting, and optional
+reconciliation.
 
 ## Optional Budget Reconciliation and Recovery
 
@@ -331,7 +472,7 @@ To isolate the allocator, hold the downstream operator family, fitting data,
 training procedure, and recovery budget fixed while changing only the score
 or allocation policy. Compare:
 
-- uniform local sparsity at the same aggregate parameter budget;
+- uniform local parameter reduction at the same aggregate parameter budget;
 - fixed-seed random permutations of importance ranks;
 - each candidate importance estimator passed through the same allocator;
 - cap-only and reconciled variants; and
@@ -341,11 +482,15 @@ or allocation policy. Compare:
 If discrete operator widths prevent exact matching, report the mismatch and
 compare actual rather than nominal parameter counts. Each run should report:
 
-- $P_0$, $P^\star$, $B^\star$, and $R^\star$;
+- the declared target scope and both corresponding target reductions
+  $s_E^\star$ and $s_{\mathrm{model}}^\star$;
+- $P_0$, $P_E$, $P_{\mathrm{fixed}}$, $P^\star$, $B^\star$, and $R^\star$;
 - every $I_\ell$, $z_\ell$, $q_\ell$, bound, and initial cap;
-- actual local parameter use and cap-utilization ratio;
+- the feasible-size rule, integer or alignment constraints, actual local
+  parameter use, and cap-utilization ratio;
 - pooled, reallocated, and unspent budget;
-- final whole-model parameter count and realized sparsity;
+- final whole-model parameter count and realized local, eligible-MLP, and
+  whole-model reduction fractions;
 - held-out local approximation measurements; and
 - model-level loss, perplexity, and the declared quality evaluations.
 
@@ -387,14 +532,18 @@ Independent cap assignment does not model how errors from several replacements
 interact or shift downstream inputs. Local fit and marginal-utility estimates
 must therefore be validated at model level, especially after reconciliation.
 
-Continuous caps may not be exactly realizable by discrete widths or operator
-families. Cap-only runs can exceed the requested sparsity; reconciled runs can
-still leave an unspendable remainder. Both cases require actual-footprint
-reporting.
+Continuous caps may not be exactly realizable by integer widths, ranks,
+operator families, or configured alignment constraints. Cap-only runs can
+exceed the requested parameter reduction; reconciled runs can still leave an
+unspendable remainder. Both cases require actual-footprint reporting. Optional
+alignment constraints can improve implementation compatibility while also
+making the feasible budget grid coarser; that trade-off must be measured for
+the selected model and runtime rather than assumed.
 
 Parameter count alone does not determine checkpoint bytes, resident memory,
 latency, or throughput. Quantization and systems effects require their own
-accounting rather than being folded silently into $s_{\mathrm{global}}$.
+accounting rather than being folded silently into
+$s_{\mathrm{model},\mathrm{actual}}$.
 
 The core formalization treats one dense MLP per Transformer layer as the
 allocation unit. A mixture-of-experts extension must first specify whether
@@ -405,7 +554,8 @@ additional variables rather than automatic consequences of this allocator.
 ## Relationships
 
 - [Global-to-local MLP operator budget allocation](../../../docs/methodology/global-to-local-operator-budget-allocation.md)
-  provides the compact thesis-facing version of this method.
+  is the earlier compact thesis-facing distillation; it does not yet include
+  this page's target-scope and discrete-sizing refinement.
 - [[method-block-importance]] defines source-derived and project-adapted
   importance candidates that may instantiate the configurable $I_\ell$ input.
 - [[method-modegpt-global-sparsity-allocation]] documents the prior-work

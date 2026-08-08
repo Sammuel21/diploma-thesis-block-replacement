@@ -61,8 +61,9 @@ No model, dataset, software, or other entity pages have been created yet.
   Maps BI scores to a smoothed per-layer sparsity distribution under a global
   compression target.
 - [[method-global-to-local-operator-budget-allocation|Global-to-local operator budget allocation]]:
-  Converts one whole-model parameter-sparsity target into configurable
-  importance-aware MLP replacement caps without selecting local operators.
+  Converts an eligible-MLP or whole-model parameter-reduction target into
+  importance-aware, feasible-size MLP replacement caps without selecting
+  local operators.
 - [[method-quality-preservation-evaluation|Quality preservation evaluation]]:
   Defines routine, confirmation, and optional profiles for intrinsic and
   downstream model evaluation.
@@ -100,7 +101,7 @@ No synthesis pages have been created yet.
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-08-08 (global-to-local operator budget methodology)
+- Last structural lint: 2026-08-09 (budget scope and discrete operator sizing)
 - Orphan pages: none detected
 - Registered source collections: 3
 - Registered individual sources: 4

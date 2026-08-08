@@ -321,3 +321,36 @@ This file is append-only. Entries use the format:
 - Found no documentation-link, math-delimiter, structural, graph, or
   changed-file whitespace errors or warnings. This lint does not establish the
   proposed allocator's empirical effectiveness.
+
+## [2026-08-09] update | Budget scope and discrete operator sizing
+
+- Distinguished local, eligible-MLP, and whole-model parameter-reduction
+  fractions and defined the exact accounting relationships between them.
+- Allowed the allocator target to be declared over either the eligible MLP
+  scope or the whole model, with both forms converted to one removal quota and
+  replacement budget.
+- Defined parameter reduction as the project term for smaller dense
+  replacements while retaining sparsity only as explicitly scoped shorthand.
+- Added integer-dimension, optional alignment, and generic feasible-candidate
+  projection rules explaining why actual operator use can remain below a
+  continuous cap.
+- Kept operator choice downstream of allocation and added no empirical claim,
+  source-registry change, notebook change, or documentation distillation.
+
+## [2026-08-09] lint | Budget scope and discrete operator sizing
+
+- Checked all 22 maintained pages for required metadata, controlled values,
+  dates, filename-to-ID agreement, verification states, required body
+  sections, registered source IDs, locators, and relations.
+- Checked wikilinks, repository links, index coverage, duplicate IDs and
+  relationships, reciprocal `related` edges, orphan coverage, conflict
+  markers, trailing whitespace, and changed-file whitespace.
+- Confirmed balanced display-math delimiters and `aligned` environments in the
+  changed method and reviewed every added equation as standard accounting,
+  standard parameter counting, or an explicit project-proposed definition.
+- Reviewed terminology for local, eligible-MLP, and whole-model reduction,
+  retention, continuous caps, discrete actual use, and optional alignment.
+- Found no wiki structural, graph, provenance, math, or semantic errors or
+  warnings. The earlier compact `docs/` distillation remains unchanged and is
+  explicitly identified on the method page; lint does not verify empirical
+  effectiveness.
