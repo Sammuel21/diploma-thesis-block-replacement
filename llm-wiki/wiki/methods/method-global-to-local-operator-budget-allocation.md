@@ -49,6 +49,7 @@ sources:
 
 related:
   - "[[method-block-importance]]"
+  - "[[method-hybrid-operator-replacement]]"
   - "[[method-modegpt-global-sparsity-allocation]]"
   - "[[concept-replacement-error-propagation]]"
   - "[[decision-primary-compression-evaluation-scope]]"
@@ -476,7 +477,7 @@ or allocation policy. Compare:
 - fixed-seed random permutations of importance ranks;
 - each candidate importance estimator passed through the same allocator;
 - cap-only and reconciled variants; and
-- the fixed $d_{\mathrm{model}}/2$ replacement baseline at a matched aggregate
+- the fixed $0.5d_{\mathrm{ff}}$ replacement baseline at a matched aggregate
   footprint.
 
 If discrete operator widths prevent exact matching, report the mismatch and
@@ -558,6 +559,9 @@ additional variables rather than automatic consequences of this allocator.
   this page's target-scope and discrete-sizing refinement.
 - [[method-block-importance]] defines source-derived and project-adapted
   importance candidates that may instantiate the configurable $I_\ell$ input.
+- [[method-hybrid-operator-replacement]] is one possible downstream local
+  construction; its internal linear/nonlinear capacity split remains outside
+  the current allocator.
 - [[method-modegpt-global-sparsity-allocation]] documents the prior-work
   precedent and its distinct direct layer-sparsity formulation.
 - [[concept-replacement-error-propagation]] explains why locally assigned caps

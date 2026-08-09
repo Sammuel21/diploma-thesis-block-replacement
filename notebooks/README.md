@@ -53,9 +53,10 @@ activation geometry without replacing model blocks.
 
 ### [`baseline-testing.ipynb`](block/baseline-testing.ipynb)
 
-Runs the practical single-block replacement baseline. It compares a fixed
-reduced-width SwiGLU with the original MLP and simple controls, reporting both
-approximation quality and parameter footprint.
+Runs the practical single-block replacement baseline. It compares a SwiGLU
+whose intermediate width is fixed at 50% of the original MLP `d_ff` with the
+original MLP and simple controls, reporting both approximation quality and
+parameter footprint.
 
 ### [`degradation-analysis.ipynb`](block/degradation-analysis.ipynb)
 

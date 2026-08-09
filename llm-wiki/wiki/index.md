@@ -64,6 +64,9 @@ No model, dataset, software, or other entity pages have been created yet.
   Converts an eligible-MLP or whole-model parameter-reduction target into
   importance-aware, feasible-size MLP replacement caps without selecting
   local operators.
+- [[method-hybrid-operator-replacement|Hybrid linear-nonlinear MLP replacement]]:
+  Defines a project-proposed linear-plus-nonlinear drop-in operator while
+  leaving its internal capacity allocation as unresolved future work.
 - [[method-quality-preservation-evaluation|Quality preservation evaluation]]:
   Defines routine, confirmation, and optional profiles for intrinsic and
   downstream model evaluation.
@@ -87,9 +90,9 @@ No model, dataset, software, or other entity pages have been created yet.
 
 - [[experiment-initial-block-compression-study|Initial block-compression study]]:
   Working three-notebook design covering activation geometry, one practical
-  narrow-SwiGLU baseline, independent dense-linear multi-block degradation, and
-  an optional quantization baseline. Status: `draft`; no direct results are
-  recorded.
+  half-$d_{\mathrm{ff}}$ SwiGLU baseline, independent dense-linear multi-block
+  degradation, and an optional quantization baseline. Status: `draft`; no
+  direct results are recorded.
 
 No MVP evidence has been ingested into canonical experiment pages. The
 historical archive remains available at `docs/prototype/mvp/`.
@@ -101,7 +104,7 @@ No synthesis pages have been created yet.
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-08-09 (budget scope and discrete operator sizing)
+- Last structural lint: 2026-08-09 (hybrid method and baseline-width correction)
 - Orphan pages: none detected
 - Registered source collections: 3
 - Registered individual sources: 4

@@ -5,7 +5,7 @@ summary: Defines the working activation, practical single-block replacement, and
 type: experiment
 status: draft
 created: 2026-07-27
-updated: 2026-08-03
+updated: 2026-08-09
 
 authorship:
   created_by: collaborative
@@ -46,6 +46,7 @@ scope:
 sources: []
 related:
   - "[[method-block-importance]]"
+  - "[[method-hybrid-operator-replacement]]"
   - "[[concept-replacement-error-propagation]]"
   - "[[decision-primary-compression-evaluation-scope]]"
   - "[[implementation-compute-environments]]"
@@ -91,9 +92,9 @@ establishing, the following propositions:
 
 - post-gating activations may concentrate most variance in substantially fewer
   directions than their nominal intermediate width;
-- a reduced-width SwiGLU with `r = d_model / 2` may preserve more of one MLP's
-  function than zero and mean-output controls while retaining only 12.5% of
-  that block's parameters;
+- a reduced-width SwiGLU with intermediate width
+  $r=0.5d_{\mathrm{ff}}$ may preserve more of one MLP's function than zero
+  and mean-output controls while retaining 50% of that block's parameters;
 - BI, local approximation error, and layer depth may describe different parts
   of block replaceability; and
 - degradation from several replacements may be non-additive because upstream
@@ -129,7 +130,8 @@ Current defaults are exploratory:
 - operator validation: 24 document-disjoint batches;
 - model validation: WikiText-2 validation batches where required;
 - seed: 21;
-- single-block replacement: bias-free SwiGLU with `r = d_model / 2`;
+- single-block replacement: bias-free SwiGLU with intermediate width
+  $r=0.5d_{\mathrm{ff}}$;
 - single-block conditions: original MLP, zero, mean, and narrow SwiGLU;
 - recovery: disabled; and
 - intended execution environment: the shared RTX 4090 environment documented
@@ -166,10 +168,27 @@ after the original down projection.
 
 Capture dense-model `(x, y)` pairs for layer 11. Compare the original MLP, a
 zero-output removal control, a calibration-output mean control, and one
-bias-free SwiGLU replacement with width `r = d_model / 2`. Fit only the narrow
-SwiGLU using activation MSE. Report its optimization history, exact footprint,
-held-out local approximation metrics, and complete-model WikiText-2 degradation
-without recovery. This stage does not search widths or operator families.
+bias-free SwiGLU replacement whose intermediate width is
+$r=0.5d_{\mathrm{ff}}$. The notebook reads the original $d_{\mathrm{ff}}$
+from the loaded teacher block; for the configured model, the expected width is
+4096 and the expected replacement count is 25,165,824 parameters. Fit only the
+narrow SwiGLU using activation MSE. Report its optimization history, exact
+footprint, held-out local approximation metrics, and complete-model WikiText-2
+degradation without recovery. This stage does not search widths or operator
+families.
+
+**Project baseline framework.** The original MLP anchors uncompressed quality,
+zero bounds complete removal, mean tests input-independent prediction, and the
+50%-of-$d_{\mathrm{ff}}$ SwiGLU is the first straightforward learned
+compressor. Future whole-MLP replacements may reuse the same capture and
+evaluation protocol. The fixed SwiGLU remains a common reference, but a claim
+of architectural superiority additionally requires comparable actual
+footprints. If model-level recovery is introduced, the reference and proposed
+operator must receive the same recovery data, objective, trainable scope, and
+optimization budget.
+
+The width equation is a project configuration rule and the parameter count is
+standard matrix-dimension arithmetic; neither requires an external citation.
 
 ### Working Numerical Baseline Extension
 
@@ -234,9 +253,9 @@ reconstruction.
 The post-down-projection PCA error also depends on how discarded directions
 align with the original down-projection weights; effective rank cannot express
 that relationship. Neither measurement directly determines a deployable
-replacement width. The fixed `d_model / 2` width is a practical baseline
-decision; a later controlled ablation would be required to compare widths or
-support an optimality claim.
+replacement width. The fixed $0.5d_{\mathrm{ff}}$ width is a practical
+baseline decision; a later controlled ablation would be required to compare
+widths or support an optimality claim.
 
 ## Direct Results
 
@@ -255,7 +274,8 @@ low-BI, or low-local-error blocks are generally replaceable.
 - The activation and practical replacement stages currently study only layer 11.
 - The practical replacement baseline uses one model, one layer, and one
   training seed.
-- The selected `d_model / 2` width is not claimed to be optimal or minimal.
+- The selected $0.5d_{\mathrm{ff}}$ width is not claimed to be optimal or
+  minimal.
 - Runtime, latency, and downstream benchmark evaluation are not part of these
   initial notebooks.
 - PCA is a reconstruction oracle, not a deployable compressed SwiGLU.
@@ -280,6 +300,9 @@ tests are intentionally deferred under
 
 - [[method-block-importance]] defines canonical whole-layer BI and explains
   why the MLP-local variant must remain separately named.
+- [[method-hybrid-operator-replacement]] defines a future candidate family
+  that should reuse this stage's comparison protocol without being treated as
+  an established improvement.
 - [[concept-replacement-error-propagation]] motivates isolated and multi-block
   comparisons and the interaction metric.
 - [[decision-primary-compression-evaluation-scope]] makes footprint-quality

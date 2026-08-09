@@ -5,8 +5,9 @@ experiments. Run them in this order:
 
 1. `activation-analysis.ipynb` studies activation geometry without modifying
    the model.
-2. `baseline-testing.ipynb` evaluates one fixed reduced-width SwiGLU against
-   the original MLP and zero/mean controls at layer 11.
+2. `baseline-testing.ipynb` evaluates one fixed SwiGLU whose intermediate
+   width is 50% of the original MLP `d_ff`, against the original MLP and
+   zero/mean controls at layer 11.
 3. `degradation-analysis.ipynb` independently freezes a dense-linear diagnostic
    operator and varies BI-based or random layer selection and replacement count.
 

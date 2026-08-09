@@ -354,3 +354,36 @@ This file is append-only. Entries use the format:
   warnings. The earlier compact `docs/` distillation remains unchanged and is
   explicitly identified on the method page; lint does not verify empirical
   effectiveness.
+
+## [2026-08-09] update | Hybrid replacement method and baseline width
+
+- Corrected the practical single-block baseline so its 50% width is defined
+  against the teacher MLP intermediate dimension $d_{\mathrm{ff}}$, not
+  $d_{\mathrm{model}}$.
+- Updated the unexecuted notebook design and maintained experiment page to
+  expect width 4096, 25,165,824 replacement parameters, and 50% block-parameter
+  retention for the configured SmolLM2-1.7B target.
+- Created `method-hybrid-operator-replacement` as a draft, unverified project
+  method covering dense or factorized linear branches, compact nonlinear
+  corrections, staged local fitting, controls, and model-level evaluation.
+- Kept internal linear/nonlinear capacity allocation explicitly unresolved;
+  the block-budget source, branch families, feasible integer projection, split
+  selection rule, and unused-capacity policy remain future work.
+- Updated reciprocal method and experiment links, notebook navigation, and the
+  exploratory hybrid note in `budget.ipynb`. No literature source, empirical
+  result, or optimality claim was added.
+
+## [2026-08-09] lint | Hybrid replacement method and baseline width
+
+- Checked all 23 maintained pages for frontmatter, required fields, controlled
+  type/status/epistemic values, dates, filename-to-ID agreement, verification
+  states, and type-required body sections.
+- Checked registered source references, all wikilinks and repository links,
+  index coverage, reciprocal `related` edges, duplicate IDs, conflict markers,
+  trailing whitespace, display-math delimiters, and `aligned` environments.
+- Confirmed that active maintained wiki pages contain no stale
+  $d_{\mathrm{model}}/2$, 12.5%, or 87.5% baseline semantics and that the
+  hybrid page explicitly leaves internal capacity allocation unresolved.
+- Found zero structural, graph, provenance, math, or scoped semantic errors or
+  warnings. The new method and corrected baseline remain `draft` and
+  `unverified`; lint does not establish empirical effectiveness.
