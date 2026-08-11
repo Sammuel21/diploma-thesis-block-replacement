@@ -1,5 +1,5 @@
 schema_version: 1
-updated: 2026-07-17
+updated: 2026-08-11
 
 # Individual sources are added here only when deliberately registered for
 # ingestion. Collection membership alone does not mean a source was reviewed.
@@ -98,3 +98,29 @@ sources:
     added: 2026-07-17
     ingestion_status: ingested
     notes: Local file is the ICLR 2025 Oral conference paper, submission 9191.
+
+  - id: src-phase-transitions-compression-2026
+    title: Phase transitions in large language model compression
+    collection_id: secondary-papers
+    origin: researcher-found
+    evidence_kind: scholarly-secondary
+    priority: supporting
+    authors:
+      - Ziyang Ma
+      - Zuchao Li
+      - Lefei Zhang
+      - Gui-Song Xia
+      - Bo Du
+      - Liangpei Zhang
+      - Dacheng Tao
+    year: 2026
+    canonical_url: https://doi.org/10.1038/s44387-026-00072-8
+    sha256: null
+    added: 2026-08-11
+    ingestion_status: in-review
+    notes: >-
+      Peer-reviewed Perspective in npj Artificial Intelligence and a
+      researcher-found supporting source. The main article mixes literature
+      synthesis, comparative experiments, and strong universal or speculative
+      claims. Its supplementary PDF was not independently reviewed during this
+      ingestion because the publisher download returned a client challenge.

@@ -17,8 +17,15 @@ substantive update, archive, or distillation operation.
 - [[source-summary-modegpt-2025|MoDeGPT (2025)]] - Jointly decomposes matrix
   pairs inside Transformer modules and allocates nonuniform sparsity from BI.
   Status: `review`.
+- [[source-summary-phase-transitions-compression-2026|Phase Transitions in LLM Compression (2026)]] -
+  Supporting Perspective on structural, numerical, and algebraic redundancy
+  axes and fitted compression-collapse boundaries. Status: `draft`;
+  Supplementary Information pending review.
 
 All currently registered supervisor-provided papers have been ingested.
+The researcher-found Phase Transitions Perspective remains `in-review` because
+its main article was checked but its central supplementary material was not
+accessible during ingestion.
 
 ## Concepts
 
@@ -93,6 +100,11 @@ No model, dataset, software, or other entity pages have been created yet.
   half-$d_{\mathrm{ff}}$ SwiGLU baseline, independent dense-linear multi-block
   degradation, and an optional quantization baseline. Status: `draft`; no
   direct results are recorded.
+- [[experiment-swiglu-operator-design-progression|SwiGLU operator-design progression]]:
+  Stages operator testing from generic whole-MLP substitutes through
+  capacity curves, structure-aware internal surgery, and unverified
+  teacher-tailored nested designs. Status: `draft`; no direct results are
+  recorded.
 
 No MVP evidence has been ingested into canonical experiment pages. The
 historical archive remains available at `docs/prototype/mvp/`.
@@ -104,8 +116,9 @@ No synthesis pages have been created yet.
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-08-09 (hybrid method and baseline-width correction)
+- Last structural lint: 2026-08-11 (Phase Transitions source ingestion and Tier I axes)
 - Orphan pages: none detected
 - Registered source collections: 3
-- Registered individual sources: 4
+- Registered individual sources: 5
 - Ingested individual sources: 4
+- Sources in review: 1

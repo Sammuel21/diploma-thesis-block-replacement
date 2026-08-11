@@ -5,7 +5,7 @@ summary: Defines the working activation, practical single-block replacement, and
 type: experiment
 status: draft
 created: 2026-07-27
-updated: 2026-08-09
+updated: 2026-08-11
 
 authorship:
   created_by: collaborative
@@ -47,6 +47,7 @@ sources: []
 related:
   - "[[method-block-importance]]"
   - "[[method-hybrid-operator-replacement]]"
+  - "[[experiment-swiglu-operator-design-progression]]"
   - "[[concept-replacement-error-propagation]]"
   - "[[decision-primary-compression-evaluation-scope]]"
   - "[[implementation-compute-environments]]"
@@ -64,18 +65,18 @@ three-notebook investigation of MLP-block compression. The notebooks are
 intended to build experimental understanding in stages; they are not a
 finished production pipeline or a final thesis protocol.
 
-The notebooks currently contain no preserved execution outputs. Their designs,
-configured metrics, and code paths are project artifacts, but no empirical
-finding should be inferred until a run configuration and result artifact are
-preserved and reviewed.
+Working notebook outputs may exist, but no run has been promoted to a reviewed
+experiment artifact on this page. Their designs, configured metrics, and code
+paths are project artifacts; no empirical finding should be inferred until a
+run configuration and result artifact are preserved and reviewed.
 
 ## Objective
 
 The study asks four progressively broader questions:
 
 1. Do MLP activations exhibit low-dimensional structure on calibration data?
-2. Can one fixed reduced-width SwiGLU approximate a frozen MLP block better
-   than complete-removal and constant-output controls?
+2. How does one fixed reduced-width SwiGLU compare with complete-removal,
+   constant-output, dense-linear, and dense-affine references?
 3. With one simple operator fixed, how do layer selection and the number of
    simultaneous replacements affect complete-model degradation?
 4. At a comparable storage budget, how competitive is simple MLP quantization
@@ -108,7 +109,7 @@ establishing, the following propositions:
 | Stage | Experimental unit | Rationale |
 | --- | --- | --- |
 | Activation analysis | Representations from one untouched block | Establish descriptive geometry before changing the model. |
-| Baseline testing | One fixed learned replacement and controls at one layer | Establish a practical reference before considering architecture or width search. |
+| Baseline testing | Fixed whole-MLP references and controls at one layer | Establish a practical reference before considering architecture or width search. |
 | Degradation analysis | Several simultaneously replaced layers | Measure selection effects, accumulation, and interaction after a simple operator is understood. |
 
 The degradation analysis remains separate because BI is a layer-selection
@@ -132,7 +133,8 @@ Current defaults are exploratory:
 - seed: 21;
 - single-block replacement: bias-free SwiGLU with intermediate width
   $r=0.5d_{\mathrm{ff}}$;
-- single-block conditions: original MLP, zero, mean, and narrow SwiGLU;
+- single-block conditions: original MLP, zero, mean, dense linear, dense
+  affine, and narrow SwiGLU;
 - recovery: disabled; and
 - intended execution environment: the shared RTX 4090 environment documented
   in [[implementation-compute-environments]].
@@ -167,15 +169,14 @@ after the original down projection.
 ### Stage 2: Single-Block Baseline Testing
 
 Capture dense-model `(x, y)` pairs for layer 11. Compare the original MLP, a
-zero-output removal control, a calibration-output mean control, and one
-bias-free SwiGLU replacement whose intermediate width is
-$r=0.5d_{\mathrm{ff}}$. The notebook reads the original $d_{\mathrm{ff}}$
-from the loaded teacher block; for the configured model, the expected width is
-4096 and the expected replacement count is 25,165,824 parameters. Fit only the
-narrow SwiGLU using activation MSE. Report its optimization history, exact
-footprint, held-out local approximation metrics, and complete-model WikiText-2
-degradation without recovery. This stage does not search widths or operator
-families.
+zero-output removal control, a calibration-output mean control, ridge-fitted
+dense linear and affine references, and one bias-free SwiGLU replacement whose
+intermediate width is $r=0.5d_{\mathrm{ff}}$. The notebook reads the original
+$d_{\mathrm{ff}}$ from the loaded teacher block; for the configured model, the
+expected width is 4096 and the expected SwiGLU count is 25,165,824 parameters.
+Fit the SwiGLU using activation MSE. Report exact footprints, held-out local
+approximation metrics, and complete-model WikiText-2 degradation without
+recovery. This stage does not search widths or operator families.
 
 **Project baseline framework.** The original MLP anchors uncompressed quality,
 zero bounds complete removal, mean tests input-independent prediction, and the
@@ -303,6 +304,9 @@ tests are intentionally deferred under
 - [[method-hybrid-operator-replacement]] defines a future candidate family
   that should reuse this stage's comparison protocol without being treated as
   an established improvement.
+- [[experiment-swiglu-operator-design-progression]] extends the fixed baseline
+  into generic whole-MLP, structure-aware, and teacher-tailored operator
+  studies without changing this page into an architecture search.
 - [[concept-replacement-error-propagation]] motivates isolated and multi-block
   comparisons and the interaction metric.
 - [[decision-primary-compression-evaluation-scope]] makes footprint-quality

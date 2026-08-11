@@ -387,3 +387,74 @@ This file is append-only. Entries use the format:
 - Found zero structural, graph, provenance, math, or scoped semantic errors or
   warnings. The new method and corrected baseline remain `draft` and
   `unverified`; lint does not establish empirical effectiveness.
+
+## [2026-08-11] update | SwiGLU operator-design progression
+
+- Created `experiment-swiglu-operator-design-progression` as a draft,
+  unverified path from fixed controls and generic whole-MLP substitutes to
+  structure-aware internal surgery and teacher-tailored nested operators.
+- Formalized the configured teacher SwiGLU as gate, value, interaction, and
+  down-projection components and recorded their interface constraints without
+  claiming that the decomposition determines an optimal replacement.
+- Defined aligned intermediate channels across gate rows, value rows, and down
+  columns, and kept proposed component scores explicitly conditional on
+  held-out ablation or model-quality validation.
+- Separated Minitron neuron importance, MoDeGPT gated-MLP decomposition, and
+  Grafting replacement/recovery as prior-work context from the researcher's
+  proposed block-specific composition direction.
+- Corrected operator notation by distinguishing linear rank $r_L$ from
+  nonlinear width $r_N$ and teacher width $d_{\mathrm{ff}}$; nonlinear width
+  is not constrained by the model-width rank bound.
+- Updated the fixed baseline experiment, hybrid method, reciprocal links, and
+  wiki index. No notebook, maintained implementation, or empirical finding was
+  changed.
+
+## [2026-08-11] lint | SwiGLU operator-design progression
+
+- Checked all 24 maintained pages for required frontmatter, controlled type
+  and status values, dates, filename-to-ID agreement, duplicate IDs, required
+  body sections, and the new experiment-specific sections.
+- Checked registered source references, wikilinks, reciprocal `related` edges,
+  index coverage, repository-relative links, conflict markers, trailing
+  whitespace, changed-file whitespace, and display-math delimiters.
+- Reviewed the new equations as explanatory teacher notation, standard
+  parameter counting, or explicit project-proposed definitions with their
+  citation requirements stated in the page.
+- Found no structural, graph, provenance, link, math-delimiter, or scoped
+  semantic errors. The experiment remains `draft` and `unverified`; lint does
+  not establish effectiveness or literature novelty.
+
+## [2026-08-11] ingest | Phase Transitions Perspective and Tier I axes
+
+- Registered `src-phase-transitions-compression-2026` in the researcher-found
+  secondary collection as a supporting scholarly-secondary source.
+- Reviewed the complete main article and created a draft source summary that
+  separates its peer-reviewed Perspective status, comparative evidence,
+  synthesis, and stronger speculative or universal claims.
+- Recorded structural, numerical, and algebraic redundancy as the source's
+  taxonomy without adopting its error-additivity, universal-threshold, 90%
+  redundancy, or deployment claims as project facts.
+- Kept the source `in-review` because the publisher's supplementary download
+  returned a client challenge and the stated orthogonality proof could not be
+  independently inspected.
+- Extended the SwiGLU operator-design progression with compact Tier I axes for
+  family, capacity, calibration data, layer, recovery, randomness, and later
+  composition studies.
+- Added a coarse-to-boundary protocol and labelled its operational boundary as
+  a project-proposed definition rather than a source-derived phase-transition
+  result. No notebook, implementation, or empirical finding was changed.
+
+## [2026-08-11] lint | Phase Transitions source and Tier I axes
+
+- Checked all 25 maintained pages for required frontmatter shape, controlled
+  metadata values, dates, filename-to-ID agreement, and duplicate IDs.
+- Checked all five registered source IDs, source locators and relations,
+  index coverage, wikilinks, reciprocal `related` edges, required sections on
+  the new source and updated experiment pages, conflict markers, trailing
+  whitespace, and display-math balance.
+- Reviewed the new material for separation of source claims, synthesis,
+  project-proposed definitions, and unresolved supplementary evidence.
+- Found no structural, graph, provenance, formatting, or scoped semantic
+  errors. The new source remains `in-review`, and the operator experiment
+  remains `draft` and `unverified`; lint does not validate either source claims
+  or operator effectiveness.

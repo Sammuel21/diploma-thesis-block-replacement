@@ -5,7 +5,7 @@ summary: Defines a project-proposed drop-in MLP replacement that adds a linear b
 type: method
 status: draft
 created: 2026-08-09
-updated: 2026-08-09
+updated: 2026-08-11
 
 authorship:
   created_by: collaborative
@@ -40,6 +40,7 @@ scope:
 sources: []
 related:
   - "[[experiment-initial-block-compression-study]]"
+  - "[[experiment-swiglu-operator-design-progression]]"
   - "[[method-global-to-local-operator-budget-allocation]]"
 supersedes: []
 superseded_by: []
@@ -244,6 +245,8 @@ before any answer becomes an empirical finding.
 - [[experiment-initial-block-compression-study]] provides the fixed
   single-block reference and evaluation measurements against which an initial
   hybrid should be compared.
+- [[experiment-swiglu-operator-design-progression]] places the hybrid between
+  generic whole-MLP screening and later teacher-tailored branch allocation.
 - [[method-global-to-local-operator-budget-allocation]] defines an upstream
   block-cap interface; the unresolved internal hybrid split is a separate
   downstream decision.
