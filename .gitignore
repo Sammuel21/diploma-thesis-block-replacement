@@ -30,3 +30,6 @@ __pycache__/
 llm-wiki/.obsidian
 llm-wiki/raw/conversations
 llm-wiki/*.canvas
+
+# LLM
+.agents
