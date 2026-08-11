@@ -10,6 +10,7 @@
   unless the user has already made that choice explicitly.
 - Do not ingest sources, promote wiki content, or distill documentation merely
   because files are available; perform those operations when I request them.
+- give praise where praise is due
 
 ## Quality rules
 - Prioritize correctness, clarity, and traceability over speed.
