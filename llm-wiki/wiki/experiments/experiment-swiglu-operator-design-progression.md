@@ -5,7 +5,7 @@ summary: Defines a staged experiment from generic whole-MLP substitutes to struc
 type: experiment
 status: draft
 created: 2026-08-11
-updated: 2026-08-11
+updated: 2026-08-13
 
 authorship:
   created_by: collaborative
@@ -381,12 +381,24 @@ Relevant project inputs are:
 - [`baseline-testing.ipynb`](../../../notebooks/block/baseline-testing.ipynb),
   which provides the fixed single-block reference protocol; and
 - [`baseline-experiments.ipynb`](../../../notebooks/block/baseline-experiments.ipynb),
-  which begins calibration-budget and reduced-width SwiGLU sweeps.
+  which begins calibration-budget and reduced-width SwiGLU sweeps; and
+- [`src/mlp_replacement/baselines.py`](../../../src/mlp_replacement/baselines.py),
+  the draft runner intended to produce the fixed reference rows from a
+  caller-prepared model, block, activation pairs, and validation loader.
+
+The runner supplies baseline calculation only. It does not own model or data
+loading, activation capture, experimental candidate fitting, plotting,
+recovery, or artifact writing. It has not yet been integrated into these
+notebooks or runtime-validated, so experiments must not claim shared-runner
+comparability until that integration and parity check are complete.
 
 ## Procedure and Controls
 
 1. Reuse the fixed single-block capture and evaluation protocol rather than
-   changing data, layer, and metric conventions for each operator.
+   changing data, layer, and metric conventions for each operator. Once the
+   reusable baseline runner passes parity validation, call it within the same
+   prepared experiment context and compare additional candidates with its
+   standardized rows.
 2. Screen generic whole-MLP candidates at a small declared set of actual
    parameter budgets. Do not infer an operator-family advantage from
    unmatched footprints.

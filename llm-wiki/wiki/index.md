@@ -96,10 +96,10 @@ No model, dataset, software, or other entity pages have been created yet.
 ## Experiments and Findings
 
 - [[experiment-initial-block-compression-study|Initial block-compression study]]:
-  Working three-notebook design covering activation geometry, one practical
-  half-$d_{\mathrm{ff}}$ SwiGLU baseline, independent dense-linear multi-block
-  degradation, and an optional quantization baseline. Status: `draft`; no
-  direct results are recorded.
+  Working design covering activation geometry, a fixed six-condition
+  single-block baseline protocol with a draft reusable runner, independent
+  dense-linear multi-block degradation, and an optional quantization baseline.
+  Status: `draft`; no direct results are recorded.
 - [[experiment-swiglu-operator-design-progression|SwiGLU operator-design progression]]:
   Stages operator testing from generic whole-MLP substitutes through
   capacity curves, structure-aware internal surgery, and unverified
@@ -116,7 +116,7 @@ No synthesis pages have been created yet.
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-08-11 (Phase Transitions source ingestion and Tier I axes)
+- Last structural lint: 2026-08-13 (single-block baseline protocol and runner documentation)
 - Orphan pages: none detected
 - Registered source collections: 3
 - Registered individual sources: 5

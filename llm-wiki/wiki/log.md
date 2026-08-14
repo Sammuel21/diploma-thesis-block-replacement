@@ -458,3 +458,34 @@ This file is append-only. Entries use the format:
   errors. The new source remains `in-review`, and the operator experiment
   remains `draft` and `unverified`; lint does not validate either source claims
   or operator effectiveness.
+
+## [2026-08-13] update | Single-block baseline protocol and runner boundary
+
+- Consolidated the six baseline conditions and their distinct control,
+  approximability, and learned-compression roles in the existing initial
+  block-compression experiment page rather than creating a duplicate method or
+  file-level implementation page.
+- Recorded the shared-context comparison contract and clarified that the fixed
+  suite is not a parameter-matched operator-family comparison.
+- Documented the inputs, responsibilities, outputs, and exclusions of the
+  draft `src/mlp_replacement/baselines.py` runner and linked it to the planned
+  SwiGLU operator-design progression.
+- Kept the runner explicitly unintegrated and unverified: the current baseline
+  notebook still executes inline logic, and no runtime-parity result or
+  empirical finding was promoted.
+
+## [2026-08-13] lint | Single-block baseline documentation
+
+- Checked all 25 maintained pages for required frontmatter fields, controlled
+  type, status, and epistemic-role values, dates, unique IDs, filename-to-ID
+  agreement, required relationship and source sections, and balanced display
+  math.
+- Checked registered source IDs, index coverage, wikilinks, reciprocal
+  `related` edges, repository-relative links, conflict markers, trailing
+  whitespace, and changed-file whitespace.
+- Reviewed the new operator equations as standard explanatory notation and the
+  baseline selection as an explicit project decision requiring no external
+  citation.
+- Found no structural, graph, provenance, link, formatting, or scoped semantic
+  errors. The baseline experiment and reusable runner remain `draft` and
+  `unverified`; lint does not establish runtime parity or empirical quality.

@@ -5,7 +5,7 @@ summary: Defines the working activation, practical single-block replacement, and
 type: experiment
 status: draft
 created: 2026-07-27
-updated: 2026-08-11
+updated: 2026-08-13
 
 authorship:
   created_by: collaborative
@@ -22,6 +22,7 @@ epistemic:
 scope:
   topics:
     - activation-analysis
+    - baseline-evaluation
     - block-importance
     - effective-rank
     - error-propagation
@@ -149,8 +150,11 @@ evaluates prefixes with `k` from 1 through 6.
 - [`baseline-testing.ipynb`](../../../notebooks/block/baseline-testing.ipynb)
 - [`degradation-analysis.ipynb`](../../../notebooks/block/degradation-analysis.ipynb)
 - [`notebooks/block/README.md`](../../../notebooks/block/README.md)
-- reusable calculations under
-  [`src/mlp_replacement/`](../../../src/mlp_replacement/)
+- [`src/mlp_replacement/baselines.py`](../../../src/mlp_replacement/baselines.py),
+  a draft reusable implementation of the fixed single-block baseline
+  calculation;
+- supporting calculations under
+  [`src/mlp_replacement/`](../../../src/mlp_replacement/); and
 - intended result directory: `data/results/notebook-block-study/`
 
 Only summaries and plot data are intended to be saved. Raw activation tensors
@@ -178,18 +182,74 @@ Fit the SwiGLU using activation MSE. Report exact footprints, held-out local
 approximation metrics, and complete-model WikiText-2 degradation without
 recovery. This stage does not search widths or operator families.
 
-**Project baseline framework.** The original MLP anchors uncompressed quality,
-zero bounds complete removal, mean tests input-independent prediction, and the
-50%-of-$d_{\mathrm{ff}}$ SwiGLU is the first straightforward learned
-compressor. Future whole-MLP replacements may reuse the same capture and
-evaluation protocol. The fixed SwiGLU remains a common reference, but a claim
-of architectural superiority additionally requires comparable actual
-footprints. If model-level recovery is introduced, the reference and proposed
-operator must receive the same recovery data, objective, trainable scope, and
-optimization budget.
+#### Fixed baseline definition
 
-The width equation is a project configuration rule and the parameter count is
-standard matrix-dimension arithmetic; neither requires an external citation.
+The baseline suite has six deliberately different roles:
+
+| Condition | Construction and fitting | Role in the comparison |
+| --- | --- | --- |
+| Original MLP | Untouched teacher operator | Uncompressed local and model-quality reference |
+| Zero | Returns zero for every input | Complete-removal control |
+| Mean | Returns the calibration-target mean for every input | Input-independent constant control |
+| Dense linear | Fits $Ax$ by ridge-regularized least squares on calibration pairs | Reference for linear approximability without an offset |
+| Dense affine | Fits $Ax+b$ by ridge-regularized least squares on calibration pairs | Tests whether a learned offset explains error beyond the linear map |
+| Narrow SwiGLU | Uses $r=\operatorname{round}(\rho d_{\mathrm{ff}})$, with default $\rho=0.5$, and fits activation MSE | Straightforward learned compression baseline in the teacher operator family |
+
+The operator forms are standard explanatory notation and do not require an
+external citation. Their selection and assigned baseline roles are project
+decisions, not literature-derived claims. The fixed SwiGLU width is not
+claimed to be optimal.
+
+#### Comparison contract
+
+All six conditions must share the same loaded checkpoint, target block,
+calibration and held-out activation pairs, complete-model validation loader
+and batch limit, numerical precision, and seed where randomness applies. The
+untouched model is evaluated once. Each substitute is then evaluated on the
+held-out activation pairs and temporarily inserted into the same model for
+complete-model loss and perplexity evaluation. Recovery is disabled in this
+baseline stage.
+
+The suite provides controls and reference levels; it is not a
+parameter-matched operator-family comparison. Dense linear, dense affine, and
+narrow SwiGLU have different feasible footprints. A later claim that one
+architecture is better than another therefore requires matched or
+nearest-feasible parameter or byte budgets, or a capacity curve. If recovery
+is introduced, every compared candidate must receive the same recovery data,
+objective, trainable scope, and optimizer-step budget.
+
+#### Reusable calculation boundary
+
+[`src/mlp_replacement/baselines.py`](../../../src/mlp_replacement/baselines.py)
+contains the draft `run_single_block_baselines` runner. It accepts an already
+loaded model, a `BlockRef` containing both the layer index and MLP module,
+captured training and validation activation pairs, a model-validation loader,
+an `OperatorConfig`, and optional SwiGLU-width, ridge, and validation-batch
+settings.
+
+Within that prepared context, the runner:
+
+1. evaluates the untouched model once;
+2. constructs or fits the five substitute conditions;
+3. computes held-out local metrics;
+4. temporarily inserts each substitute for complete-model evaluation;
+5. records parameter, state-element, and theoretical-weight-byte accounting;
+   and
+6. returns six standardized result rows, per-operator fit histories, the
+   untouched model metrics, and the original and replacement intermediate
+   widths in `SingleBlockBaselineResult`.
+
+The runner intentionally does not load models or datasets, build loaders,
+capture activations, choose a layer, run model-level recovery, create plots,
+or write JSON artifacts. Experimental notebooks own those choices and may
+evaluate additional candidates against the returned rows.
+
+**Implementation status.** Repository inspection shows that
+`baseline-testing.ipynb` still performs the equivalent baseline calculation
+inline. The draft runner has not yet been wired into that notebook or the
+operator experiments, and clean-runtime and numerical-parity checks have not
+been recorded. It is therefore a proposed reusable boundary, not yet the
+authoritative or validated executor of the baseline protocol.
 
 ### Working Numerical Baseline Extension
 
@@ -260,8 +320,9 @@ widths or support an optimality claim.
 
 ## Direct Results
 
-No direct results are recorded. The notebooks have not been promoted to
-experiment-backed evidence and currently contain no stored outputs.
+No direct results are recorded. Exploratory notebook outputs may exist, but no
+run has been promoted to a preserved, reviewed experiment artifact on this
+page.
 
 ## Interpretation
 
@@ -293,9 +354,12 @@ low-BI, or low-local-error blocks are generally replaceable.
 
 Status: working and unverified. The current notebooks expose their main model,
 data, seed, fixed replacement, and output-path choices, but clean-kernel
-executions and preserved result artifacts remain pending. Production hardening and automated
-tests are intentionally deferred under
-[[decision-working-experiment-code-standards]].
+executions and preserved result artifacts remain pending. The reusable runner
+additionally requires a six-row parity check against the inline notebook logic
+under one identical prepared context, finite local and model metrics, and
+confirmation that temporary replacement restores the teacher after each
+condition. Production hardening and automated tests are intentionally deferred
+under [[decision-working-experiment-code-standards]].
 
 ## Relationships
 
