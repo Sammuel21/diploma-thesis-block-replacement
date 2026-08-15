@@ -111,12 +111,15 @@ historical archive remains available at `docs/prototype/mvp/`.
 
 ## Syntheses and Comparisons
 
-No synthesis pages have been created yet.
+- [[comparison-recovery-objective-trainable-scope|Recovery objective and trainable scope]]:
+  Distinguishes model-level loss placement from full-student,
+  replacement-only, and LoRA update scopes in the project, Minitron, and
+  Grafting.
 
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-08-13 (single-block baseline protocol and runner documentation)
+- Last structural lint: 2026-08-15 (recovery objective and trainable-scope comparison)
 - Orphan pages: none detected
 - Registered source collections: 3
 - Registered individual sources: 5

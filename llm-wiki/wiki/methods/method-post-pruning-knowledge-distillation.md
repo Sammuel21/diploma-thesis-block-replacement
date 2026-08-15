@@ -5,7 +5,7 @@ summary: Recovers a structurally pruned student by matching outputs and optional
 type: method
 status: review
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-08-15
 
 authorship:
   created_by: collaborative
@@ -43,6 +43,7 @@ related:
   - "[[source-summary-minitron-2024]]"
   - "[[method-retraining-assisted-architecture-search]]"
   - "[[method-two-stage-operator-grafting]]"
+  - "[[comparison-recovery-objective-trainable-scope]]"
 supersedes: []
 superseded_by: []
 ---
@@ -113,6 +114,8 @@ replacement requires direct thesis experiments.
 - [[method-two-stage-operator-grafting]] also separates local structural change
   from model-level recovery, but initializes replacement operators through
   activation regression rather than producing a student through pruning.
+- [[comparison-recovery-objective-trainable-scope]] distinguishes Minitron's
+  full pruned-student retraining from the project's replacement-only updates.
 
 ## Sources
 

@@ -489,3 +489,31 @@ This file is append-only. Entries use the format:
 - Found no structural, graph, provenance, link, formatting, or scoped semantic
   errors. The baseline experiment and reusable runner remain `draft` and
   `unverified`; lint does not establish runtime parity or empirical quality.
+
+## [2026-08-15] update | Recovery objective and trainable scope
+
+- Created `comparison-recovery-objective-trainable-scope` to distinguish the
+  location of a recovery objective from the parameters updated by it.
+- Recorded the current project as model-level teacher-logit KD with
+  replacement-only updates, based on the maintained recovery implementation
+  and exploratory width-recovery notebook.
+- Compared that scope with Minitron's full pruned-student retraining,
+  Grafting's main end-to-end DiT recovery, and Grafting's PixArt-Sigma LoRA
+  exception using the registered source snapshots.
+- Added reciprocal links from the Minitron and Grafting method pages and added
+  the comparison to the wiki index. No implementation or empirical finding
+  was changed.
+
+## [2026-08-15] lint | Recovery objective and trainable scope
+
+- Checked all 26 maintained pages for required frontmatter, controlled type,
+  status, and epistemic-role values, dates, unique IDs, filename-to-ID
+  agreement, and required body sections.
+- Checked all registered source references, index coverage, wikilinks,
+  reciprocal `related` edges, repository-relative links, conflict markers,
+  trailing whitespace, and balanced display-math delimiters.
+- Reviewed the new comparison for explicit separation of source-derived
+  claims, repository-observed behavior, and synthesis terminology.
+- Found no structural, graph, provenance, link, formatting, or scoped semantic
+  errors. Lint does not establish that replacement-only recovery is
+  empirically equivalent to the source-paper recovery protocols.

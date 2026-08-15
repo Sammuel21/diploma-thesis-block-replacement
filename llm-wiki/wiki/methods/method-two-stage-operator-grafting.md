@@ -5,7 +5,7 @@ summary: Initializes replacement operators through local activation regression a
 type: method
 status: review
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-08-15
 
 authorship:
   created_by: collaborative
@@ -48,6 +48,7 @@ related:
   - "[[method-post-pruning-knowledge-distillation]]"
   - "[[method-mone-novice-expert-replacement]]"
   - "[[method-modegpt-modular-decomposition]]"
+  - "[[comparison-recovery-objective-trainable-scope]]"
 supersedes: []
 superseded_by: []
 ---
@@ -130,6 +131,9 @@ MLPs is a thesis hypothesis, not a verified consequence of this source.
 - [[method-modegpt-modular-decomposition]] uses calibration-aware closed-form
   dimension reduction within the existing operator family instead of learning
   an arbitrary substitute and relying on integrated recovery.
+- [[comparison-recovery-objective-trainable-scope]] separates Grafting's main
+  end-to-end recovery scope, its PixArt LoRA exception, and the project's
+  replacement-only updates.
 
 ## Sources
 
