@@ -5,7 +5,7 @@ summary: Defines a staged experiment from generic whole-MLP substitutes to struc
 type: experiment
 status: draft
 created: 2026-08-11
-updated: 2026-08-13
+updated: 2026-08-18
 
 authorship:
   created_by: collaborative
@@ -65,6 +65,7 @@ sources:
 
 related:
   - "[[experiment-initial-block-compression-study]]"
+  - "[[experiment-baseline-operator-analysis]]"
   - "[[method-hybrid-operator-replacement]]"
   - "[[source-summary-phase-transitions-compression-2026]]"
 supersedes: []
@@ -488,6 +489,9 @@ as wiki evidence.
 
 - [[experiment-initial-block-compression-study]] supplies the fixed baseline
   and single-block evaluation conventions from which this study proceeds.
+- [[experiment-baseline-operator-analysis]] supplies the initial calibration,
+  width, recovery, and depth-sensitivity axes before teacher-tailored operator
+  construction is introduced.
 - [[method-hybrid-operator-replacement]] defines one generic whole-MLP family
   that may later receive teacher-tailored branch sizes.
 - [[method-minitron-activation-based-importance]] provides prior-work context

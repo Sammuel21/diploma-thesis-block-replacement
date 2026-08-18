@@ -517,3 +517,34 @@ This file is append-only. Entries use the format:
 - Found no structural, graph, provenance, link, formatting, or scoped semantic
   errors. Lint does not establish that replacement-only recovery is
   empirically equivalent to the source-paper recovery protocols.
+
+## [2026-08-18] update | Baseline operator-analysis methodology
+
+- Created `experiment-baseline-operator-analysis` as the methodology page for
+  `baseline-experiments.ipynb`, keeping it distinct from the fixed
+  six-condition `baseline-testing.ipynb` protocol.
+- Recorded the calibration-data, reduced-SwiGLU width, replacement-only
+  recovery, full-depth pre-recovery KL, and global-to-local analysis designs.
+- Distinguished calibration data, local optimizer exposure, validation, KL
+  evaluation, and recovery-update budgets; no notebook result was promoted.
+- Documented the current large CPU teacher-logit cache and a planned shared
+  streaming or chunked recovery design without changing implementation code.
+- Marked unexecuted cells, placeholder analyses, workflow controls, and memory
+  optimizations as pending or planned, and added reciprocal experiment,
+  recovery-scope, and error-propagation links.
+
+## [2026-08-18] lint | Baseline operator-analysis methodology
+
+- Checked all 27 maintained pages for required frontmatter fields, controlled
+  type, status, epistemic-role, verification, and source-relation values,
+  dates, unique IDs, filename-to-ID agreement, required body sections,
+  conflict markers, trailing whitespace, and balanced display math.
+- Checked the five registered source IDs, source locators, index coverage,
+  wikilinks, reciprocal `related` edges, and repository-relative links.
+- Reviewed the new experiment page for separation of prior-work context,
+  project definitions, researcher questions and hypotheses, observed
+  implementation state, planned work, and non-promoted notebook output.
+- Found no structural, graph, provenance, link, formatting, or scoped semantic
+  errors. The experiment remains `draft` and `unverified`; lint does not
+  establish the adequacy of its budgets, the memory benefit of an unimplemented
+  streaming loop, or any empirical result.

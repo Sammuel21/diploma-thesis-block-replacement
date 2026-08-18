@@ -5,7 +5,7 @@ summary: Distinguishes where a recovery loss is measured from which student para
 type: comparison
 status: review
 created: 2026-08-15
-updated: 2026-08-15
+updated: 2026-08-18
 
 authorship:
   created_by: collaborative
@@ -46,6 +46,7 @@ sources:
 related:
   - "[[method-post-pruning-knowledge-distillation]]"
   - "[[method-two-stage-operator-grafting]]"
+  - "[[experiment-baseline-operator-analysis]]"
 supersedes: []
 superseded_by: []
 ---
@@ -125,6 +126,8 @@ be named `model-level teacher-logit KD with replacement-only updates`.
   loss design and full pruned-student retraining context.
 - [[method-two-stage-operator-grafting]] documents Grafting's local activation
   fitting and integrated fine-tuning stages.
+- [[experiment-baseline-operator-analysis]] applies the project's
+  replacement-only model-level KD scope to reduced-SwiGLU recovery curves.
 
 ## Sources
 

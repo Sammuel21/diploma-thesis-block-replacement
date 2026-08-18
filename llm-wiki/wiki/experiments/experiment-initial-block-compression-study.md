@@ -5,7 +5,7 @@ summary: Defines the working activation, practical single-block replacement, and
 type: experiment
 status: draft
 created: 2026-07-27
-updated: 2026-08-13
+updated: 2026-08-18
 
 authorship:
   created_by: collaborative
@@ -49,6 +49,7 @@ related:
   - "[[method-block-importance]]"
   - "[[method-hybrid-operator-replacement]]"
   - "[[experiment-swiglu-operator-design-progression]]"
+  - "[[experiment-baseline-operator-analysis]]"
   - "[[concept-replacement-error-propagation]]"
   - "[[decision-primary-compression-evaluation-scope]]"
   - "[[implementation-compute-environments]]"
@@ -371,6 +372,9 @@ under [[decision-working-experiment-code-standards]].
 - [[experiment-swiglu-operator-design-progression]] extends the fixed baseline
   into generic whole-MLP, structure-aware, and teacher-tailored operator
   studies without changing this page into an architecture search.
+- [[experiment-baseline-operator-analysis]] varies calibration data, reduced
+  SwiGLU width, recovery budget, and layer position without changing the fixed
+  six-condition definition recorded here.
 - [[concept-replacement-error-propagation]] motivates isolated and multi-block
   comparisons and the interaction metric.
 - [[decision-primary-compression-evaluation-scope]] makes footprint-quality

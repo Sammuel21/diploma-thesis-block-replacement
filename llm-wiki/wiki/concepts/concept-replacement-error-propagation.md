@@ -5,7 +5,7 @@ summary: Local approximation errors alter downstream activation distributions an
 type: concept
 status: review
 created: 2026-07-17
-updated: 2026-08-08
+updated: 2026-08-18
 
 authorship:
   created_by: collaborative
@@ -44,6 +44,7 @@ related:
   - "[[method-two-stage-operator-grafting]]"
   - "[[method-global-to-local-operator-budget-allocation]]"
   - "[[experiment-initial-block-compression-study]]"
+  - "[[experiment-baseline-operator-analysis]]"
 supersedes: []
 superseded_by: []
 ---
@@ -107,6 +108,9 @@ The thesis should test that relationship directly and report both levels.
   several locally fitted replacements can interact.
 - [[experiment-initial-block-compression-study]] measures whether simultaneous
   replacement degradation is additive or shows interaction.
+- [[experiment-baseline-operator-analysis]] compares held-out local error with
+  pre-recovery model-level KL for independently fitted single-block
+  replacements across depth.
 
 ## Sources
 

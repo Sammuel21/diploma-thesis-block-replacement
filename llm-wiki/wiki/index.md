@@ -100,6 +100,11 @@ No model, dataset, software, or other entity pages have been created yet.
   single-block baseline protocol with a draft reusable runner, independent
   dense-linear multi-block degradation, and an optional quantization baseline.
   Status: `draft`; no direct results are recorded.
+- [[experiment-baseline-operator-analysis|Baseline operator analysis]]:
+  Exploratory protocol for calibration scaling, reduced-SwiGLU capacity,
+  replacement-only recovery, and local-to-global replacement sensitivity.
+  Status: `draft`; several analyses and the consolidated artifact remain
+  unverified or pending execution, and no direct results are recorded.
 - [[experiment-swiglu-operator-design-progression|SwiGLU operator-design progression]]:
   Stages operator testing from generic whole-MLP substitutes through
   capacity curves, structure-aware internal surgery, and unverified
@@ -119,7 +124,7 @@ historical archive remains available at `docs/prototype/mvp/`.
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-08-15 (recovery objective and trainable-scope comparison)
+- Last structural lint: 2026-08-18 (baseline operator-analysis methodology)
 - Orphan pages: none detected
 - Registered source collections: 3
 - Registered individual sources: 5
