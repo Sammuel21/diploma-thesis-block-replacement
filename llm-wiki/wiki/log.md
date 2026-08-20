@@ -548,3 +548,13 @@ This file is append-only. Entries use the format:
   errors. The experiment remains `draft` and `unverified`; lint does not
   establish the adequacy of its budgets, the memory benefit of an unimplemented
   streaming loop, or any empirical result.
+
+## [2026-08-20] update | Controlled operator-family comparisons
+
+- Extended `experiment-swiglu-operator-design-progression` with three distinct
+  comparison views: matched-footprint architecture controls, within-family
+  capacity curves, and cross-family Pareto analysis.
+- Recorded that equal stored parameters do not imply equal expressivity, using
+  dense $d^2$ and rank-$d/2$ factorized linear maps as the project control.
+- Kept the rationale explicitly project-defined and unverified; no empirical
+  operator ranking or result was promoted.

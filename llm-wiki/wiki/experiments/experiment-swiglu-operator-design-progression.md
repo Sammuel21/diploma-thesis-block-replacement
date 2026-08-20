@@ -5,7 +5,7 @@ summary: Defines a staged experiment from generic whole-MLP substitutes to struc
 type: experiment
 status: draft
 created: 2026-08-11
-updated: 2026-08-18
+updated: 2026-08-20
 
 authorship:
   created_by: collaborative
@@ -309,6 +309,39 @@ $r_L$, and reduced SwiGLU capacity is controlled by $r_N$ relative to
 $d_{\mathrm{ff}}$. Family comparisons must therefore use realized parameter
 count or bytes on the footprint axis rather than equating their raw width or
 rank fractions.
+
+### Complementary operator comparisons
+
+**Project experiment design; unverified.** Operator-family evaluation should
+use three complementary views rather than require every comparison to answer
+the same question:
+
+1. **Matched-footprint architectural control:** compare different families at
+   the same or nearest feasible realized parameter count. Hold calibration
+   data, local optimizer exposure, validation data, and recovery protocol fixed
+   so the comparison primarily tests operator structure.
+2. **Within-family capacity curve:** vary the rank, hidden width, or
+   intermediate width inside one family to measure its footprint-quality
+   scaling and locate an operational boundary.
+3. **Cross-family Pareto comparison:** after collecting stable configurations,
+   compare all candidates on declared footprint and quality axes without
+   requiring exact parameter equality.
+
+Exact matching is not always feasible because ranks and widths are integers.
+The experiment should use the nearest valid configurations and report their
+actual parameter counts and bytes rather than treating nominal ratios as equal
+budgets.
+
+Equal stored parameter count also does not imply equal expressivity. For
+example, a dense linear map stores $d^2$ parameters, while a factorized map
+$U(Vx)$ stores $2dr_L$. At $r_L=d/2$, both store $d^2$ parameters, but the
+factorized map remains constrained to rank at most $d/2$. This setting is an
+equal-budget structural control, not evidence of a low-rank storage advantage.
+Parameter savings relative to the dense linear map require $r_L<d/2$.
+
+These equations are standard matrix-dimension counts and require no citation.
+The decision to use them as matched-budget controls is project methodology,
+not a source-derived prescription.
 
 ### Coarse-to-boundary procedure
 

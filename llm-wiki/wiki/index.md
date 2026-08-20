@@ -106,8 +106,8 @@ No model, dataset, software, or other entity pages have been created yet.
   Status: `draft`; several analyses and the consolidated artifact remain
   unverified or pending execution, and no direct results are recorded.
 - [[experiment-swiglu-operator-design-progression|SwiGLU operator-design progression]]:
-  Stages operator testing from generic whole-MLP substitutes through
-  capacity curves, structure-aware internal surgery, and unverified
+  Stages matched-footprint family comparisons and within-family capacity
+  curves through structure-aware internal surgery and unverified
   teacher-tailored nested designs. Status: `draft`; no direct results are
   recorded.
 
