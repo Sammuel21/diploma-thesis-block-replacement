@@ -4,6 +4,17 @@ This is the content-oriented entry point for maintained thesis knowledge.
 Read it before searching individual pages and update it after every ingest,
 substantive update, archive, or distillation operation.
 
+## Current Research Focus
+
+Artifact-backed profiling now covers isolated replacement behavior across all
+eligible MLP layers for the baseline and generic operator-family suites. The
+active next direction is simultaneous multi-block replacement interaction:
+the initial skeleton is
+[`block-interaction.ipynb`](../../notebooks/model/block-interaction.ipynb).
+Its subset construction, operator controls, interaction metric, ordering, and
+recovery protocol remain to be designed. Singleton KL profiles must not be
+assumed to compose additively.
+
 ## Sources
 
 - [[source-summary-minitron-2024|Minitron (2024)]] - Combines structured
@@ -68,9 +79,8 @@ No model, dataset, software, or other entity pages have been created yet.
   Maps BI scores to a smoothed per-layer sparsity distribution under a global
   compression target.
 - [[method-global-to-local-operator-budget-allocation|Global-to-local operator budget allocation]]:
-  Converts an eligible-MLP or whole-model parameter-reduction target into
-  importance-aware, feasible-size MLP replacement caps without selecting
-  local operators.
+  Adapts MoDeGPT's importance-weighted softmax allocation into bounded,
+  feasible-size MLP replacement caps without selecting local operators.
 - [[method-hybrid-operator-replacement|Hybrid linear-nonlinear MLP replacement]]:
   Defines a project-proposed linear-plus-nonlinear drop-in operator while
   leaving its internal capacity allocation as unresolved future work.
@@ -99,17 +109,18 @@ No model, dataset, software, or other entity pages have been created yet.
   Working design covering activation geometry, a fixed six-condition
   single-block baseline protocol with a draft reusable runner, independent
   dense-linear multi-block degradation, and an optional quantization baseline.
-  Status: `draft`; no direct results are recorded.
+  Status: `draft`; checked singleton results are maintained on the two linked
+  downstream experiment pages rather than duplicated here.
 - [[experiment-baseline-operator-analysis|Baseline operator analysis]]:
-  Exploratory protocol for calibration scaling, reduced-SwiGLU capacity,
-  replacement-only recovery, and local-to-global replacement sensitivity.
-  Status: `draft`; several analyses and the consolidated artifact remain
-  unverified or pending execution, and no direct results are recorded.
+  Artifact-backed single-run evidence for calibration scaling, reduced-SwiGLU
+  capacity, replacement-only recovery, and full-depth isolated replacement
+  sensitivity. Status: `draft`; schema-2 evidence is checked, while newer
+  notebook additions remain pending rerun.
 - [[experiment-swiglu-operator-design-progression|SwiGLU operator-design progression]]:
-  Stages matched-footprint family comparisons and within-family capacity
-  curves through structure-aware internal surgery and unverified
-  teacher-tailored nested designs. Status: `draft`; no direct results are
-  recorded.
+  Artifact-backed full-depth comparison of ten generic operator
+  configurations, followed by planned structure-aware internal surgery and
+  teacher-tailored nested designs. Status: `draft`; Tier I singleton evidence
+  is checked and later stages remain unverified.
 
 No MVP evidence has been ingested into canonical experiment pages. The
 historical archive remains available at `docs/prototype/mvp/`.
@@ -124,7 +135,7 @@ historical archive remains available at `docs/prototype/mvp/`.
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-08-18 (baseline operator-analysis methodology)
+- Last structural lint: 2026-08-22 (MoDeGPT allocation attribution)
 - Orphan pages: none detected
 - Registered source collections: 3
 - Registered individual sources: 5

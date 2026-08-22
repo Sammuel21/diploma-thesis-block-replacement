@@ -5,7 +5,7 @@ summary: Local approximation errors alter downstream activation distributions an
 type: concept
 status: review
 created: 2026-07-17
-updated: 2026-08-18
+updated: 2026-08-20
 
 authorship:
   created_by: collaborative
@@ -45,6 +45,7 @@ related:
   - "[[method-global-to-local-operator-budget-allocation]]"
   - "[[experiment-initial-block-compression-study]]"
   - "[[experiment-baseline-operator-analysis]]"
+  - "[[experiment-swiglu-operator-design-progression]]"
 supersedes: []
 superseded_by: []
 ---
@@ -111,6 +112,9 @@ The thesis should test that relationship directly and report both levels.
 - [[experiment-baseline-operator-analysis]] compares held-out local error with
   pre-recovery model-level KL for independently fitted single-block
   replacements across depth.
+- [[experiment-swiglu-operator-design-progression]] extends that singleton
+  profile across ten generic operator configurations before simultaneous
+  replacement interactions are introduced.
 
 ## Sources
 

@@ -5,7 +5,7 @@ summary: Documents canonical Transformer-layer BI and distinguishes raw MLP inpu
 type: method
 status: review
 created: 2026-07-17
-updated: 2026-08-08
+updated: 2026-08-20
 
 authorship:
   created_by: collaborative
@@ -48,6 +48,8 @@ related:
   - "[[method-modegpt-global-sparsity-allocation]]"
   - "[[method-global-to-local-operator-budget-allocation]]"
   - "[[experiment-initial-block-compression-study]]"
+  - "[[experiment-baseline-operator-analysis]]"
+  - "[[experiment-swiglu-operator-design-progression]]"
 supersedes: []
 superseded_by: []
 ---
@@ -167,6 +169,28 @@ does not establish that either proxy reliably predicts model-level importance.
 That requires a model-level reference outcome, such as the validation-loss
 change caused by a controlled singleton replacement.
 
+### Current Project Use
+
+**Working project interpretation.** Pre-recovery teacher-to-student KL after a
+controlled singleton MLP replacement is now the primary empirical reference
+for single-block replacement sensitivity. It directly measures model-wide
+output change, but it is conditioned on the replacement family, parameter
+budget, local fitting procedure, data, and KL protocol. It is therefore not an
+intrinsic architecture-independent layer score.
+
+Canonical BI remains the source-derived, replacement-operator-independent
+baseline. Residual-aware MLP BI remains a project-proposed candidate with
+closer granularity to the replaced component. Their useful role is now a
+falsifiable screening question: do these inexpensive forward-only scores rank
+layers similarly to pre-recovery KL for fixed replacement configurations? That
+comparison has not yet been executed. The raw MLP input-output cosine distance
+is retained only as an optional diagnostic.
+
+An importance score can rank where compression may be safer or riskier; it
+does not determine how many blocks should be replaced. Replacement count must
+come from a declared footprint target, quality constraint, or separate search
+policy.
+
 ## Evidence and Rationale
 
 Minitron compares BI with a more expensive leave-one-layer-out perplexity
@@ -216,6 +240,11 @@ definition and experiments are ingested.
   per-block replacement caps without using that score to select an operator.
 - [[experiment-initial-block-compression-study]] uses canonical BI as a layer
   selection baseline and keeps MLP-local adaptations separately named.
+- [[experiment-baseline-operator-analysis]] records the checked singleton KL
+  reference for five baseline operators across eligible depth.
+- [[experiment-swiglu-operator-design-progression]] extends that reference to
+  ten generic operator configurations and retains its operator-conditioned
+  interpretation.
 
 ## Sources
 

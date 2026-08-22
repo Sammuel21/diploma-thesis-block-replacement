@@ -1,11 +1,11 @@
 ---
 id: method-global-to-local-operator-budget-allocation
 title: Global-to-Local Operator Budget Allocation
-summary: Converts a declared whole-model or eligible-MLP parameter-reduction target into importance-aware per-block replacement-budget caps without choosing local operators.
+summary: Adapts MoDeGPT's importance-weighted softmax allocation into bounded per-block parameter caps for heterogeneous MLP replacement operators.
 type: method
 status: draft
 created: 2026-08-08
-updated: 2026-08-09
+updated: 2026-08-22
 
 authorship:
   created_by: collaborative
@@ -45,7 +45,8 @@ scope:
 sources:
   - source_id: src-modegpt-2025
     locator: "Section 3.3; Equations 10-11"
-    relation: motivates
+    relation: defines
+    note: "Defines the importance-weighted softmax sparsity allocation adapted here; replacement-cap accounting and discrete realization are project extensions."
 
 related:
   - "[[method-block-importance]]"
@@ -62,17 +63,24 @@ superseded_by: []
 
 ## Overview
 
-**Project-proposed method.** This method converts one declared parameter-
-reduction target into an initial maximum parameter budget for every eligible
-MLP replacement. The target may be stated over the eligible MLP scope or the
-whole model; both forms are converted to the same eligible-operator removal
-quota. It is a first-stage screener and allocator: it decides how much capacity
-each block may initially receive, not which replacement architecture, fitting
-algorithm, or recovery procedure should be used.
+**Source-derived allocation principle with project-proposed extensions.** This
+method adapts MoDeGPT's importance-weighted softmax sparsity allocation into an
+initial maximum parameter budget for every eligible MLP replacement.
+[src-modegpt-2025, Section 3.3; Equations 10-11] The target may be stated over
+the eligible MLP scope or the whole model; both forms are converted to the same
+eligible-operator removal quota. It is a first-stage screener and allocator: it
+decides how much capacity each block may initially receive, not which
+replacement architecture, fitting algorithm, or recovery procedure should be
+used.
 
-The fixed method skeleton covers parameter accounting, feasibility, budget
-conservation, cap semantics, and actual-footprint reporting. Importance
-estimation and downstream operator construction remain replaceable policies.
+The adopted component is the exponentially smoothed mapping from larger
+importance to lower local removal under a conserved global target. The project
+extends that rule with target-scope conversion, parameter-size weighting,
+protected-block and local bounds, replacement-cap semantics, discrete feasible
+operator sizes, unused-budget reconciliation, and actual-footprint reporting.
+Importance estimation and downstream operator construction remain replaceable
+policies. The softmax allocation rule itself is not claimed as an original
+project contribution.
 The method is currently unverified and makes no empirical claim that its
 nonuniform allocation outperforms a uniform budget.
 
@@ -263,8 +271,21 @@ Alternative normalization rules remain configurable and must be reported.
 
 ## Reference Cap Allocation
 
-**Project-proposed reference allocation.** For temperature $\tau>0$, define
-a positive removal propensity and its parameter-size-weighted share:
+**Source-derived allocation principle and project adaptation.** For the
+regularization regime stated in its Theorem 4, MoDeGPT obtains continuous
+layer sparsities using
+
+$$
+\boldsymbol{\phi}
+=L\phi_{\mathrm{avg}}\operatorname{softmax}
+\!\left(-\frac{\mathbf{s}}{\varepsilon}\right),
+$$
+
+where $\mathbf{s}$ contains layer-importance scores and $\varepsilon$ controls
+the entropic smoothing. [src-modegpt-2025, Section 3.3; Equations 10-11] The
+project applies the same negative-exponential allocation pattern after its
+project-proposed rank normalization. For temperature $\tau>0$, define a
+positive removal propensity and its parameter-size-weighted share:
 
 $$
 \begin{aligned}
@@ -282,8 +303,8 @@ equal, $\mathbf{q}=\operatorname{softmax}(-\mathbf{z}/\tau)$; with unequal
 sizes it is a size-weighted softmax. The $q_\ell$ values, not the local
 retention ratios, sum to one.
 
-**Project-proposed reference allocation (continued).** Without active bounds,
-assign removals and initial caps as:
+**Source-derived allocation form with project-specific cap semantics.** Without
+active bounds, assign removals and initial caps as:
 
 $$
 \begin{aligned}
@@ -304,6 +325,20 @@ probability weights, and they need not sum to one. If earlier notation writes
 $C_\ell^{(0)}=w_\ell(F_\ell)$, $w_\ell$
 denotes this derived local mapping; $q_\ell$ is the separately normalized
 global share.
+
+For equal original block sizes $F_\ell=F$ and
+$R^\star=L\phi_{\mathrm{avg}}F$, the assigned local reduction becomes
+
+$$
+\frac{R_\ell}{F}
+=L\phi_{\mathrm{avg}}
+\operatorname{softmax}\!\left(-\frac{\mathbf{z}}{\tau}\right)_\ell.
+$$
+
+This is MoDeGPT's allocation form under the substitutions
+$\mathbf{s}\mapsto\mathbf{z}$ and $\varepsilon\mapsto\tau$. The
+parameter-size weighting for unequal $F_\ell$ and the interpretation of the
+result as a cap for a discrete replacement operator are project extensions.
 
 Temperature controls concentration. Large $\tau$ approaches uniform local
 parameter reduction, while smaller values direct more removal toward lower-
@@ -501,17 +536,19 @@ budget does not establish optimality.
 
 ## Evidence and Rationale
 
-MoDeGPT is a source-checked precedent for converting layer-importance scores
-into nonuniform sparsities under a global compression constraint. Its
-source-derived optimization and softmax solution are documented separately in
-[[method-modegpt-global-sparsity-allocation]]. [src-modegpt-2025, Section 3.3;
-Equations 10-11]
+MoDeGPT is the source-checked basis for the reference allocator's negative-
+softmax mapping from layer importance to nonuniform compression under a global
+constraint. Its optimization objective and softmax solution are documented
+separately in [[method-modegpt-global-sparsity-allocation]].
+[src-modegpt-2025, Section 3.3; Equations 10-11]
 
 **Synthesis.** That precedent supports separating model-level allocation from
-local compression realization. The project method extends the separation to
-replacement-budget caps, configurable importance estimators, actual cap
-utilization, and optional leftover reconciliation. These additions are
-project proposals, not claims attributed to MoDeGPT.
+local compression realization. The project method transfers the allocation
+from continuous matrix sparsity to heterogeneous replacement-operator caps and
+extends it with configurable importance estimators, target-scope conversion,
+bounds, discrete sizing, actual cap utilization, and optional leftover
+reconciliation. These additions are project proposals, not claims attributed
+to MoDeGPT.
 
 No result from the exploratory importance notebook is promoted here as an
 empirical finding. Any future claim about correlation, predictive validity, or
@@ -528,6 +565,10 @@ Rank normalization makes heterogeneous scores easy to pass into one allocator
 but discards score magnitude. The appropriate temperature, normalization, and
 local bounds may depend on the model, calibration distribution, global target,
 and downstream operator family.
+
+MoDeGPT's derivation and reported sparsity results do not establish that the
+same allocation improves MLP replacement. Its transfer to replacement caps is
+a project research question requiring matched-budget empirical evaluation.
 
 Independent cap assignment does not model how errors from several replacements
 interact or shift downstream inputs. Local fit and marginal-utility estimates
@@ -562,8 +603,9 @@ additional variables rather than automatic consequences of this allocator.
 - [[method-hybrid-operator-replacement]] is one possible downstream local
   construction; its internal linear/nonlinear capacity split remains outside
   the current allocator.
-- [[method-modegpt-global-sparsity-allocation]] documents the prior-work
-  precedent and its distinct direct layer-sparsity formulation.
+- [[method-modegpt-global-sparsity-allocation]] documents the source of the
+  adopted importance-weighted softmax rule and its original direct layer-
+  sparsity formulation.
 - [[concept-replacement-error-propagation]] explains why locally assigned caps
   and errors require integrated model-level evaluation.
 - [[decision-primary-compression-evaluation-scope]] requires final comparisons

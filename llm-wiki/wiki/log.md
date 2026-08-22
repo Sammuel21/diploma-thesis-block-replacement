@@ -558,3 +558,98 @@ This file is append-only. Entries use the format:
   dense $d^2$ and rank-$d/2$ factorized linear maps as the project control.
 - Kept the rationale explicitly project-defined and unverified; no empirical
   operator ranking or result was promoted.
+
+## [2026-08-20] update | Artifact-backed singleton profiling and active focus
+
+- Promoted bounded results from the local schema-2 baseline artifact and
+  schema-1 operator artifact to experiment-backed evidence while retaining
+  both experiment pages at `draft` status.
+- Recorded the calibration, width, recovery, full-depth KL, matched-footprint
+  operator, local-to-global, and layer-sensitivity observations with their
+  single-model, single-seed, isolated-replacement limitations.
+- Distinguished operator-conditioned pre-recovery KL as the current empirical
+  reference for singleton replacement sensitivity from canonical BI and the
+  project-proposed residual-aware MLP BI screening candidates.
+- Updated the umbrella experiment and wiki index to make simultaneous
+  multi-block replacement interaction the active next focus, linked to the
+  new model-level notebook skeleton without inventing a frozen protocol or
+  result.
+- Left activation tensors, logits, fitted weights, and local ignored artifacts
+  outside the maintained wiki; only artifact paths, configurations, checked
+  summaries, and bounded interpretations were recorded.
+
+## [2026-08-20] lint | Singleton profiling evidence and focus transition
+
+- Checked all 27 maintained pages for required frontmatter, controlled type,
+  status, epistemic, verification, granularity, pipeline-stage, source-
+  relation, ID, filename, and date values.
+- Checked registered source IDs, index coverage, wikilinks, reciprocal
+  `related` edges, repository-relative links including both local artifacts and
+  the new model-level notebook, conflict markers, trailing whitespace, display
+  math balance, and changed-file whitespace.
+- Cross-checked the baseline and operator artifacts for row counts, unique
+  operator-layer keys, shared-row consistency, KL-reduction arithmetic,
+  configuration provenance, and the numerical summaries promoted to the wiki.
+- Reviewed the changed pages for separation of source-derived BI, project-
+  proposed residual-aware MLP BI, artifact-backed singleton KL findings,
+  anomalous observations, pending notebook additions, and unimplemented
+  multi-block methodology.
+- Found no structural, graph, provenance, link, formatting, or scoped semantic
+  errors or warnings. Lint does not establish cross-seed, cross-model, or
+  simultaneous-replacement generality.
+
+## [2026-08-20] update | Compact block-experiment documentation
+
+- Compacted `experiment-initial-block-compression-study`,
+  `experiment-baseline-operator-analysis`, and
+  `experiment-swiglu-operator-design-progression` to reduce duplicated
+  methodology, configuration, and implementation detail.
+- Kept the umbrella page focused on stage ownership, the baseline page focused
+  on calibration/capacity/recovery evidence, and the operator page focused on
+  generic-family results plus the bounded teacher-tailored progression.
+- Preserved stable IDs, metadata, equations, source locators, artifact links,
+  direct numerical findings, epistemic labels, and unresolved limitations.
+- Reduced the three pages from 8,039 to 3,510 words in total without changing
+  their experiment or verification status.
+
+## [2026-08-20] lint | Compact block-experiment documentation
+
+- Checked all 27 maintained pages and five registered sources for required
+  metadata, controlled type/status/epistemic values, dates, unique IDs,
+  filename-to-ID agreement, index coverage, source registration, required
+  relationship and source sections, reciprocal wikilinks, repository links,
+  conflict markers, trailing whitespace, and balanced display math.
+- Reviewed the compacted pages for retained separation of prior work,
+  researcher hypotheses, project definitions, experiment-backed findings, and
+  pending work.
+- Found no structural, graph, provenance, link, formatting, or scoped semantic
+  errors. Lint does not expand the evidence beyond the existing single-model,
+  single-seed, singleton-replacement artifacts.
+
+## [2026-08-22] update | Correct MoDeGPT allocation attribution
+
+- Reclassified the reference negative-softmax allocation in
+  `method-global-to-local-operator-budget-allocation` as a source-derived
+  adaptation of MoDeGPT Section 3.3, Equations 10-11, rather than an original
+  project allocation rule.
+- Added the equal-block-size equivalence between MoDeGPT's assigned sparsity
+  and the project's assigned parameter-removal fraction.
+- Preserved target-scope conversion, parameter-size weighting, bounded cap
+  semantics, discrete operator realization, and unused-budget reconciliation
+  as explicitly project-proposed extensions whose effectiveness remains
+  unverified.
+- Updated the method's source relation and the wiki index summary without
+  changing any experiment, implementation, or distilled documentation.
+
+## [2026-08-22] lint | MoDeGPT allocation attribution
+
+- Checked all 27 maintained pages and five registered sources for required
+  metadata, IDs, dates, controlled source relations, source registration,
+  index coverage, wikilinks, required sections, display-math balance, conflict
+  markers, and trailing whitespace.
+- Reviewed the changed method against the registered MoDeGPT source at Section
+  3.3, Equations 10-11, and verified that adopted and project-proposed parts
+  are now distinguished explicitly.
+- Found no structural, graph, provenance, formatting, or scoped semantic
+  errors. This lint does not empirically validate transfer of the allocation
+  rule from continuous sparsity to MLP replacement budgets.
