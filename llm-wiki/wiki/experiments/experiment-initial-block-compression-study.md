@@ -5,7 +5,7 @@ summary: Defines the working activation, practical single-block replacement, and
 type: experiment
 status: draft
 created: 2026-07-27
-updated: 2026-08-20
+updated: 2026-08-28
 
 authorship:
   created_by: collaborative
@@ -53,6 +53,7 @@ related:
   - "[[concept-replacement-error-propagation]]"
   - "[[decision-primary-compression-evaluation-scope]]"
   - "[[implementation-compute-environments]]"
+  - "[[implementation-maintained-mlp-replacement-package]]"
   - "[[decision-working-experiment-code-standards]]"
 supersedes: []
 superseded_by: []
@@ -99,7 +100,6 @@ Primary inputs are:
 
 - [`activation-analysis.ipynb`](../../../notebooks/block/activation-analysis.ipynb)
 - [`baseline-testing.ipynb`](../../../notebooks/block/baseline-testing.ipynb)
-- [`degradation-analysis.ipynb`](../../../notebooks/block/degradation-analysis.ipynb)
 - [`block-interaction.ipynb`](../../../notebooks/model/block-interaction.ipynb)
 - [`operator.ipynb`](../../../notebooks/block/operator.ipynb)
 - [`src/mlp_replacement/`](../../../src/mlp_replacement/)
@@ -162,6 +162,8 @@ quantization, and the new multi-block stage remain unverified.
   operator-conditioned KL sensitivity.
 - [[decision-primary-compression-evaluation-scope]] defines the primary
   footprint-quality evaluation boundary.
+- [[implementation-maintained-mlp-replacement-package]] records where reusable
+  operations from these notebooks belong in the maintained source tree.
 
 ## Sources
 

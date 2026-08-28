@@ -5,7 +5,7 @@ summary: Keeps initial experiment code direct, naturally formatted, lightly docu
 type: decision
 status: review
 created: 2026-07-27
-updated: 2026-07-27
+updated: 2026-08-28
 
 authorship:
   created_by: collaborative
@@ -35,6 +35,7 @@ sources: []
 related:
   - "[[experiment-initial-block-compression-study]]"
   - "[[implementation-compute-environments]]"
+  - "[[implementation-maintained-mlp-replacement-package]]"
 supersedes: []
 superseded_by: []
 ---
@@ -203,6 +204,10 @@ three notebooks are intentionally working initial experiments. Their lack of
 automated tests is a chosen maturity boundary, not evidence that their
 scientific results have been verified.
 
+[[implementation-maintained-mlp-replacement-package]] records the package-level
+responsibility boundaries used when notebook logic is promoted into reusable
+source modules.
+
 ## Revisit Conditions
 
 Revisit this decision when the researcher asks for production hardening, a
@@ -216,6 +221,8 @@ maintained experiment pipeline.
   governed by this decision.
 - [[implementation-compute-environments]] records where the working notebooks
   are intended to run but does not change their implementation maturity.
+- [[implementation-maintained-mlp-replacement-package]] applies this decision
+  to the maintained source-code organization.
 
 ## Sources
 

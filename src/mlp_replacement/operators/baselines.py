@@ -4,18 +4,16 @@ from dataclasses import dataclass
 
 import torch
 
-from .evaluation.footprint import parameter_footprint
-from .evaluation.language_model import LanguageModelMetrics, evaluate_language_model
-from .evaluation.operator import evaluate_operator
-from .operators import (
+from ..compression.surgery import count_state_elements, temporary_replacement
+from ..evaluation.footprint import parameter_footprint
+from ..evaluation.language_model import LanguageModelMetrics, evaluate_language_model
+from ..evaluation.operator import evaluate_operator
+from .modules import (
     GatedMLPReplacement,
     MeanReplacement,
     ZeroReplacement,
-    fit_operator,
-    fit_ridge_linear,
 )
-from .operators.training import OperatorTrainingEpoch
-from .surgery import count_state_elements, temporary_replacement
+from .training import OperatorTrainingEpoch, fit_operator, fit_ridge_linear
 
 
 @dataclass(frozen=True)

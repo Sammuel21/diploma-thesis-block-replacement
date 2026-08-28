@@ -200,7 +200,7 @@ protocol. Learned fits report their stopping behavior; closed-form fits report
 their solver and regularization.
 
 Inputs are [`operator.ipynb`](../../../notebooks/block/operator.ipynb),
-[`replacement_sensitivity.py`](../../../src/mlp_replacement/replacement_sensitivity.py),
+[`analysis/sensitivity.py`](../../../src/mlp_replacement/analysis/sensitivity.py),
 and the baseline conventions in
 [[experiment-baseline-operator-analysis]]. The draft baseline runner is not yet
 the validated executor of these notebook results.

@@ -91,7 +91,7 @@ The exploratory width-recovery notebook follows the same trainable scope.
 
 Relevant project artifacts:
 
-- [`src/mlp_replacement/recovery.py`](../../../src/mlp_replacement/recovery.py)
+- [`src/mlp_replacement/compression/recovery.py`](../../../src/mlp_replacement/compression/recovery.py)
   implements teacher-logit caching, the KL loss, and replacement-only recovery;
 - [`notebooks/block/baseline-experiments.ipynb`](../../../notebooks/block/baseline-experiments.ipynb)
   applies the same scope in the exploratory width-recovery trajectories.
@@ -133,5 +133,5 @@ be named `model-level teacher-logit KD with replacement-only updates`.
 
 - `src-minitron-2024` - Sections 2.3 and 3; Section 4.3; Appendix A.8
 - `src-grafting-2025` - Sections 3.1-3.3 and 5; Appendix B.1
-- Project implementation - `src/mlp_replacement/recovery.py` and
+- Project implementation - `src/mlp_replacement/compression/recovery.py` and
   `notebooks/block/baseline-experiments.ipynb`, inspected 2026-08-15

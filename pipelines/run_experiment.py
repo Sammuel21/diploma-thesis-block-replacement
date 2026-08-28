@@ -7,7 +7,7 @@ from mlp_replacement.config import experiment_config_from_dict
 from mlp_replacement.data import build_data_loaders
 from mlp_replacement.model import load_model_and_tokenizer
 from mlp_replacement.runlog import ExperimentLog
-from mlp_replacement.workflows import run_replacement_experiment
+from mlp_replacement.compression.workflows import run_replacement_experiment
 
 
 def parse_args():

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 
-from .model import resolve_dtype
+from ..model import resolve_dtype
 
 
 @dataclass(frozen=True)

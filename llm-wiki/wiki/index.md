@@ -90,6 +90,9 @@ No model, dataset, software, or other entity pages have been created yet.
 
 ## Implementations
 
+- [[implementation-maintained-mlp-replacement-package|Maintained MLP replacement package]]:
+  Separates local operators, model-level compression, diagnostic analysis, and
+  evaluation while keeping shared infrastructure at the package root.
 - [[implementation-compute-environments|Research compute environments]]:
   Records the local MVP and shared remote experiment capacity, setup, and
   constraints without identifying the remote host or its owner.
@@ -135,7 +138,7 @@ historical archive remains available at `docs/prototype/mvp/`.
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-08-22 (MoDeGPT allocation attribution)
+- Last structural lint: 2026-08-28 (maintained source-package restructuring)
 - Orphan pages: none detected
 - Registered source collections: 3
 - Registered individual sources: 5

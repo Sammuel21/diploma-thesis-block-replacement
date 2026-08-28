@@ -3,8 +3,8 @@ from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 
-from .capture import first_tensor
-from .model import discover_mlp_blocks, discover_transformer_layers
+from ..capture import first_tensor
+from ..model import discover_mlp_blocks, discover_transformer_layers
 
 
 @dataclass(frozen=True)

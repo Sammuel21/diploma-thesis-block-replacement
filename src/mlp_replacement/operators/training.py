@@ -163,14 +163,24 @@ def fit_operator(module, training_pairs, validation_pairs, config, device):
     return OperatorFitResult(module, tuple(history), best_epoch, best_validation)
 
 
-def fit_replacement_operator(training_pairs, validation_pairs, config, device):
+def fit_replacement_operator(
+    training_pairs,
+    validation_pairs,
+    config,
+    device,
+    intermediate_width=None,
+):
     """Fit one replacement operator and retain its best validation state."""
 
     if training_pairs.hidden_size != validation_pairs.hidden_size:
         raise ValueError("Training and validation hidden sizes differ")
 
     torch.manual_seed(config.seed)
-    module = make_replacement_operator(training_pairs.hidden_size, config).to(device)
+    module = make_replacement_operator(
+        training_pairs.hidden_size,
+        config,
+        intermediate_width,
+    ).to(device)
     return fit_operator(module, training_pairs, validation_pairs, config, device)
 
 

@@ -109,9 +109,17 @@ class CaptureConfig:
 class SelectionConfig:
     """Defines how replacement candidates are selected and ordered."""
 
-    strategy: Literal["manual", "first_k", "random_k", "top_k_bi"] = "manual"
+    strategy: Literal[
+        "manual",
+        "first_k",
+        "random_k",
+        "top_k_bi",
+        "interleaved",
+    ] = "manual"
     k: int = 1
     manual_indices: tuple[int, ...] = (3,)
+    interleave_stride: int = 2
+    interleave_offset: int = 0
     bi_scope: Literal["transformer_layer", "mlp_sublayer"] = "transformer_layer"
     bi_order: Literal["asc", "desc"] = "asc"
     application_order: Literal["layer", "selection"] = "layer"
@@ -126,14 +134,19 @@ class SelectionConfig:
             raise ValueError("selection k must be positive")
         if self.protected_prefix < 0 or self.protected_suffix < 0:
             raise ValueError("protected boundary counts cannot be negative")
+        if self.interleave_stride < 1:
+            raise ValueError("interleave_stride must be positive")
+        if not 0 <= self.interleave_offset < self.interleave_stride:
+            raise ValueError("interleave_offset must lie within the stride")
 
 
 @dataclass(frozen=True)
 class OperatorConfig:
     """Defines the replacement architecture and its local fitting procedure."""
 
-    kind: Literal["linear", "bottleneck_mlp"] = "linear"
+    kind: Literal["linear", "bottleneck_mlp", "swiglu"] = "linear"
     bottleneck_ratio: float = 0.25
+    intermediate_ratio: float = 0.5
     activation: Literal["gelu", "silu", "relu"] = "gelu"
     bias: bool = False
     epochs: int = 5
@@ -151,6 +164,8 @@ class OperatorConfig:
 
         if not 0.0 < self.bottleneck_ratio <= 1.0:
             raise ValueError("bottleneck_ratio must be in (0, 1]")
+        if not 0.0 < self.intermediate_ratio <= 1.0:
+            raise ValueError("intermediate_ratio must be in (0, 1]")
         if self.epochs < 1 or self.batch_size < 1:
             raise ValueError("operator epochs and batch_size must be positive")
         if self.learning_rate <= 0 or self.weight_decay < 0:

@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from .model import discover_mlp_blocks
+from ..model import discover_mlp_blocks
 
 
 @dataclass(frozen=True)

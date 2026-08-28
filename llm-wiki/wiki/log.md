@@ -653,3 +653,36 @@ This file is append-only. Entries use the format:
 - Found no structural, graph, provenance, formatting, or scoped semantic
   errors. This lint does not empirically validate transfer of the allocation
   rule from continuous sparsity to MLP replacement budgets.
+
+## [2026-08-28] update | Restructure maintained source-package responsibilities
+
+- Grouped reusable source modules under `analysis/`, `compression/`,
+  `evaluation/`, and `operators/`, while retaining cross-cutting configuration,
+  data, model, capture, and run-log modules at the package root.
+- Moved operator baselines into `operators/`; model-level selection, surgery,
+  recovery, and workflows into `compression/`; and activation, screening,
+  sensitivity, and interaction diagnostics into `analysis/`.
+- Updated required relative imports, the maintained pipeline entry point, and
+  seven working notebooks without intentionally changing implementation logic.
+- Added `implementation-maintained-mlp-replacement-package` to document module
+  responsibilities, data flow, entry points, maturity, and limitations.
+- Updated affected repository links and removed the stale link to the deleted
+  `degradation-analysis.ipynb`; the unused interaction helper remains preserved
+  as provisional code.
+
+## [2026-08-28] lint | Maintained source-package restructuring
+
+- Checked 28 maintained wiki pages for required frontmatter, unique IDs,
+  filename-to-ID agreement, index coverage, required relationship and source
+  sections, wikilinks, repository links, conflict markers, and trailing
+  whitespace.
+- Parsed the seven notebooks whose imports changed, resolved 63 maintained
+  absolute imports and 28 relative source imports statically, and found no
+  remaining imports of the superseded root module paths.
+- Runtime import execution was unavailable on the local machine because no
+  Python interpreter is installed; the moved package must therefore receive a
+  runtime import check in the configured remote environment before experiment
+  execution.
+- Found no remaining structural, graph, link, formatting, or scoped semantic
+  errors. This lint verifies organization and import targets, not experimental
+  behavior or result reproducibility.

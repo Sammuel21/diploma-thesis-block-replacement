@@ -124,7 +124,7 @@ raw_mlp_score_i = 1 - E[cos(Norm_2(u_i), m_i)]
 
 This equation describes the maintained implementation and requires no external
 literature citation. The implementation is located in
-[`src/mlp_replacement/screening.py`](../../../src/mlp_replacement/screening.py).
+[`src/mlp_replacement/analysis/screening.py`](../../../src/mlp_replacement/analysis/screening.py).
 
 This score is not canonical BI. Its values can exceed one when the average
 cosine similarity is negative, which means the raw update tends to point partly

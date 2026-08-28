@@ -2,13 +2,18 @@ from dataclasses import dataclass
 
 import torch
 
-from .capture import collect_module_io
-from .evaluation.footprint import ParameterFootprint, parameter_footprint
-from .evaluation.language_model import LanguageModelMetrics, evaluate_language_model
-from .model import discover_mlp_blocks, resolve_dtype
-from .operators.training import OperatorTrainingEpoch, fit_replacement_operator
-from .recovery import RecoveryResult, cache_teacher_logits, recover_replacements
-from .screening import ScreeningResult, compute_bi_scores
+from ..analysis.screening import ScreeningResult, compute_bi_scores
+from ..capture import collect_module_io, collect_modules_io
+from ..evaluation.footprint import ParameterFootprint, parameter_footprint
+from ..evaluation.language_model import LanguageModelMetrics, evaluate_language_model
+from ..model import discover_mlp_blocks, resolve_dtype
+from ..operators.training import OperatorTrainingEpoch, fit_replacement_operator
+from .recovery import (
+    RecoveryResult,
+    cache_teacher_logits,
+    mean_cache_loss,
+    recover_replacements,
+)
 from .selection import LayerSelection, select_layers
 from .surgery import apply_replacements
 
@@ -41,7 +46,10 @@ class WorkflowResult:
     selection: LayerSelection
     screening: ScreeningResult | None
     baseline_validation_metrics: LanguageModelMetrics
+    pre_recovery_validation_metrics: LanguageModelMetrics
+    pre_recovery_validation_kl: float | None
     final_validation_metrics: LanguageModelMetrics
+    post_recovery_validation_kl: float | None
     baseline_test_metrics: LanguageModelMetrics | None
     final_test_metrics: LanguageModelMetrics | None
     footprint_before: ParameterFootprint
@@ -63,7 +71,18 @@ def fit_layer_replacement(model, ref, loaders, config, device):
         model, ref.path, loaders.operator_validation, config.data.num_operator_validation_batches,
         device, storage_device, storage_dtype
     )
-    return fit_replacement_operator(training_pairs, validation_pairs, config.operator, device)
+    intermediate_width = (
+        int(ref.module.up_proj.out_features)
+        if config.operator.kind == "swiglu"
+        else None
+    )
+    return fit_replacement_operator(
+        training_pairs,
+        validation_pairs,
+        config.operator,
+        device,
+        intermediate_width,
+    )
 
 
 def create_teacher_caches(model, loaders, config, device):
@@ -132,13 +151,57 @@ def run_one_shot_replacement(model, loaders, selection, config, screening=None, 
 
     refs = {ref.index: ref for ref in discover_mlp_blocks(model)}
     target_paths = {index: refs[index].path for index in selection.indices}
+    storage_device = torch.device(config.capture.storage_device)
+    storage_dtype = resolve_dtype(config.capture.storage_dtype, storage_device)
+    if run_log is not None:
+        run_log.begin("operator_activation_capture")
+    training_pairs_by_path = collect_modules_io(
+        model,
+        target_paths.values(),
+        loaders.calibration,
+        config.data.num_calibration_batches,
+        device,
+        storage_device,
+        storage_dtype,
+    )
+    validation_pairs_by_path = collect_modules_io(
+        model,
+        target_paths.values(),
+        loaders.operator_validation,
+        config.data.num_operator_validation_batches,
+        device,
+        storage_device,
+        storage_dtype,
+    )
+    if run_log is not None:
+        run_log.record("operator_activation_capture", {
+            "layers": selection.indices,
+            "training_tokens_per_layer": next(
+                iter(training_pairs_by_path.values())
+            ).num_tokens,
+            "validation_tokens_per_layer": next(
+                iter(validation_pairs_by_path.values())
+            ).num_tokens,
+        })
     fits = {}
     replacements = {}
     operator_progress = {}
     for layer_index in selection.indices:
         if run_log is not None:
             run_log.begin(f"operator_fit_layer_{layer_index}")
-        fit = fit_layer_replacement(model, refs[layer_index], loaders, config, device)
+        ref = refs[layer_index]
+        intermediate_width = (
+            int(ref.module.up_proj.out_features)
+            if config.operator.kind == "swiglu"
+            else None
+        )
+        fit = fit_replacement_operator(
+            training_pairs_by_path[ref.path],
+            validation_pairs_by_path[ref.path],
+            config.operator,
+            device,
+            intermediate_width,
+        )
         fits[layer_index] = fit
         replacements[layer_index] = fit.module
         operator_progress[str(layer_index)] = {
@@ -151,6 +214,8 @@ def run_one_shot_replacement(model, loaders, selection, config, screening=None, 
         if run_log is not None:
             run_log.record("operators", operator_progress)
 
+    del training_pairs_by_path, validation_pairs_by_path
+
     if run_log is not None:
         run_log.begin("apply_replacements")
     manifest = apply_replacements(model, replacements)
@@ -158,6 +223,32 @@ def run_one_shot_replacement(model, loaders, selection, config, screening=None, 
         run_log.record("replacement_manifest", manifest)
     records = {record.layer_index: record for record in manifest.records}
     del refs
+    if run_log is not None:
+        run_log.begin("pre_recovery_model_validation")
+    pre_recovery_validation = evaluate_language_model(
+        model,
+        loaders.model_validation,
+        device,
+        config.data.num_model_validation_batches,
+    )
+    pre_recovery_validation_kl = (
+        mean_cache_loss(
+            model,
+            validation_cache,
+            config.recovery.temperature,
+            device,
+        )
+        if validation_cache is not None
+        else None
+    )
+    if run_log is not None:
+        run_log.record(
+            "pre_recovery_metrics",
+            {
+                "model_validation": pre_recovery_validation,
+                "teacher_kl": pre_recovery_validation_kl,
+            },
+        )
     recovery_steps = ()
     if config.recovery.enabled:
         if run_log is not None:
@@ -174,6 +265,16 @@ def run_one_shot_replacement(model, loaders, selection, config, screening=None, 
     final_validation = evaluate_language_model(
         model, loaders.model_validation, device, config.data.num_model_validation_batches
     )
+    post_recovery_validation_kl = (
+        mean_cache_loss(
+            model,
+            validation_cache,
+            config.recovery.temperature,
+            device,
+        )
+        if validation_cache is not None
+        else None
+    )
     final_test = None
     if loaders.test is not None:
         if run_log is not None:
@@ -182,6 +283,7 @@ def run_one_shot_replacement(model, loaders, selection, config, screening=None, 
     if run_log is not None:
         run_log.record("final_metrics", {
             "model_validation": final_validation,
+            "teacher_kl": post_recovery_validation_kl,
             "final_test": final_test,
         })
 
@@ -197,7 +299,10 @@ def run_one_shot_replacement(model, loaders, selection, config, screening=None, 
         selection=selection,
         screening=screening,
         baseline_validation_metrics=baseline_validation,
+        pre_recovery_validation_metrics=pre_recovery_validation,
+        pre_recovery_validation_kl=pre_recovery_validation_kl,
         final_validation_metrics=final_validation,
+        post_recovery_validation_kl=post_recovery_validation_kl,
         baseline_test_metrics=baseline_test,
         final_test_metrics=final_test,
         footprint_before=footprint_before,

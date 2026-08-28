@@ -197,7 +197,7 @@ def initialize_low_rank_from_linear(low_rank, linear):
     )
 
 
-def make_replacement_operator(hidden_size, config):
+def make_replacement_operator(hidden_size, config, intermediate_width=None):
     """Construct the replacement architecture selected in the configuration."""
 
     if config.kind == "linear":
@@ -207,6 +207,18 @@ def make_replacement_operator(hidden_size, config):
             hidden_size=hidden_size,
             bottleneck_ratio=config.bottleneck_ratio,
             activation=config.activation,
+            bias=config.bias,
+        )
+    if config.kind == "swiglu":
+        if intermediate_width is None:
+            raise ValueError("SwiGLU replacement requires teacher intermediate width")
+        replacement_width = max(
+            1,
+            round(config.intermediate_ratio * intermediate_width),
+        )
+        return GatedMLPReplacement(
+            hidden_size,
+            replacement_width,
             bias=config.bias,
         )
     raise ValueError(f"Unsupported replacement operator: {config.kind}")

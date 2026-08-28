@@ -5,9 +5,9 @@ from dataclasses import dataclass
 
 import torch
 
-from .model import get_mlp_block, resolve_dtype
-from .recovery import TeacherBatch, distillation_loss, mean_cache_loss
-from .surgery import temporary_replacement
+from ..compression.recovery import TeacherBatch, distillation_loss, mean_cache_loss
+from ..compression.surgery import temporary_replacement
+from ..model import get_mlp_block, resolve_dtype
 
 
 @dataclass(frozen=True)

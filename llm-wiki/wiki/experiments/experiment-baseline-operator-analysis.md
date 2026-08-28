@@ -187,8 +187,8 @@ is not a universal block-importance or intrinsic-linearity score.
 
 - [`baseline-experiments.ipynb`](../../../notebooks/block/baseline-experiments.ipynb)
 - [`baseline-testing.ipynb`](../../../notebooks/block/baseline-testing.ipynb)
-- [`src/mlp_replacement/baselines.py`](../../../src/mlp_replacement/baselines.py)
-- [`src/mlp_replacement/recovery.py`](../../../src/mlp_replacement/recovery.py)
+- [`src/mlp_replacement/operators/baselines.py`](../../../src/mlp_replacement/operators/baselines.py)
+- [`src/mlp_replacement/compression/recovery.py`](../../../src/mlp_replacement/compression/recovery.py)
 - [`baseline-experiments.json`](../../../data/results/notebook-block-study/baseline-experiments.json)
 
 The checked local, ignored schema-2 artifact records configuration and result

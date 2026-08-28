@@ -52,6 +52,10 @@ def select_layers(available_indices, config, bi_scores=None):
                 raise ValueError(f"BI scores are missing eligible layers: {missing}")
             reverse = config.bi_order == "desc"
             selected = sorted(eligible, key=lambda index: bi_scores[index], reverse=reverse)[: config.k]
+        elif config.strategy == "interleaved":
+            selected = list(
+                eligible[config.interleave_offset :: config.interleave_stride]
+            )
         else:
             raise ValueError(f"Unsupported selection strategy: {config.strategy}")
 
