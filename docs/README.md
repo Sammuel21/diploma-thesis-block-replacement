@@ -23,6 +23,9 @@ LLM-maintained research knowledge base.
 - [Global-to-local MLP operator budget allocation](methodology/global-to-local-operator-budget-allocation.md)
   summarizes the numbered procedure for converting one model-level parameter
   target into block-specific replacement caps and reconciling unused budget.
+- [Operator calibration data and training budget](methodology/operator-calibration-data-and-training-budget.md)
+  explains activation-pair data feeding and distinguishes fixed-update,
+  fixed-epoch, and operator-batch-size experiments.
 
 ## Historical prototype
 
