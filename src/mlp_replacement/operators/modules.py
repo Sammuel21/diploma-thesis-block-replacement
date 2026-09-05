@@ -111,6 +111,57 @@ class GatedMLPReplacement(nn.Module):
         return self.down_projection(gate * values)
 
 
+def initialize_gated_mlp_from_teacher(student, teacher, neuron_indices):
+    """Initialize a reduced SwiGLU from matching teacher neuron groups."""
+
+    if not isinstance(student, GatedMLPReplacement):
+        raise TypeError("student must be a GatedMLPReplacement")
+    teacher_gate = teacher.gate_proj.weight
+    teacher_up = teacher.up_proj.weight
+    teacher_down = teacher.down_proj.weight
+    indices = torch.as_tensor(
+        neuron_indices,
+        dtype=torch.long,
+        device=teacher_gate.device,
+    )
+    if indices.ndim != 1 or indices.numel() != student.bottleneck_size:
+        raise ValueError("neuron_indices must match the student intermediate width")
+    if torch.unique(indices).numel() != indices.numel():
+        raise ValueError("neuron_indices must be unique")
+    if indices.numel() and (
+        indices.min().item() < 0 or indices.max().item() >= teacher_gate.shape[0]
+    ):
+        raise ValueError("neuron_indices contain an out-of-range teacher neuron")
+    expected_shapes = (
+        (student.gate_projection.weight.shape, (indices.numel(), teacher_gate.shape[1])),
+        (student.up_projection.weight.shape, (indices.numel(), teacher_up.shape[1])),
+        (student.down_projection.weight.shape, (teacher_down.shape[0], indices.numel())),
+    )
+    if any(actual != expected for actual, expected in expected_shapes):
+        raise ValueError("Student and teacher SwiGLU projection shapes are incompatible")
+    if any(
+        projection.bias is not None
+        for projection in (
+            student.gate_projection,
+            student.up_projection,
+            student.down_projection,
+        )
+    ):
+        raise ValueError("Teacher-derived SwiGLU initialization requires bias-free projections")
+
+    with torch.no_grad():
+        student.gate_projection.weight.copy_(
+            teacher_gate.index_select(0, indices).to(student.gate_projection.weight)
+        )
+        student.up_projection.weight.copy_(
+            teacher_up.index_select(0, indices).to(student.up_projection.weight)
+        )
+        student.down_projection.weight.copy_(
+            teacher_down.index_select(1, indices).to(student.down_projection.weight)
+        )
+    return student
+
+
 class HybridReplacement(nn.Module):
     """Combine a low-rank linear map with a compact nonlinear residual."""
 

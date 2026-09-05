@@ -93,9 +93,17 @@ def fit_operator(module, training_pairs, validation_pairs, config, device):
         )
 
     history = []
-    best_validation = float("inf")
+    best_validation = evaluate_operator_mse(
+        module,
+        validation_pairs,
+        device,
+        config.batch_size,
+    )
     best_epoch = 0
-    best_state = None
+    best_state = {
+        name: tensor.detach().cpu().clone()
+        for name, tensor in module.state_dict().items()
+    }
     stale_epochs = 0
     calculation_dtype = module_dtype(module, training_pairs.inputs.dtype)
 
