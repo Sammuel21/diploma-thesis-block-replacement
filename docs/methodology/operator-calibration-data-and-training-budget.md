@@ -50,6 +50,27 @@ More calibration data supplies more unique examples. It does not by itself
 guarantee more learning: the optimizer must also receive enough steps to learn
 from those examples.
 
+## Fixed baseline and validation partition
+
+The notebook preserves the original data setting before drawing additional
+calibration samples:
+
+```text
+48 original calibration batches
+    -> 24 fixed operator-validation batches
+    -> 336 additional calibration batches
+```
+
+With capture batch size 2 and sequence length 128, this gives 12,288 original
+calibration pairs and 6,144 fixed validation pairs. Every experiment uses the
+same validation pairs. Larger calibration conditions append samples drawn only
+after that validation partition, so additional training data cannot displace or
+overlap the original validation data.
+
+The original baseline is recomputed in the notebook with a 4,096-wide SwiGLU,
+which is 50% of the teacher MLP's `d_ff=8,192`. The older 1,024-wide result used
+50% of `d_model=2,048` and is not a valid baseline for this study.
+
 ## Legacy method: fixed optimizer-update budget
 
 The earlier notebook derived a budget of 384 optimizer steps from its smallest
