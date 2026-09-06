@@ -5,8 +5,12 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from ..evaluation.operator import module_dtype
-from .modules import make_replacement_operator
-from .modules import LinearReplacement
+from .modules import (
+    LinearReplacement,
+    initialize_gated_mlp_from_teacher,
+    make_replacement_operator,
+    swiglu_neuron_importance_scores,
+)
 
 
 @dataclass(frozen=True)
@@ -177,6 +181,7 @@ def fit_replacement_operator(
     config,
     device,
     intermediate_width=None,
+    teacher_module=None,
 ):
     """Fit one replacement operator and retain its best validation state."""
 
@@ -189,6 +194,26 @@ def fit_replacement_operator(
         config,
         intermediate_width,
     ).to(device)
+    if config.initialization == "importance_teacher_subset":
+        if teacher_module is None:
+            raise ValueError(
+                "Teacher-derived initialization requires the teacher module"
+            )
+        importance_scores = swiglu_neuron_importance_scores(
+            teacher_module,
+            training_pairs.inputs,
+            config.batch_size,
+        )
+        neuron_indices = torch.argsort(
+            importance_scores,
+            descending=True,
+            stable=True,
+        )[:module.bottleneck_size].sort().values
+        initialize_gated_mlp_from_teacher(
+            module,
+            teacher_module,
+            neuron_indices,
+        )
     return fit_operator(module, training_pairs, validation_pairs, config, device)
 
 

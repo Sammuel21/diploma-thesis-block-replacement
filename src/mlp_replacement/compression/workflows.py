@@ -6,6 +6,7 @@ from ..analysis.screening import ScreeningResult, compute_bi_scores
 from ..capture import collect_module_io, collect_modules_io
 from ..evaluation.footprint import ParameterFootprint, parameter_footprint
 from ..evaluation.language_model import LanguageModelMetrics, evaluate_language_model
+from ..evaluation.operator import evaluate_operator
 from ..model import discover_mlp_blocks, resolve_dtype
 from ..operators.training import OperatorTrainingEpoch, fit_replacement_operator
 from .recovery import (
@@ -26,8 +27,11 @@ class BlockReplacementResult:
     path: str
     operator_kind: str
     operator_history: tuple[OperatorTrainingEpoch, ...]
+    operator_initialization: str
     best_operator_epoch: int
     operator_validation_mse: float
+    operator_validation_nmse: float
+    operator_validation_cosine: float
     original_parameters: int
     replacement_parameters: int
 
@@ -82,6 +86,7 @@ def fit_layer_replacement(model, ref, loaders, config, device):
         config.operator,
         device,
         intermediate_width,
+        ref.module,
     )
 
 
@@ -100,7 +105,7 @@ def create_teacher_caches(model, loaders, config, device):
     return training_cache, validation_cache
 
 
-def create_block_result(layer_index, path, fit, record, config):
+def create_block_result(layer_index, path, fit, metrics, record, config):
     """Combine local fitting and structural information into one block result."""
 
     return BlockReplacementResult(
@@ -108,8 +113,11 @@ def create_block_result(layer_index, path, fit, record, config):
         path=path,
         operator_kind=config.operator.kind,
         operator_history=fit.history,
+        operator_initialization=config.operator.initialization,
         best_operator_epoch=fit.best_epoch,
         operator_validation_mse=fit.best_validation_mse,
+        operator_validation_nmse=metrics.relative_mse,
+        operator_validation_cosine=metrics.cosine_similarity,
         original_parameters=record.original_parameters,
         replacement_parameters=record.replacement_parameters,
     )
@@ -184,6 +192,7 @@ def run_one_shot_replacement(model, loaders, selection, config, screening=None, 
             ).num_tokens,
         })
     fits = {}
+    fit_metrics = {}
     replacements = {}
     operator_progress = {}
     for layer_index in selection.indices:
@@ -201,15 +210,25 @@ def run_one_shot_replacement(model, loaders, selection, config, screening=None, 
             config.operator,
             device,
             intermediate_width,
+            ref.module,
+        )
+        metrics = evaluate_operator(
+            fit.module,
+            validation_pairs_by_path[ref.path],
+            device,
+            config.operator.batch_size,
         )
         fits[layer_index] = fit
+        fit_metrics[layer_index] = metrics
         replacements[layer_index] = fit.module
         operator_progress[str(layer_index)] = {
             "path": refs[layer_index].path,
             "kind": config.operator.kind,
+            "initialization": config.operator.initialization,
             "history": fit.history,
             "best_epoch": fit.best_epoch,
             "best_validation_mse": fit.best_validation_mse,
+            "validation_metrics": metrics,
         }
         if run_log is not None:
             run_log.record("operators", operator_progress)
@@ -288,7 +307,14 @@ def run_one_shot_replacement(model, loaders, selection, config, screening=None, 
         })
 
     blocks = tuple(
-        create_block_result(index, target_paths[index], fits[index], records[index], config)
+        create_block_result(
+            index,
+            target_paths[index],
+            fits[index],
+            fit_metrics[index],
+            records[index],
+            config,
+        )
         for index in selection.indices
     )
     footprint_after = parameter_footprint(model)

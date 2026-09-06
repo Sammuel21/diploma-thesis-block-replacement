@@ -12,6 +12,7 @@ from .modules import (
     initialize_low_rank_from_linear,
     initialize_low_rank_from_svd,
     linear_svd,
+    swiglu_neuron_importance_scores,
 )
 from .training import fit_operator, fit_replacement_operator, fit_ridge_linear
 
@@ -30,4 +31,5 @@ __all__ = [
     "initialize_low_rank_from_linear",
     "initialize_low_rank_from_svd",
     "linear_svd",
+    "swiglu_neuron_importance_scores",
 ]

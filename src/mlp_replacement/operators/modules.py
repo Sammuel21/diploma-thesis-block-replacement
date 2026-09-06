@@ -111,6 +111,50 @@ class GatedMLPReplacement(nn.Module):
         return self.down_projection(gate * values)
 
 
+def swiglu_neuron_importance_scores(teacher, inputs, batch_size):
+    """Compute the project-defined RMS-activation contribution score."""
+
+    if batch_size < 1:
+        raise ValueError("batch_size must be positive")
+    if inputs.ndim != 2:
+        raise ValueError("inputs must have shape [tokens, hidden_size]")
+    required = ("gate_proj", "up_proj", "down_proj", "act_fn")
+    if any(not hasattr(teacher, name) for name in required):
+        raise TypeError("teacher must expose SwiGLU projections and activation")
+
+    teacher_gate = teacher.gate_proj.weight
+    intermediate_width = teacher_gate.shape[0]
+    activation_squared_sum = torch.zeros(
+        intermediate_width,
+        dtype=torch.float64,
+    )
+    activation_count = 0
+
+    with torch.no_grad():
+        for start in range(0, inputs.shape[0], batch_size):
+            batch = inputs[start:start + batch_size].to(
+                device=teacher_gate.device,
+                dtype=teacher_gate.dtype,
+            )
+            intermediate = (
+                teacher.act_fn(teacher.gate_proj(batch))
+                * teacher.up_proj(batch)
+            )
+            activation_squared_sum += (
+                intermediate.float().square().sum(dim=0).cpu().double()
+            )
+            activation_count += intermediate.shape[0]
+
+    if activation_count == 0:
+        raise ValueError("importance scoring received no calibration inputs")
+    rms_activation = (activation_squared_sum / activation_count).sqrt()
+    down_column_norm = (
+        teacher.down_proj.weight.detach()
+        .float().norm(dim=0).cpu().double()
+    )
+    return rms_activation * down_column_norm
+
+
 def initialize_gated_mlp_from_teacher(student, teacher, neuron_indices):
     """Initialize a reduced SwiGLU from matching teacher neuron groups."""
 

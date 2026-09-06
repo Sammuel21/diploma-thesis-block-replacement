@@ -145,6 +145,10 @@ class OperatorConfig:
     """Defines the replacement architecture and its local fitting procedure."""
 
     kind: Literal["linear", "bottleneck_mlp", "swiglu"] = "linear"
+    initialization: Literal[
+        "random_weights",
+        "importance_teacher_subset",
+    ] = "random_weights"
     bottleneck_ratio: float = 0.25
     intermediate_ratio: float = 0.5
     activation: Literal["gelu", "silu", "relu"] = "gelu"
@@ -162,6 +166,18 @@ class OperatorConfig:
     def __post_init__(self):
         """Validate operator capacity and optimization settings."""
 
+        if self.initialization not in {
+            "random_weights",
+            "importance_teacher_subset",
+        }:
+            raise ValueError("Unsupported operator initialization")
+        if (
+            self.initialization != "random_weights"
+            and self.kind != "swiglu"
+        ):
+            raise ValueError(
+                "Teacher-derived initialization is only supported for SwiGLU"
+            )
         if not 0.0 < self.bottleneck_ratio <= 1.0:
             raise ValueError("bottleneck_ratio must be in (0, 1]")
         if not 0.0 < self.intermediate_ratio <= 1.0:
