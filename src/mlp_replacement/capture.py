@@ -87,10 +87,11 @@ def collect_module_io(model, module_path, loader, max_batches, device, storage_d
     if not input_chunks:
         raise ValueError(f"No activations were captured for {module_path}")
 
-    return ActivationPairs(
-        inputs=torch.cat(input_chunks, dim=0),
-        targets=torch.cat(target_chunks, dim=0),
-    )
+    inputs = torch.cat(input_chunks, dim=0)
+    input_chunks.clear()
+    targets = torch.cat(target_chunks, dim=0)
+    target_chunks.clear()
+    return ActivationPairs(inputs=inputs, targets=targets)
 
 
 def collect_modules_io(
@@ -167,10 +168,9 @@ def collect_modules_io(
     missing = [path for path in paths if not input_chunks[path]]
     if missing:
         raise ValueError(f"No activations were captured for modules: {missing}")
-    return {
-        path: ActivationPairs(
-            inputs=torch.cat(input_chunks[path], dim=0),
-            targets=torch.cat(target_chunks[path], dim=0),
-        )
-        for path in paths
-    }
+    pairs_by_path = {}
+    for path in paths:
+        inputs = torch.cat(input_chunks.pop(path), dim=0)
+        targets = torch.cat(target_chunks.pop(path), dim=0)
+        pairs_by_path[path] = ActivationPairs(inputs=inputs, targets=targets)
+    return pairs_by_path

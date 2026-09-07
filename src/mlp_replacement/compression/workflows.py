@@ -145,18 +145,6 @@ def run_one_shot_replacement(model, loaders, selection, config, screening=None, 
             "final_test": baseline_test,
         })
 
-    training_cache = validation_cache = None
-    if config.recovery.enabled:
-        if run_log is not None:
-            run_log.begin("teacher_cache")
-        training_cache, validation_cache = create_teacher_caches(model, loaders, config, device)
-        if run_log is not None:
-            run_log.record("teacher_cache", {
-                "training_batches": len(training_cache),
-                "validation_batches": len(validation_cache) if validation_cache is not None else 0,
-                "dtype": config.recovery.cache_dtype,
-            })
-
     refs = {ref.index: ref for ref in discover_mlp_blocks(model)}
     target_paths = {index: refs[index].path for index in selection.indices}
     storage_device = torch.device(config.capture.storage_device)
@@ -218,6 +206,7 @@ def run_one_shot_replacement(model, loaders, selection, config, screening=None, 
             device,
             config.operator.batch_size,
         )
+        del training_pairs_by_path[ref.path], validation_pairs_by_path[ref.path]
         fits[layer_index] = fit
         fit_metrics[layer_index] = metrics
         replacements[layer_index] = fit.module
@@ -234,6 +223,18 @@ def run_one_shot_replacement(model, loaders, selection, config, screening=None, 
             run_log.record("operators", operator_progress)
 
     del training_pairs_by_path, validation_pairs_by_path
+
+    training_cache = validation_cache = None
+    if config.recovery.enabled:
+        if run_log is not None:
+            run_log.begin("teacher_cache")
+        training_cache, validation_cache = create_teacher_caches(model, loaders, config, device)
+        if run_log is not None:
+            run_log.record("teacher_cache", {
+                "training_batches": len(training_cache),
+                "validation_batches": len(validation_cache) if validation_cache is not None else 0,
+                "dtype": config.recovery.cache_dtype,
+            })
 
     if run_log is not None:
         run_log.begin("apply_replacements")

@@ -184,6 +184,7 @@ def recover_replacements(student, training_cache, validation_cache, target_paths
                 module.load_state_dict(state)
         student.eval()
     finally:
+        optimizer.zero_grad(set_to_none=True)
         for parameter, requires_grad in original_flags:
             parameter.requires_grad = requires_grad
 

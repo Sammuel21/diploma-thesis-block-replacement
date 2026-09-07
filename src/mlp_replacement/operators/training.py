@@ -170,6 +170,7 @@ def fit_operator(module, training_pairs, validation_pairs, config, device):
     if best_state is None:
         raise RuntimeError("Operator training did not produce a model state")
     module.load_state_dict(best_state)
+    module.zero_grad(set_to_none=True)
     module.to(device)
     module.eval()
     return OperatorFitResult(module, tuple(history), best_epoch, best_validation)
