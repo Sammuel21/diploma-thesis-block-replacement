@@ -19,11 +19,12 @@ defined in [docs/annotation.md](docs/annotation.md).
 | `configs/` | Historical MVP configuration and maintained experiment configuration files |
 | `data/mvp/results/logs/` | Versioned MVP experiment evidence |
 | `src/mlp_replacement/` | Maintained replacement, recovery, and evaluation implementation |
-| `pipelines/` | Thin maintained experiment process entry points |
+| `workflows/` | Maintained experiment runners and executor-specific job definitions |
 
 The executable MVP paths remain unchanged to avoid breaking notebook imports.
-New work belongs to the maintained package; historical modules are evidence of
-the prototype rather than dependencies of the production architecture.
+New work belongs to the maintained package and workflow layer; historical
+modules are evidence of the prototype rather than dependencies of the
+production architecture.
 
 ## Navigation
 

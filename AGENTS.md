@@ -29,8 +29,8 @@
 - `docs/prototype/mvp/` documents the frozen prototype and its limitations.
 - `notebooks/mvp/`, `scripts/intro/`, and the associated configs are historical
   MVP implementation paths, not the target production architecture.
-- `src/` and `pipelines/` are reserved for the future maintained codebase after
-  its architecture is explicitly reviewed.
+- `src/` contains maintained reusable implementation; `workflows/` contains
+  maintained process entry points and executor-specific job definitions.
 
 ## Instruction routing
 - For work under `llm-wiki/`, read and follow `llm-wiki/AGENTS.md` and

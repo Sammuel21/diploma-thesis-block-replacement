@@ -111,9 +111,10 @@ The completed MVP remains executable at `notebooks/mvp/`, `scripts/intro/`,
 and `configs/intro_config.py`. Its evidence is preserved under
 `data/mvp/results/logs/`, with a manifest in `docs/prototype/mvp/`.
 
-Future maintained implementation belongs under a separately reviewed `src/`
-and `pipelines/` architecture. The documentation restructuring does not imply
-that the MVP code has already been productionized.
+Maintained reusable implementation belongs under `src/`, while top-level
+process entry points and executor-specific submission files belong under
+`workflows/`. This boundary keeps the historical MVP intact and does not imply
+that every notebook workflow has already been migrated or productionized.
 
 Stable implementations also receive wiki graph nodes. These nodes explain
 which methods and decisions a component implements, where its code and

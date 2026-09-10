@@ -1,11 +1,11 @@
 ---
 id: implementation-maintained-mlp-replacement-package
 title: Maintained MLP Replacement Package
-summary: Defines the responsibility boundaries of the maintained operator, compression, analysis, and evaluation code packages.
+summary: Separates maintained scientific code, experiment runners, and executor-specific job definitions.
 type: implementation
 status: draft
 created: 2026-08-28
-updated: 2026-08-28
+updated: 2026-09-10
 
 authorship:
   created_by: collaborative
@@ -100,13 +100,17 @@ The maintained flow is:
 
 Notebooks remain responsible for research narrative, configuration choices,
 visualization, and experiment-specific result tables. Shared domain operations
-belong in `src/` only after they have a stable reusable role.
+belong in `src/` only after they have a stable reusable role. Maintained Python
+process entry points and executor-specific submission files belong in the
+top-level `workflows/` orchestration layer.
 
 ## Repository Locations and Entry Points
 
 - Maintained package: [`src/mlp_replacement/`](../../../src/mlp_replacement/)
 - Maintained single-experiment runner:
-  [`pipelines/run_experiment.py`](../../../pipelines/run_experiment.py)
+  [`workflows/runs/run_experiment.py`](../../../workflows/runs/run_experiment.py)
+- TUKE Perun submission files:
+  [`workflows/jobs/perun/`](../../../workflows/jobs/perun/)
 - Block notebooks: [`notebooks/block/`](../../../notebooks/block/)
 - Model notebooks: [`notebooks/model/`](../../../notebooks/model/)
 
@@ -116,16 +120,19 @@ implemented by this structural migration.
 
 ## Version and Maturity
 
-The package is working research software. This restructuring changes module
-ownership and import paths without intentionally changing algorithmic behavior.
-The interfaces may still evolve as multi-block compression and allocation
-experiments become concrete.
+The package and its workflow layer are working research software. The
+`workflows/` migration relocates the existing single-experiment process entry
+point and adds Perun submission policy without intentionally changing the
+scientific workflow. The interfaces may still evolve as multi-block
+compression and allocation experiments become concrete.
 
 ## Validation
 
-Migration validation covers Python import resolution, notebook JSON structure,
-remaining obsolete import paths, and wiki structure and links. It does not
-constitute an experiment rerun or empirical validation of compression quality.
+The source-package migration was checked for import and notebook-link
+resolution. The workflow relocation is checked for runner import, configuration
+parsing, shell syntax when a Bash interpreter is available, and repository
+links. These checks do not constitute an experiment rerun or empirical
+validation of compression quality.
 
 ## Limitations
 
@@ -133,8 +140,10 @@ constitute an experiment rerun or empirical validation of compression quality.
   public API.
 - Notebook imports remain coupled to maintained module paths and must be linted
   when modules move.
-- Package organization does not solve experiment caching, artifact design, or
-  model-checkpoint persistence.
+- The Perun launchers currently execute only the maintained configuration-driven
+  runner; notebook-specific SwiGLU workflow parity is not yet implemented.
+- Package and workflow organization do not solve experiment caching, large
+  artifact design, or model-checkpoint persistence.
 - `analysis/interactions.py` remains provisional until the multi-block study
   adopts or replaces it.
 

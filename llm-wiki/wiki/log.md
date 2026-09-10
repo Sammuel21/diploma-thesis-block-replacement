@@ -686,3 +686,15 @@ This file is append-only. Entries use the format:
 - Found no remaining structural, graph, link, formatting, or scoped semantic
   errors. This lint verifies organization and import targets, not experimental
   behavior or result reproducibility.
+
+## [2026-09-10] update | Adopt workflow and TUKE Perun job layout
+
+- Replaced the top-level `pipelines/` boundary with `workflows/`, placing the
+  maintained single-experiment Python entry point under `workflows/runs/`.
+- Added separate TUKE Perun Slurm files for an end-to-end smoke run, one
+  configuration-driven experiment, and an array of independent configurations.
+- Added a minimal smoke configuration and documented the account, QoS, Python
+  environment, resource-override, automatic-scratch, and artifact contracts.
+- Updated the maintained implementation page, wiki index, root repository map,
+  and current architecture guide without changing notebooks, scientific logic,
+  historical MVP documentation, or empirical findings.

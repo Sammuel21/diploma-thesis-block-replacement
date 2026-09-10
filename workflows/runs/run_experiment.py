@@ -11,7 +11,7 @@ from mlp_replacement.compression.workflows import run_replacement_experiment
 
 
 def parse_args():
-    """Read the JSON configuration path supplied to the pipeline."""
+    """Read the JSON configuration path supplied to the workflow."""
 
     parser = argparse.ArgumentParser(description="Run one MLP replacement experiment")
     parser.add_argument("config", type=Path, help="Path to an experiment JSON configuration")

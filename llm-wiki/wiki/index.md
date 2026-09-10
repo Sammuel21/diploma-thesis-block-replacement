@@ -91,8 +91,8 @@ No model, dataset, software, or other entity pages have been created yet.
 ## Implementations
 
 - [[implementation-maintained-mlp-replacement-package|Maintained MLP replacement package]]:
-  Separates local operators, model-level compression, diagnostic analysis, and
-  evaluation while keeping shared infrastructure at the package root.
+  Separates reusable scientific code, top-level experiment runners, and
+  executor-specific jobs, including the TUKE Perun submission layer.
 - [[implementation-compute-environments|Research compute environments]]:
   Records the local MVP and shared remote experiment capacity, setup, and
   constraints without identifying the remote host or its owner.

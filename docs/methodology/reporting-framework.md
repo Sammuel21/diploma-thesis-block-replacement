@@ -23,6 +23,14 @@ example, processing the same calibration pairs for 64 epochs does not create
 64 times more unique data, but it does require approximately 64 times more
 training work.
 
+When early stopping is enabled, report both the configured maximum and the
+actual work performed. For each initialization method, summarize the actual
+epochs and optimizer steps per operator, the selected best epoch, and the
+fraction of fits with `best_epoch = 0`. A best epoch of zero means that no
+trained epoch improved on the initialization. This distinction is necessary
+when teacher-initialized operators stop much earlier than randomly initialized
+operators.
+
 ## Relative Cost
 
 Use two transparent ratios:
@@ -60,8 +68,8 @@ choice consistently.
 
 Each final configuration should have one compact summary row containing:
 
-| Method | Total parameter reduction | MLP parameter reduction | PPL change | KL | Production tokens | Optimizer steps | GPU-hours | Pretraining data fraction | Pretraining compute fraction |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Method | Total parameter reduction | MLP parameter reduction | PPL change | KL | Production tokens | Actual epochs | Optimizer steps | GPU-hours | Pretraining data fraction | Pretraining compute fraction |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 
 Measured GPU-hours, wall-clock time, and peak memory should name the hardware.
 Estimated FLOPs should be marked as estimates and should not be mixed with
