@@ -27,6 +27,13 @@ LLM-maintained research knowledge base.
   explains activation-pair data feeding and distinguishes fixed-update,
   fixed-epoch, and operator-batch-size experiments.
 
+## Experiment workflows
+
+- [Model compression experiments](experiments/model/README.md) explain the
+  executable compression baseline, SwiGLU allocation, and allocation-search
+  pipelines. Isolated operator studies can be documented separately under a
+  future `experiments/block/` hierarchy.
+
 ## Historical prototype
 
 - [MVP archive](prototype/mvp/README.md) records the completed prototype,
