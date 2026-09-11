@@ -1,3 +1,19 @@
+---
+metadata_version: 1
+title: Historical MVP Notes
+type: index
+category: prototype/mvp/notes
+status: archived
+created: 2026-07-17
+modified: 2026-09-11
+authorship:
+  created_by: unknown
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+---
+
 # Historical MVP Notes
 
 These files are preserved as unmodified design notes from the prototype phase.

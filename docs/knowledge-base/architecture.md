@@ -1,3 +1,19 @@
+---
+metadata_version: 1
+title: LLM-Wiki Architecture
+type: architecture
+category: knowledge-base
+status: active
+created: 2026-07-17
+modified: 2026-09-11
+authorship:
+  created_by: unknown
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+---
+
 # LLM-Wiki Architecture
 
 ## Purpose

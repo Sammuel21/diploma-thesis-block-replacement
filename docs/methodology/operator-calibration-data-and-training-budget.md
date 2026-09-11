@@ -1,3 +1,19 @@
+---
+metadata_version: 1
+title: Operator Calibration Data and Training Budget
+type: methodology
+category: methodology
+status: draft
+created: 2026-09-04
+modified: 2026-09-11
+authorship:
+  created_by: collaborative
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+---
+
 # Operator Calibration Data and Training Budget
 
 Status: methodology note. The reworked method is implemented in the notebook,

@@ -1,3 +1,25 @@
+---
+metadata_version: 1
+title: SwiGLU Compression Workflow
+type: experiment-workflow
+category: experiments/model
+status: active
+created: 2026-09-10
+modified: 2026-09-11
+authorship:
+  created_by: collaborative
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+sources:
+  notebooks:
+    - notebooks/model/swiglu.ipynb
+  artifacts:
+    - data/results/notebook-model-study/swiglu-compression.json
+    - data/results/notebook-model-study/swiglu-compression-optimized.json
+---
+
 # SwiGLU Compression Workflow
 
 Notebook: [swiglu.ipynb](../../../notebooks/model/swiglu.ipynb)

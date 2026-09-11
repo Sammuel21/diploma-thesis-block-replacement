@@ -1,3 +1,19 @@
+---
+metadata_version: 1
+title: High-Level Pipeline Draft
+type: research-note
+category: prototype/mvp/notes
+status: archived
+created: 2026-05-06
+modified: 2026-09-11
+authorship:
+  created_by: unknown
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+---
+
 # High-level pipeline draft
 
 1. Setup

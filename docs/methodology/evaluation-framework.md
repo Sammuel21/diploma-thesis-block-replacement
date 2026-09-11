@@ -1,3 +1,19 @@
+---
+metadata_version: 1
+title: Model Compression Evaluation Framework
+type: evaluation-framework
+category: methodology
+status: draft
+created: 2026-07-18
+modified: 2026-09-11
+authorship:
+  created_by: unknown
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+---
+
 # Model Compression Evaluation Framework
 
 Status: review draft. The primary scope records the direction discussed with

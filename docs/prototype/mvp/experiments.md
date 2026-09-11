@@ -1,3 +1,26 @@
+---
+metadata_version: 1
+title: MVP Experiment Index
+type: index
+category: prototype/mvp
+status: archived
+created: 2026-07-17
+modified: 2026-09-11
+authorship:
+  created_by: unknown
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+sources:
+  notebooks: []
+  artifacts:
+    - data/mvp/results/logs/mvp_log_1.json
+    - data/mvp/results/logs/mvp_log_2.json
+    - data/mvp/results/logs/mvp_log_3_search.json
+    - data/mvp/results/logs/mvp_log_4_search_high_recovery_budget.json
+---
+
 # MVP Experiment Index
 
 This index maps the preserved JSON logs to the prototype experiment rounds.

@@ -1,3 +1,19 @@
+---
+metadata_version: 1
+title: Block Replacement MVP Archive
+type: index
+category: prototype/mvp
+status: archived
+created: 2026-07-17
+modified: 2026-09-11
+authorship:
+  created_by: unknown
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+---
+
 # Block Replacement MVP Archive
 
 ## Status

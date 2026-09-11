@@ -1,3 +1,19 @@
+---
+metadata_version: 1
+title: Thesis Annotation and Goals
+type: thesis-scope
+category: thesis
+status: active
+created: 2026-03-19
+modified: 2026-09-11
+authorship:
+  created_by: unknown
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+---
+
 Thesis: Diploma
 Degree: CS + DS (mAIN)
 Faculty: FMFI UK Bratislava

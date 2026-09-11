@@ -1,3 +1,19 @@
+---
+metadata_version: 1
+title: Compression Reporting Framework
+type: reporting-framework
+category: methodology
+status: active
+created: 2026-09-07
+modified: 2026-09-11
+authorship:
+  created_by: collaborative
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+---
+
 # Compression Reporting Framework
 
 ## Purpose

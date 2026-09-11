@@ -1,3 +1,25 @@
+---
+metadata_version: 1
+title: SwiGLU Allocation Study Workflow
+type: experiment-workflow
+category: experiments/model
+status: draft
+created: 2026-09-10
+modified: 2026-09-11
+authorship:
+  created_by: collaborative
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+sources:
+  notebooks:
+    - notebooks/model/swiglu-2.ipynb
+  artifacts: []
+  reference_artifacts:
+    - data/results/notebook-model-study/swiglu-compression-optimized.json
+---
+
 # SwiGLU Allocation Study Workflow
 
 Notebook: [swiglu-2.ipynb](../../../notebooks/model/swiglu-2.ipynb)

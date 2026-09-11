@@ -1,3 +1,19 @@
+---
+metadata_version: 1
+title: Diploma Thesis MVP Result Overview
+type: report
+category: prototype/mvp
+status: archived
+created: 2026-07-17
+modified: 2026-09-11
+authorship:
+  created_by: unknown
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+---
+
 Below is a long, self-contained summary you can paste into another LLM for presentation generation.
 
 ---

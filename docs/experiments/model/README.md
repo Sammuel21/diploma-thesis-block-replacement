@@ -1,3 +1,19 @@
+---
+metadata_version: 1
+title: Model Compression Experiment Workflows
+type: index
+category: experiments/model
+status: active
+created: 2026-09-10
+modified: 2026-09-11
+authorship:
+  created_by: collaborative
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+---
+
 # Model Compression Experiment Workflows
 
 This directory explains how the model-wide compression notebooks work. The

@@ -1,3 +1,25 @@
+---
+metadata_version: 1
+title: Compression Baseline Workflow
+type: experiment-workflow
+category: experiments/model
+status: active
+created: 2026-09-10
+modified: 2026-09-11
+authorship:
+  created_by: collaborative
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+sources:
+  notebooks:
+    - notebooks/model/compression-baseline.ipynb
+  artifacts:
+    - data/results/model-compression-baselines/compression-baseline.json
+    - data/results/model-compression-baselines/compression-baseline-v2.json
+---
+
 # Compression Baseline Workflow
 
 Notebook: [compression-baseline.ipynb](../../../notebooks/model/compression-baseline.ipynb)

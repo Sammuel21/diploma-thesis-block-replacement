@@ -1,3 +1,19 @@
+---
+metadata_version: 1
+title: LLM-Wiki Metadata Reference
+type: metadata-reference
+category: knowledge-base
+status: active
+created: 2026-07-17
+modified: 2026-09-11
+authorship:
+  created_by: unknown
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+---
+
 # LLM-Wiki Metadata Reference
 
 This document explains the YAML metadata used by maintained pages under

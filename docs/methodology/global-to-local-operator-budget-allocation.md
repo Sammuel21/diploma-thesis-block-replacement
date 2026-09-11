@@ -1,3 +1,19 @@
+---
+metadata_version: 1
+title: Global-to-Local MLP Operator Budget Allocation
+type: methodology
+category: methodology
+status: draft
+created: 2026-08-08
+modified: 2026-09-11
+authorship:
+  created_by: collaborative
+curation:
+  status: unreviewed
+  reviewed_by: null
+  reviewed_on: null
+---
+
 # Global-to-Local MLP Operator Budget Allocation
 
 Status: methodology draft. This is a project-proposed allocation framework,
