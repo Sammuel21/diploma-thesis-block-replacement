@@ -139,6 +139,18 @@ interact downstream.
 Optimized results and comparisons are stored in
 [swiglu-compression-optimized.json](../../../data/results/notebook-model-study/swiglu-compression-optimized.json).
 
+## Python workflow
+
+The headless compute path is
+[`workflows.runs.model.swiglu`](../../../workflows/runs/model/swiglu.py),
+driven by [`swiglu.json`](../../../workflows/configs/model/swiglu.json).
+It exposes historical, optimized, and combined stages while retaining the
+notebook as the explanatory and loading frontend. The optimized runner keeps
+the six-block, native-dtype CPU capture discipline described above. Each run
+writes the notebook-compatible science artifact and a sibling crash-aware
+`.run.json` operational record. Numerical parity still requires a GPU
+execution comparison; the migration has not yet been run on Perun.
+
 ## Limits and handoff
 
 The optimized section fixes the target MLP sparsity, score set, and allocation

@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "workflow": "compression-baseline",
+  "model_revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+  "seed": 21,
+  "data": {
+    "sequence_length": 128,
+    "batch_size": 2,
+    "historical_calibration_batches": 48,
+    "optimized_calibration_batches": 384,
+    "operator_validation_batches": 24,
+    "recovery_batches": 64,
+    "recovery_validation_batches": 24,
+    "model_validation_batches": 24,
+    "test_batches": 0
+  },
+  "selection": {
+    "interleave_stride": 2,
+    "interleave_offset": 0,
+    "variants": {
+      "including_boundaries": {
+        "protected_prefix": 0,
+        "protected_suffix": 0
+      },
+      "excluding_boundaries": {
+        "protected_prefix": 1,
+        "protected_suffix": 1
+      }
+    }
+  },
+  "operator": {
+    "kind": "swiglu",
+    "intermediate_ratio": 0.5,
+    "bias": false,
+    "epochs": 64,
+    "learning_rate": 0.001,
+    "batch_size": 2048,
+    "weight_decay": 0.0,
+    "scheduler": "constant",
+    "early_stopping_patience": 3,
+    "initializations": {
+      "new_data_random": "random_weights",
+      "complete_method": "importance_teacher_subset"
+    }
+  },
+  "recovery": {
+    "enabled": true,
+    "epochs": 1,
+    "learning_rate": 0.00001,
+    "weight_decay": 0.0,
+    "temperature": 1.0,
+    "cache_dtype": "float16",
+    "early_stopping_patience": null
+  },
+  "capture": {
+    "storage_device": "cpu",
+    "storage_dtype": "float32"
+  }
+}

@@ -182,6 +182,19 @@ could therefore discard a policy that becomes best after training. The final
 winner is selected by the lowest post-recovery teacher KL, with perplexity,
 loss, compression, and local fit reported alongside it.
 
+## Python workflow
+
+The headless compute path is
+[`workflows.runs.model.swiglu_2`](../../../workflows/runs/model/swiglu_2.py),
+driven by [`swiglu-2.json`](../../../workflows/configs/model/swiglu-2.json).
+It implements the six dependent stages above in one process because later
+promotion and finalist choices depend on earlier measurements. The notebook is
+retained as the explanatory and loading frontend. The runner writes the
+planned schema-1 science artifact and a sibling crash-aware `.run.json`
+operational record. Numerical parity still requires the first successful GPU
+execution; neither the notebook nor this migration has yet produced the final
+artifact.
+
 ## Reporting and artifact
 
 The notebook records:

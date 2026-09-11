@@ -46,6 +46,12 @@ Markdown files in this directory follow the
   explains activation-pair data feeding and distinguishes fixed-update,
   fixed-epoch, and operator-batch-size experiments.
 
+## Infrastructure
+
+- [TUKE Perun workflow infrastructure](infrastructure/perun.md) records the
+  access, Slurm, storage, environment, scratch, artifact, and validation
+  requirements for unattended Perun workflows.
+
 ## Experiment workflows
 
 - [Model compression experiments](experiments/model/README.md) explain the

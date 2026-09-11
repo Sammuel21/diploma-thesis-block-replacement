@@ -125,6 +125,18 @@ The historical artifact did not store NMSE directly. For the additional NMSE
 plot, the notebook reconstructs it from historical MSE and the target scale of
 the matched optimized validation partition.
 
+## Python workflow
+
+The headless compute path is
+[`workflows.runs.model.compression_baseline`](../../../workflows/runs/model/compression_baseline.py),
+driven by
+[`compression-baseline.json`](../../../workflows/configs/model/compression-baseline.json).
+It exposes historical, optimized, and combined stages and leaves this notebook
+unchanged as the explanatory and loading frontend. Each run writes the same
+science-artifact schema plus a sibling crash-aware `.run.json` operational
+record. Numerical parity still requires a GPU execution comparison; the
+migration has not yet been run on Perun.
+
 ## Output and limits
 
 Optimized results and the historical comparison are stored in

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "workflow": "swiglu-2",
+  "reference_artifact": "data/results/notebook-model-study/swiglu-compression-optimized.json",
+  "probe_width_ratios": [0.25, 0.5],
+  "reference_width_ratio": 0.5,
+  "width_sweep_ratios": [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+  "allocation_temperatures": [1.0, 2.0, 4.0],
+  "boundary_minimum_retentions": [0.3, 0.4],
+  "allocation_selection_batches": 12,
+  "screening_calibration_batches": 96,
+  "allocation_score_names": [
+    "canonical_bi",
+    "residual_aware_mlp_bi",
+    "singleton_kl_w25",
+    "singleton_kl_w50",
+    "singleton_loss_delta_w25",
+    "singleton_loss_delta_w50"
+  ]
+}

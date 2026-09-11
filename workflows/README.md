@@ -6,10 +6,22 @@ model replacement, fitting, recovery, and evaluation logic stays in `src/`.
 
 ```text
 workflows/
+|-- AGENTS.md                scoped workflow and Perun requirements
+|-- configs/                 explicit workflow choices and budgets
+|   `-- model/               model-wide notebook-equivalent settings
 |-- runs/                    Python process entry points
+|   `-- model/               model-wide notebook migrations
 `-- jobs/
     `-- perun/               TUKE Perun Slurm submission files
 ```
+
+## Infrastructure prerequisite
+
+Before designing or modifying a workflow intended for TUKE Perun, read the
+canonical [Perun infrastructure guide](../docs/infrastructure/perun.md). It
+records the submission, storage, environment, scratch, artifact, and validation
+requirements that migrated workflows must respect. Scoped implementation-agent
+instructions are in [`AGENTS.md`](AGENTS.md).
 
 ## Run one experiment
 
@@ -38,13 +50,18 @@ One experiment per process is deliberate. Process exit releases the model,
 activation data, and CUDA allocator state between runs; a scheduler or job
 array can then coordinate independent processes.
 
-## Current migration boundary
+## Model-wide notebook migrations
 
-`runs/run_experiment.py` is the maintained configuration-driven workflow that
-already existed as a pipeline entry point. Notebook-specific workflows such as
-the evolving SwiGLU studies have not yet been claimed as equivalent Python
-jobs. They should be migrated here only when their inputs, outputs, and artifact
-contracts are defined well enough to preserve notebook parity.
+The retained `compression-baseline.ipynb`, `swiglu.ipynb`, and
+`swiglu-2.ipynb` compute paths now have Python entry points under
+[`runs/model/`](runs/model/). Their explicit notebook-equivalent choices live
+under [`configs/model/`](configs/model/). See the
+[`runs/model` README](runs/model/README.md) for stage, dependency, artifact,
+and validation details.
 
-For TUKE Perun submission and artifact-retrieval instructions, see
+The older `runs/run_experiment.py` remains the generic configuration-driven
+entry point for one standard replacement experiment. It is not an alias for
+the multi-policy model-study runners.
+
+For commands specific to the tracked Slurm files, see
 [`jobs/perun/README.md`](jobs/perun/README.md).
