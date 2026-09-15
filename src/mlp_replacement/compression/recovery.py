@@ -1,4 +1,7 @@
+import math
+from contextlib import nullcontext
 from dataclasses import dataclass
+from time import perf_counter
 
 import torch
 import torch.nn.functional as F
@@ -42,6 +45,28 @@ class RecoveryResult:
     best_epoch: int | None
 
 
+@dataclass(frozen=True)
+class TokenRecoveryEvent:
+    """Describe one completed optimizer boundary in a token-budget run."""
+
+    tokens_seen: int
+    optimizer_updates: int
+    microbatches: int
+    mean_train_kl: float
+    elapsed_seconds: float
+    requested_checkpoint_tokens: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class TokenRecoveryResult:
+    """Record the final cursor and first-step numerical diagnostics."""
+
+    tokens_seen: int
+    optimizer_updates: int
+    elapsed_seconds: float
+    first_step: dict | None
+
+
 def cache_teacher_logits(model, loader, max_batches, device, cache_dtype="float16"):
     """Cache dense-model logits on CPU for later knowledge-distillation recovery."""
 
@@ -58,7 +83,11 @@ def cache_teacher_logits(model, loader, max_batches, device, cache_dtype="float1
                     break
                 input_ids = batch["input_ids"].to(device)
                 attention_mask = batch["attention_mask"].to(device)
-                output = model(input_ids=input_ids, attention_mask=attention_mask)
+                output = model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    use_cache=False,
+                )
                 batches.append(
                     TeacherBatch(
                         input_ids=batch["input_ids"].detach().cpu(),
@@ -189,3 +218,230 @@ def recover_replacements(student, training_cache, validation_cache, target_paths
             parameter.requires_grad = requires_grad
 
     return RecoveryResult(tuple(history), best_epoch)
+
+
+def next_optimizer_boundary(requested_tokens, effective_batch_tokens, limit=None):
+    """Round a requested milestone up to a complete optimizer update."""
+
+    if requested_tokens < 0 or effective_batch_tokens < 1:
+        raise ValueError("Token milestone and effective batch must be non-negative")
+    boundary = math.ceil(requested_tokens / effective_batch_tokens) * effective_batch_tokens
+    return min(boundary, limit) if limit is not None else boundary
+
+
+def token_checkpoint_schedule(target_tokens, interval_tokens, effective_batch_tokens):
+    """Map requested periodic checkpoints to actual optimizer boundaries."""
+
+    if target_tokens < 1 or interval_tokens < 1:
+        raise ValueError("Recovery target and checkpoint interval must be positive")
+    requested = list(range(interval_tokens, target_tokens, interval_tokens))
+    requested.append(target_tokens)
+    grouped = {}
+    for value in requested:
+        actual = next_optimizer_boundary(value, effective_batch_tokens, target_tokens)
+        grouped.setdefault(actual, []).append(value)
+    return tuple(
+        (actual, tuple(values)) for actual, values in sorted(grouped.items())
+    )
+
+
+def _autocast(device, dtype):
+    device = torch.device(device)
+    if device.type != "cuda":
+        return nullcontext()
+    return torch.autocast(device_type="cuda", dtype=dtype)
+
+
+def online_distillation_loss(student, teacher, batch, temperature, device, autocast_dtype):
+    """Compute teacher-to-student KL without retaining an unbounded logits cache."""
+
+    input_ids = batch["input_ids"].to(device)
+    attention_mask = batch["attention_mask"].to(device)
+    with torch.no_grad(), _autocast(device, autocast_dtype):
+        teacher_logits = teacher(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            use_cache=False,
+        ).logits
+    with _autocast(device, autocast_dtype):
+        student_logits = student(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            use_cache=False,
+        ).logits
+    mask = attention_mask.bool()
+    teacher_probabilities = torch.softmax(
+        teacher_logits[mask].float() / temperature, dim=-1
+    )
+    student_log_probabilities = torch.log_softmax(
+        student_logits[mask].float() / temperature, dim=-1
+    )
+    loss = F.kl_div(
+        student_log_probabilities,
+        teacher_probabilities,
+        reduction="batchmean",
+    ) * (temperature**2)
+    return loss, int(mask.sum().item())
+
+
+def recover_replacements_by_tokens(
+    student,
+    teacher,
+    target_paths,
+    batch_at,
+    target_tokens,
+    microbatch_tokens,
+    accumulation_steps,
+    learning_rate,
+    weight_decay,
+    temperature,
+    device,
+    autocast_dtype=torch.bfloat16,
+    start_tokens=0,
+    start_updates=0,
+    elapsed_seconds=0.0,
+    optimizer_state=None,
+    checkpoint_schedule=(),
+    on_checkpoint=None,
+):
+    """Recover FP32 replacement weights along one resumable token trajectory.
+
+    Frozen model parameters stay in their model dtype.  Replacement parameters
+    remain FP32 master weights and AdamW uses FP32 states; CUDA forward operations
+    run under the requested autocast dtype.  ``batch_at`` receives an absolute
+    token cursor, which makes a packed finite stream exactly resumable.
+    """
+
+    target_tokens = int(target_tokens)
+    microbatch_tokens = int(microbatch_tokens)
+    accumulation_steps = int(accumulation_steps)
+    if target_tokens < 1 or microbatch_tokens < 1 or accumulation_steps < 1:
+        raise ValueError("Recovery token and accumulation budgets must be positive")
+    if not 0 <= start_tokens <= target_tokens:
+        raise ValueError("Recovery start cursor lies outside the target")
+    if start_tokens % microbatch_tokens:
+        raise ValueError("Recovery cursor must lie on a complete microbatch")
+
+    original_flags = [(parameter, parameter.requires_grad) for parameter in student.parameters()]
+    for parameter, _ in original_flags:
+        parameter.requires_grad = False
+    trainable = replacement_parameters(student, target_paths)
+    if any(parameter.dtype != torch.float32 for parameter in trainable):
+        raise ValueError("Token-budget recovery requires FP32 replacement parameters")
+    for parameter in trainable:
+        parameter.requires_grad = True
+    optimizer = torch.optim.AdamW(
+        trainable,
+        lr=float(learning_rate),
+        weight_decay=float(weight_decay),
+        foreach=False,
+    )
+    if optimizer_state is not None:
+        optimizer.load_state_dict(optimizer_state)
+        optimizer_state.clear()
+
+    schedule = {int(actual): tuple(requested) for actual, requested in checkpoint_schedule}
+    cursor = int(start_tokens)
+    updates = int(start_updates)
+    first_step = None
+    total_loss = 0.0
+    total_loss_tokens = 0
+    started = perf_counter()
+    target_modules = [student.get_submodule(path) for path in target_paths]
+    student.eval()
+    teacher.eval()
+    for module in target_modules:
+        module.train()
+
+    try:
+        while cursor < target_tokens:
+            remaining_microbatches = math.ceil(
+                (target_tokens - cursor) / microbatch_tokens
+            )
+            microbatches = min(accumulation_steps, remaining_microbatches)
+            microbatch_counts = []
+            planned_cursor = cursor
+            for _ in range(microbatches):
+                count = min(microbatch_tokens, target_tokens - planned_cursor)
+                microbatch_counts.append(count)
+                planned_cursor += count
+            planned_step_tokens = sum(microbatch_counts)
+            optimizer.zero_grad(set_to_none=True)
+            first_parameter = trainable[0]
+            before = first_parameter.detach().clone() if first_step is None else None
+            step_loss = 0.0
+            step_tokens = 0
+            for count in microbatch_counts:
+                batch = batch_at(cursor, count)
+                loss, valid_tokens = online_distillation_loss(
+                    student,
+                    teacher,
+                    batch,
+                    float(temperature),
+                    device,
+                    autocast_dtype,
+                )
+                if valid_tokens != count:
+                    raise ValueError(
+                        "Packed recovery batches must contain only valid, unpadded tokens"
+                    )
+                (loss * valid_tokens / planned_step_tokens).backward()
+                cursor += valid_tokens
+                step_loss += float(loss.detach().item()) * valid_tokens
+                step_tokens += valid_tokens
+            grad_norm = None
+            if first_step is None:
+                grad_norm = torch.linalg.vector_norm(
+                    torch.stack(
+                        [
+                            parameter.grad.detach().float().norm()
+                            for parameter in trainable
+                            if parameter.grad is not None
+                        ]
+                    )
+                )
+            optimizer.step()
+            updates += 1
+            total_loss += step_loss
+            total_loss_tokens += step_tokens
+            if first_step is None:
+                first_step = {
+                    "gradient_l2_norm": float(grad_norm.item()),
+                    "first_parameter_max_abs_update": float(
+                        (first_parameter.detach() - before).abs().max().item()
+                    ),
+                    "replacement_parameter_dtype": str(first_parameter.dtype),
+                    "optimizer_state_dtypes": sorted(
+                        {
+                            str(value.dtype)
+                            for state in optimizer.state.values()
+                            for value in state.values()
+                            if isinstance(value, torch.Tensor)
+                        }
+                    ),
+                    "microbatches": microbatches,
+                    "valid_tokens": step_tokens,
+                }
+                del before
+            if cursor in schedule and on_checkpoint is not None:
+                event = TokenRecoveryEvent(
+                    tokens_seen=cursor,
+                    optimizer_updates=updates,
+                    microbatches=microbatches,
+                    mean_train_kl=total_loss / total_loss_tokens,
+                    elapsed_seconds=elapsed_seconds + perf_counter() - started,
+                    requested_checkpoint_tokens=schedule[cursor],
+                )
+                on_checkpoint(event, optimizer, first_step)
+    finally:
+        optimizer.zero_grad(set_to_none=True)
+        for parameter, requires_grad in original_flags:
+            parameter.requires_grad = requires_grad
+        student.eval()
+
+    return TokenRecoveryResult(
+        tokens_seen=cursor,
+        optimizer_updates=updates,
+        elapsed_seconds=elapsed_seconds + perf_counter() - started,
+        first_step=first_step,
+    )

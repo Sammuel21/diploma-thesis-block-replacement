@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from time import perf_counter
 
 import torch
 import torch.nn as nn
@@ -31,6 +32,31 @@ class OperatorFitResult:
     history: tuple[OperatorTrainingEpoch, ...]
     best_epoch: int
     best_validation_mse: float
+
+
+@dataclass(frozen=True)
+class DetailedOperatorEpoch:
+    """Record scale-aware held-out metrics for one FP32 local-fit epoch."""
+
+    epoch: int
+    updates: int
+    train_mse: float
+    validation_mse: float
+    validation_nmse: float
+    validation_cosine: float
+    learning_rate: float
+    elapsed_seconds: float
+
+
+@dataclass(frozen=True)
+class DetailedOperatorFitResult:
+    """Return a best-validation FP32 operator and its detailed history."""
+
+    module: nn.Module
+    history: tuple[DetailedOperatorEpoch, ...]
+    best_epoch: int
+    best_validation_mse: float
+    updates: int
 
 
 def evaluate_operator_mse(module, pairs, device, batch_size):
@@ -174,6 +200,103 @@ def fit_operator(module, training_pairs, validation_pairs, config, device):
     module.to(device)
     module.eval()
     return OperatorFitResult(module, tuple(history), best_epoch, best_validation)
+
+
+def fit_operator_fp32_detailed(module, training_pairs, validation_pairs, config, device):
+    """Fit an operator with FP32 master weights and per-epoch NMSE/cosine."""
+
+    from ..evaluation.operator import evaluate_operator
+
+    if training_pairs.hidden_size != validation_pairs.hidden_size:
+        raise ValueError("Training and validation hidden sizes differ")
+    module = module.to(device=device, dtype=torch.float32)
+    parameters = tuple(parameter for parameter in module.parameters() if parameter.requires_grad)
+    if not parameters:
+        raise ValueError("Detailed local fitting requires trainable parameters")
+    torch.manual_seed(config.seed)
+    dataset = TensorDataset(training_pairs.inputs, training_pairs.targets)
+    generator = torch.Generator().manual_seed(config.seed)
+    loader = DataLoader(
+        dataset,
+        batch_size=config.batch_size,
+        shuffle=True,
+        generator=generator,
+    )
+    optimizer = torch.optim.AdamW(
+        parameters,
+        lr=config.learning_rate,
+        weight_decay=config.weight_decay,
+        foreach=False,
+    )
+    if config.scheduler != "constant":
+        raise ValueError("Detailed SwiGLU fitting requires a constant schedule")
+
+    initial = evaluate_operator(module, validation_pairs, device, config.batch_size)
+    best_validation = initial.mse
+    best_epoch = 0
+    best_state = {
+        name: tensor.detach().cpu().clone() for name, tensor in module.state_dict().items()
+    }
+    history = []
+    stale_epochs = 0
+    updates = 0
+    started = perf_counter()
+    for epoch in range(1, config.epochs + 1):
+        module.train()
+        squared_error = 0.0
+        element_count = 0
+        for inputs, targets in loader:
+            inputs = inputs.to(device=device, dtype=torch.float32)
+            targets = targets.to(device=device, dtype=torch.float32)
+            errors = module(inputs) - targets
+            loss = errors.square().mean()
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            if config.gradient_clip_norm is not None:
+                torch.nn.utils.clip_grad_norm_(parameters, config.gradient_clip_norm)
+            optimizer.step()
+            updates += 1
+            squared_error += float(errors.detach().square().sum().item())
+            element_count += errors.numel()
+        metrics = evaluate_operator(module, validation_pairs, device, config.batch_size)
+        history.append(
+            DetailedOperatorEpoch(
+                epoch=epoch,
+                updates=updates,
+                train_mse=squared_error / element_count,
+                validation_mse=metrics.mse,
+                validation_nmse=metrics.relative_mse,
+                validation_cosine=metrics.cosine_similarity,
+                learning_rate=float(optimizer.param_groups[0]["lr"]),
+                elapsed_seconds=perf_counter() - started,
+            )
+        )
+        if metrics.mse < best_validation - config.early_stopping_min_delta:
+            best_validation = metrics.mse
+            best_epoch = epoch
+            best_state = {
+                name: tensor.detach().cpu().clone()
+                for name, tensor in module.state_dict().items()
+            }
+            stale_epochs = 0
+        else:
+            stale_epochs += 1
+        if (
+            config.early_stopping_patience is not None
+            and stale_epochs >= config.early_stopping_patience
+        ):
+            break
+
+    module.load_state_dict(best_state)
+    module.zero_grad(set_to_none=True)
+    module.eval()
+    return DetailedOperatorFitResult(
+        module=module,
+        history=tuple(history),
+        best_epoch=best_epoch,
+        best_validation_mse=best_validation,
+        updates=updates,
+    )
 
 
 def fit_replacement_operator(

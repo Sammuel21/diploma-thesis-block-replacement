@@ -1,5 +1,8 @@
+import hashlib
+import json
 import random
 from dataclasses import dataclass
+from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -183,3 +186,152 @@ def build_data_loaders(tokenizer, config, include_recovery=True):
         model_validation=make_token_loader(model_validation_sequences, batch_size),
         test=test_loader,
     )
+
+
+@dataclass(frozen=True)
+class PackedTokenCache:
+    """Memory-map one finite, non-repeating packed token stream."""
+
+    path: Path
+    token_count: int
+    sequence_length: int
+    fingerprint: str
+
+    def batch(self, token_offset, token_count, batch_size):
+        """Read consecutive complete sequences without repeating cache content."""
+
+        import numpy as np
+
+        token_offset = int(token_offset)
+        token_count = int(token_count)
+        batch_size = int(batch_size)
+        if token_offset < 0 or token_count < 1:
+            raise ValueError("Packed-token offsets and counts must be positive")
+        if token_count % self.sequence_length:
+            raise ValueError("Packed-token reads must contain complete sequences")
+        if token_offset + token_count > self.token_count:
+            raise ValueError("Packed-token read exceeds the finite cache")
+        sequence_count = token_count // self.sequence_length
+        if sequence_count > batch_size:
+            raise ValueError("Packed-token read exceeds the configured microbatch")
+        tokens = np.memmap(self.path, mode="r", dtype=np.int32)
+        selected = np.asarray(
+            tokens[token_offset : token_offset + token_count], dtype=np.int64
+        ).copy()
+        input_ids = torch.from_numpy(selected).reshape(
+            sequence_count, self.sequence_length
+        )
+        return {
+            "input_ids": input_ids,
+            "attention_mask": torch.ones_like(input_ids),
+        }
+
+
+def packed_token_fingerprint(source, tokenizer_identity, token_count, sequence_length):
+    """Fingerprint the provenance and exact extent of a packed token cache."""
+
+    payload = {
+        "source": source,
+        "tokenizer": tokenizer_identity,
+        "token_count": int(token_count),
+        "sequence_length": int(sequence_length),
+        "format": "signed-int32-packed-documents-with-eos-v1",
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def build_or_open_packed_token_cache(
+    records,
+    tokenizer,
+    path,
+    token_count,
+    sequence_length,
+    source,
+    tokenizer_identity,
+    text_column="text",
+):
+    """Build or validate a compact token stream from fresh documents.
+
+    Each source document is tokenized once and separated by EOS.  The stream is
+    truncated exactly once at ``token_count`` and is never wrapped or repeated.
+    A matching manifest makes subsequent sparsity runs and resumes reuse the same
+    bytes without holding millions of Python tensors in memory.
+    """
+
+    import numpy as np
+
+    path = Path(path)
+    manifest_path = path.with_suffix(path.suffix + ".json")
+    token_count = int(token_count)
+    sequence_length = int(sequence_length)
+    if token_count < 1 or token_count % sequence_length:
+        raise ValueError("Packed-token count must be a positive number of sequences")
+    fingerprint = packed_token_fingerprint(
+        source, tokenizer_identity, token_count, sequence_length
+    )
+    if path.exists() or manifest_path.exists():
+        if not path.is_file() or not manifest_path.is_file():
+            raise ValueError("Packed-token cache and manifest must either both exist or both be absent")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        expected_bytes = token_count * np.dtype(np.int32).itemsize
+        if (
+            manifest.get("fingerprint") != fingerprint
+            or int(manifest.get("token_count", -1)) != token_count
+            or path.stat().st_size != expected_bytes
+        ):
+            raise ValueError("Existing packed-token cache does not match this run")
+        return PackedTokenCache(path, token_count, sequence_length, fingerprint)
+
+    if tokenizer.eos_token_id is None:
+        raise ValueError("Packed recovery data requires an EOS token")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    written = 0
+    documents = 0
+    try:
+        with temporary.open("wb") as output:
+            for record in records:
+                text = str(record.get(text_column) or "")
+                if not text.strip():
+                    continue
+                token_ids = tokenizer(
+                    text,
+                    add_special_tokens=False,
+                    return_attention_mask=False,
+                ).input_ids
+                if not token_ids:
+                    continue
+                document = np.asarray(
+                    [*token_ids, tokenizer.eos_token_id], dtype=np.int32
+                )
+                remaining = token_count - written
+                selected = document[:remaining]
+                selected.tofile(output)
+                written += int(selected.size)
+                documents += 1
+                if written == token_count:
+                    break
+        if written != token_count:
+            raise RuntimeError(
+                f"Fresh recovery source supplied {written:,} of {token_count:,} "
+                "tokens; the stream will not be repeated"
+            )
+        temporary.replace(path)
+        manifest = {
+            "schema_version": 1,
+            "fingerprint": fingerprint,
+            "token_count": token_count,
+            "sequence_length": sequence_length,
+            "dtype": "int32",
+            "documents_consumed": documents,
+            "source": source,
+            "tokenizer": tokenizer_identity,
+        }
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    return PackedTokenCache(path, token_count, sequence_length, fingerprint)

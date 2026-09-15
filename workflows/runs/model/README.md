@@ -10,6 +10,7 @@ frontend.
 | `compression-baseline.ipynb` | `workflows.runs.model.compression_baseline` | `workflows/configs/model/compression-baseline.json` | optimized |
 | `swiglu.ipynb` | `workflows.runs.model.swiglu` | `workflows/configs/model/swiglu.json` | optimized |
 | `swiglu-2.ipynb` | `workflows.runs.model.swiglu_2` | `workflows/configs/model/swiglu-2.json` | complete search |
+| `swiglu-3.ipynb` | `workflows.runs.model.swiglu_3` | `workflows/configs/model/swiglu-3.json` | calibration, sparsity, and recovery |
 
 The two older notebooks contain historical and optimized sections. Their
 runners expose `--stage historical`, `--stage optimized`, and `--stage all`.
@@ -33,6 +34,7 @@ export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 python -m workflows.runs.model.compression_baseline --stage optimized
 python -m workflows.runs.model.swiglu --stage optimized
 python -m workflows.runs.model.swiglu_2
+python -m workflows.runs.model.swiglu_3
 ```
 
 Every runner accepts `--config` and `--output`. The two staged runners also
@@ -63,3 +65,10 @@ no usable project Python environment or GPU, and the repository has not yet
 recorded a Perun smoke run. Compare a runner artifact against the
 corresponding notebook artifact before treating numerical equivalence as
 established thesis evidence.
+
+`swiglu-3` also accepts `--resume` with the same explicit `--output` and
+`--smoke` for checked-in reduced budgets. Its long recovery writes incremental
+current/best state plus retained 10M and 100M milestone states beneath the
+output's sibling asset directory. See
+[`swiglu-3.md`](../../../docs/experiments/model/swiglu-3.md) for background
+launch, resume, and artifact semantics.

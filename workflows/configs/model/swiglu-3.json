@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "workflow": "swiglu-3",
+  "seed": 21,
+  "references": {
+    "allocation_artifact": "data/results/notebook-model-study/swiglu-2.json",
+    "ranking_artifact": "data/results/notebook-model-study/swiglu-compression-optimized.json",
+    "winning_policy": "singleton_kl_w25_t1",
+    "winning_pre_recovery": {
+      "teacher_kl": 0.652182838569085,
+      "perplexity": 29.706515026355348
+    },
+    "winning_post_recovery": {
+      "teacher_kl": 0.649285607039928,
+      "perplexity": 29.59728597015512
+    }
+  },
+  "model": {
+    "model_id": "HuggingFaceTB/SmolLM2-1.7B",
+    "revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "tokenizer_revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "device": "cuda",
+    "dtype": "bfloat16",
+    "trust_remote_code": false,
+    "hidden_size": 2048,
+    "intermediate_size": 8192,
+    "num_layers": 24
+  },
+  "data": {
+    "sequence_length": 128,
+    "capture_batch_size": 2,
+    "local_source": {
+      "path": "allenai/c4",
+      "name": null,
+      "split": "train",
+      "text_column": "text",
+      "revision": null,
+      "data_file": "en/c4-train.00000-of-01024.json.gz",
+      "streaming": false
+    },
+    "recovery_source": {
+      "path": "allenai/c4",
+      "name": null,
+      "split": "train",
+      "text_column": "text",
+      "revision": null,
+      "data_file": "en/c4-train.00001-of-01024.json.gz",
+      "streaming": true
+    },
+    "model_validation_source": {
+      "path": "Salesforce/wikitext",
+      "name": "wikitext-2-raw-v1",
+      "split": "validation",
+      "text_column": "text",
+      "revision": null,
+      "data_file": null,
+      "streaming": false
+    },
+    "model_validation_batches": 24,
+    "partition_batches": {
+      "calibration": 48,
+      "operator_validation": 24,
+      "old_recovery": 64,
+      "recovery_validation": 24,
+      "additional_calibration": 336,
+      "allocation_selection": 12,
+      "appended_calibration": 1152
+    }
+  },
+  "calibration": {
+    "pair_counts": [98304, 196608, 393216],
+    "capture_group_size": 6,
+    "selection_metric": "allocation_selection_teacher_kl",
+    "tie_break": "smaller_pair_count"
+  },
+  "local_fitting": {
+    "parameter_dtype": "float32",
+    "optimizer": "AdamW",
+    "learning_rate": 0.001,
+    "batch_size": 2048,
+    "weight_decay": 0.0,
+    "max_epochs": 64,
+    "early_stopping_patience": 3,
+    "early_stopping_min_delta": 0.0,
+    "scheduler": "constant",
+    "initialization": "importance_teacher_subset"
+  },
+  "allocation": {
+    "eligible_layers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
+    "protected_layers": [0, 23],
+    "score": "singleton_kl_w25",
+    "temperature": 1.0,
+    "minimum_retention": null,
+    "target_mlp_removals": [0.5, 0.4, 0.3, 0.2],
+    "whole_neuron_parameter_step": 6144
+  },
+  "recovery": {
+    "target_tokens_per_model": 100000000,
+    "milestone_tokens": [10000000, 100000000],
+    "checkpoint_interval_tokens": 1000000,
+    "microbatch_sequences": 2,
+    "gradient_accumulation_steps": 8,
+    "effective_batch_tokens": 2048,
+    "optimizer": "AdamW",
+    "learning_rate": 0.00001,
+    "weight_decay": 0.0,
+    "temperature": 1.0,
+    "forward_autocast_dtype": "bfloat16",
+    "replacement_parameter_dtype": "float32",
+    "optimizer_state_dtype": "float32",
+    "validation_cache_dtype": "float16",
+    "selection_rule": "lowest_fixed_recovery_validation_kl_at_or_below_budget"
+  },
+  "smoke_overrides": {
+    "data": {
+      "model_validation_batches": 1,
+      "partition_batches": {
+        "calibration": 1,
+        "operator_validation": 1,
+        "old_recovery": 1,
+        "recovery_validation": 1,
+        "additional_calibration": 0,
+        "allocation_selection": 1,
+        "appended_calibration": 3
+      }
+    },
+    "calibration": {
+      "pair_counts": [256, 512, 1024],
+      "capture_group_size": 2
+    },
+    "local_fitting": {
+      "batch_size": 256,
+      "max_epochs": 1,
+      "early_stopping_patience": 1
+    },
+    "recovery": {
+      "target_tokens_per_model": 8192,
+      "milestone_tokens": [4096, 8192],
+      "checkpoint_interval_tokens": 4096
+    }
+  }
+}

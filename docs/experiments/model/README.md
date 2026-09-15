@@ -30,6 +30,7 @@ and interpretation of each pipeline.
 | [Compression baseline](compression-baseline.md) | Do the improved calibration and initialization methods help under a simple fixed replacement pattern? | Notebook artifacts present; Python runner not yet executed |
 | [SwiGLU compression](swiglu.md) | Does nonuniform block-width allocation improve a fixed model-wide compression budget? | Notebook artifacts present; Python runner not yet executed |
 | [SwiGLU allocation study](swiglu-2.md) | Which block score and allocation temperature should determine the nonuniform widths? | Python runner implemented; no final artifact yet |
+| [SwiGLU calibration and recovery](swiglu-3.md) | How much calibration data is useful, and how do fixed allocations recover over 100M tokens? | Python runner implemented; not yet GPU-validated |
 
 Reusable definitions belong under [methodology](../../methodology/). Results
 and run metadata belong in JSON artifacts. The Python migrations require an

@@ -14,7 +14,12 @@ from .modules import (
     linear_svd,
     swiglu_neuron_importance_scores,
 )
-from .training import fit_operator, fit_replacement_operator, fit_ridge_linear
+from .training import (
+    fit_operator,
+    fit_operator_fp32_detailed,
+    fit_replacement_operator,
+    fit_ridge_linear,
+)
 
 __all__ = [
     "BottleneckMLPReplacement",
@@ -25,6 +30,7 @@ __all__ = [
     "MeanReplacement",
     "ZeroReplacement",
     "fit_operator",
+    "fit_operator_fp32_detailed",
     "fit_replacement_operator",
     "fit_ridge_linear",
     "initialize_gated_mlp_from_teacher",
