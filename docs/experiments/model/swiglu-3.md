@@ -143,8 +143,12 @@ resume before the scientific run; its numbers are not thesis results.
 
 ## Resource and validation boundary
 
-The 393,216-pair capture for six blocks is expected to require roughly 18 GiB
-of CPU activation storage before transient overhead. Recovery holds a BF16
+The full run captures three blocks at a time. At 393,216 pairs per block,
+this requires roughly 9 GiB of BF16 CPU activation storage before transient
+overhead. Smaller capture groups require more teacher passes while preserving
+the calibration examples and local fitting budgets. This setting does not
+control model-wide recovery batching; the smoke override remains two blocks.
+Recovery holds a BF16
 teacher and compressed student plus FP32 replacement parameters and optimizer
 state. Checkpoint storage is also substantial because reconstructable FP32
 replacement states are retained at 10M and 100M. Actual RAM, VRAM, disk,
