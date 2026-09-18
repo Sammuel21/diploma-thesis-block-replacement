@@ -33,12 +33,34 @@
   maintained process entry points and executor-specific job definitions.
 
 ## Instruction routing
-- For work under `llm-wiki/`, read and follow `llm-wiki/AGENTS.md` and
-  `llm-wiki/SCHEMA.md` in addition to this file.
+- For work under `notebooks/`, read and follow `notebooks/AGENTS.md` and the
+  notebook implementation standard linked there.
+- For work under `src/`, read and follow `src/AGENTS.md` and the maintained-code
+  implementation standard linked there.
+- For work under `workflows/`, read and follow `workflows/AGENTS.md` and the
+  maintained-code implementation standard linked there.
+- For work under `llm-wiki/`, read and follow `llm-wiki/AGENTS.md`. Read
+  `llm-wiki/SCHEMA.md` before modifying maintained wiki content; a read-only
+  query starts from `llm-wiki/wiki/index.md` and only loads the schema sections
+  needed for the requested operation.
 - Treat scoped instructions as additions to these global approval and quality
   rules, not permission to bypass them.
 - Keep this root file as a navigation and governance map; detailed wiki rules
   belong in `llm-wiki/SCHEMA.md`.
+
+## Implementation-agent routing
+- Do not delegate implementation automatically. If the user has not selected a
+  model and delegation would be useful, state the task's implementation-risk
+  rating and recommended model tier before asking whether to delegate.
+- Astra is reserved for manual selection by the user as the primary session
+  model. Do not recommend, select, or spawn Astra as a delegated agent.
+- Use the scoped model-suitability rules in `notebooks/AGENTS.md`,
+  `src/AGENTS.md`, and `workflows/AGENTS.md`. A cheaper model is suitable only
+  when the design, file scope, reference implementation, and completion checks
+  are concrete.
+- Give an implementation agent the relevant scoped instructions, exact files or
+  cells, reference examples, allowed changes, and completion checks. Do not use
+  an active high-cost supervising agent for routine polling.
 
 ## Thesis context
 - `docs/annotation.md` contains the thesis annotation and basic problem definition.

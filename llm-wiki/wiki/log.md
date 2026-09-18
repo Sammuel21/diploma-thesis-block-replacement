@@ -698,3 +698,47 @@ This file is append-only. Entries use the format:
 - Updated the maintained implementation page, wiki index, root repository map,
   and current architecture guide without changing notebooks, scientific logic,
   historical MVP documentation, or empirical findings.
+
+## [2026-09-18] update | Separate notebook and maintained-workflow standards
+
+- Re-audited maintained model and block notebooks, excluding
+  `activation-analysis.ipynb` from the coding-style reference set at the
+  researcher's direction.
+- Preserved direct, minimally abstracted notebook implementation while making
+  researcher-authored Markdown an explicit boundary.
+- Added proportional reliability requirements for maintained source code and
+  long-running workflows, using SwiGLU-3 as the current checkpoint/resume and
+  crash-aware artifact reference.
+- Added low, medium, and high implementation-risk routing without authorizing
+  automatic delegation.
+- Linked the decision to scoped `AGENTS.md` files and the operational standards
+  under `docs/agents/`.
+
+## [2026-09-18] lint | Implementation standards and agent routing
+
+- Checked all 28 maintained wiki pages for required frontmatter, unique IDs,
+  filename-to-ID agreement, required relationship and source sections,
+  wikilink targets, conflict markers, trailing whitespace, and balanced display
+  math.
+- Checked the two new operational standards and the documentation index for the
+  required human-document metadata fields.
+- Resolved all repository-relative Markdown links in the changed instruction,
+  documentation, README, and wiki files.
+- Found no structural, graph, metadata, link, or formatting errors. This lint
+  validates documentation structure and routing, not model behavior or
+  experiment reproducibility.
+
+## [2026-09-18] update | Default eligible Luna work to Max reasoning
+
+- Changed low-risk notebook implementation and eligible isolated code or
+  workflow implementation from a variable Luna reasoning level to GPT-5.6 Luna
+  Max.
+- Retained the existing escalation to Terra, Sol, or Astra when unresolved
+  judgment or failure cost exceeds the Luna implementation boundary.
+
+## [2026-09-18] update | Reserve Astra for manual primary-session selection
+
+- Removed Astra from notebook, maintained-code, workflow, and wiki delegation
+  recommendations.
+- Made GPT-5.6 Sol the high-risk delegated model while reserving Astra for
+  manual selection by the researcher as the primary session model.

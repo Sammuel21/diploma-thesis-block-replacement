@@ -1,11 +1,11 @@
 ---
 id: decision-working-experiment-code-standards
 title: Working Experiment Code Standards
-summary: Keeps initial experiment code direct, naturally formatted, lightly documented, and free of unsolicited testing or speculative abstractions.
+summary: Separates direct notebook implementation from reliable maintained code and workflow implementation, with scoped agent routing for each.
 type: decision
 status: review
 created: 2026-07-27
-updated: 2026-08-28
+updated: 2026-09-18
 
 authorship:
   created_by: collaborative
@@ -25,6 +25,8 @@ scope:
     - exploratory-experiments
     - implementation-scope
     - notebook-workflow
+    - workflow-reliability
+    - agent-routing
   granularities:
     - cross-level
   pipeline_stages:
@@ -44,10 +46,23 @@ superseded_by: []
 
 ## Statement
 
-**Project decision.** Initial thesis experiments should optimize for directness,
-readability, and ease of modification. They are working research code, not a
-production framework. Production hardening, broad abstraction, and automated
-tests are added only when the researcher explicitly requests them.
+**Project decision.** Maintained notebooks and maintained execution code have
+different implementation boundaries. Notebooks optimize for directness,
+readability, and researcher-controlled narrative. Reusable source code and
+long-running workflows add reliability in proportion to their scientific and
+compute risk, including explicit configuration, portable execution, structured
+artifacts, failure records, and resumable continuation when replay is costly.
+
+Operational instructions are maintained in
+[`notebooks/AGENTS.md`](../../../notebooks/AGENTS.md),
+[`src/AGENTS.md`](../../../src/AGENTS.md), and
+[`workflows/AGENTS.md`](../../../workflows/AGENTS.md). The detailed human-facing
+standards are the
+[notebook implementation standard](../../../docs/agents/notebook-implementation.md)
+and the
+[maintained code and workflow standard](../../../docs/agents/maintained-code-and-workflows.md).
+This wiki page records the rationale and decision rather than duplicating every
+operational rule.
 
 ## Motivation and Prior Overengineering
 
@@ -64,6 +79,18 @@ useful, then add hardening on demand around behavior that has become stable.
 
 ## Observed Repository Style
 
+**Repository observation.** The maintained notebooks under `notebooks/model/`
+and `notebooks/block/`, excluding `activation-analysis.ipynb` as directed by the
+researcher, use sequential experiment cells, visible configuration, a small
+number of local helpers, no notebook-defined framework classes, DataFrame-based
+reporting, and compact JSON artifacts. `swiglu-2.ipynb` and
+`operator-distillation.ipynb` are the primary current style references.
+
+**Researcher decision.** Existing notebook Markdown is a researcher-authored
+boundary. Implementation agents preserve it unless prose changes are requested.
+An agent may add a short plain-text transition cell when necessary, without a
+new Markdown heading.
+
 The maintained `src/mlp_replacement/` package provides the current style
 reference:
 
@@ -77,11 +104,12 @@ reference:
   and
 - standard-library, third-party, and local imports separated into groups.
 
-The audit also found mechanically inconsistent wrapping: 19 Python lines under
-`src/`, `pipelines/`, and `configs/` exceed 99 characters, including several
-long signatures and calls. These are formatting issues to clean incrementally,
-not a reason to introduce a formatter, lint framework, or broad refactor during
-an experiment change.
+The maintained `workflows/` layer is intentionally more procedural. It keeps
+experiment-specific stage order in Python runners, explicit scientific choices
+under `workflows/configs/`, and executor-only launch behavior under
+`workflows/jobs/`. SwiGLU-3 is the current reference for a long workflow whose
+cost justifies atomic artifacts, fingerprints, failure state, checkpoints, and
+resume behavior.
 
 ## Formatting Rules
 
@@ -147,17 +175,21 @@ alignment.
 
 ## Notebook Rules
 
-- Keep the experimental story in notebook order: rationale, configuration,
-  data capture, analysis or intervention, plots, and saved summaries.
+- Preserve existing Markdown cells, their order, and their heading structure
+  unless the researcher requests prose changes.
+- Keep the experimental story in notebook order: setup, configuration and data,
+  analysis or intervention, nearby reports, and saved summaries.
 - Put important constants and budget choices near the beginning.
-- Use Markdown immediately before a non-obvious or expensive section to state
-  what question it answers.
+- Use only a short plain-text transition cell when implementation requires a new
+  separator; do not add an unsolicited heading or long explanation.
 - Keep visualization and interpretation sequencing in the notebook.
 - Move logic into `src/mlp_replacement/` only when it is reused, expresses a
   clear domain operation, or would otherwise obscure the experiment.
 - Save compact metrics and plot data, not raw activation tensors.
 - Do not add notebook assertion cells, periodic self-check evaluations, or
   other verification-only sections unless the researcher requests them.
+- Preserve unrelated outputs, metadata, and cell IDs; do not reserialize the
+  complete notebook merely to change selected cells.
 
 ## Abstraction Rules
 
@@ -174,18 +206,50 @@ alignment.
 
 ## Testing Policy
 
-Do not add automated tests, a test directory, synthetic fixtures, mocks,
-assertion-based notebook verification, or test-only abstractions unless the
+Do not add automated tests, synthetic fixtures, mocks, assertion-based notebook
+verification, or test-only abstractions to exploratory notebooks unless the
 researcher explicitly asks for them.
 
-When tests are requested later, add only focused coverage for the behavior then
-considered stable or risky. Experiment execution, plotting, and inspection of
-results are research activities; they should not be expanded into a testing
-framework by default.
+For maintained source and workflows, verification is proportional to risk. Add
+or run focused coverage when it protects a stable scientific invariant,
+artifact contract, failure boundary, or continuation behavior. Use a reduced
+smoke path for integration checks when one exists. Do not create a broad test
+framework or unrelated lint cleanup for a local change.
 
 Basic runtime errors may still be used at genuine external boundaries when
 continuing would silently produce an invalid experiment. Such checks should be
 short and local rather than generalized into verification infrastructure.
+
+## Workflow Reliability
+
+**Project decision.** A maintained workflow exposes explicit versioned
+configuration, portable repository-relative paths, unique outputs, structured
+provenance, and atomic persistence. Long or expensive stages record progress
+and failures before their cost becomes material. Resume support is added only
+when replay cost justifies the extra state contract, and it validates that the
+configuration and prerequisite artifacts match the interrupted run.
+
+Python workflow code must remain usable both in a direct checkout on the shared
+RTX 4090 machine and in a staged Perun checkout. Machine identities, user paths,
+credentials, accounts, QoS values, and environment locations are not embedded
+in scientific code. Slurm files request resources and launch a process; they do
+not own scientific logic.
+
+## Implementation-Agent Routing
+
+**Project decision.** Model suitability is based on unresolved judgment and
+failure cost rather than diff size. Bounded reporting work with exact reference
+cells defaults to Luna Max; settled multi-file work with moderate dependency
+tracing is eligible for Terra; scientific-method, artifact-schema,
+checkpoint/resume, memory-lifetime, and cross-environment changes default to Sol
+when delegated. Astra is reserved for manual selection by the researcher as the
+primary session model and is not a delegation target.
+
+Before delegating maintained `src/` or `workflows/` implementation, the agent
+reports a low, medium, or high risk rating and recommends a model tier. If the
+researcher has not already selected a model, the agent asks whether to use the
+cheaper eligible implementation model or the stronger recommendation. This
+rating does not authorize automatic delegation.
 
 ## Change-Scope Rules
 
@@ -199,10 +263,10 @@ short and local rather than generalized into verification infrastructure.
 
 ## Current Application
 
-These rules govern [[experiment-initial-block-compression-study]]. The current
-three notebooks are intentionally working initial experiments. Their lack of
-automated tests is a chosen maturity boundary, not evidence that their
-scientific results have been verified.
+These rules govern maintained notebooks, the reusable source package, and the
+workflow layer, including [[experiment-initial-block-compression-study]]. Their
+different verification requirements reflect different failure costs and do not
+establish that scientific results are correct.
 
 [[implementation-maintained-mlp-replacement-package]] records the package-level
 responsibility boundaries used when notebook logic is promoted into reusable
@@ -223,6 +287,8 @@ maintained experiment pipeline.
   are intended to run but does not change their implementation maturity.
 - [[implementation-maintained-mlp-replacement-package]] applies this decision
   to the maintained source-code organization.
+- [[implementation-compute-environments]] provides the execution environments
+  whose portability requirements apply to workflow implementation.
 
 ## Sources
 

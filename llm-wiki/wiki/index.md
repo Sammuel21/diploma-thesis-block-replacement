@@ -103,8 +103,9 @@ No model, dataset, software, or other entity pages have been created yet.
   Makes footprint-quality trade-offs primary and limits systems metrics to
   optional controlled observations.
 - [[decision-working-experiment-code-standards|Working experiment code standards]]:
-  Keeps initial notebook code direct and readable while deferring tests and
-  production abstractions until explicitly requested.
+  Separates researcher-structured notebook work from reliable maintained code
+  and workflows, and routes implementation agents by unresolved judgment and
+  failure cost.
 
 ## Experiments and Findings
 
@@ -138,7 +139,7 @@ historical archive remains available at `docs/prototype/mvp/`.
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-08-28 (maintained source-package restructuring)
+- Last structural lint: 2026-09-18 (implementation standards and agent routing)
 - Orphan pages: none detected
 - Registered source collections: 3
 - Registered individual sources: 5

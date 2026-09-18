@@ -5,7 +5,7 @@ type: index
 category: documentation
 status: active
 created: 2026-07-17
-modified: 2026-09-11
+modified: 2026-09-18
 authorship:
   created_by: unknown
 curation:
@@ -26,6 +26,15 @@ Markdown files in this directory follow the
 ## Core scope
 
 - [Thesis annotation](annotation.md) defines the baseline problem and goals.
+
+## Agent implementation standards
+
+- [Notebook implementation standard](agents/notebook-implementation.md)
+  defines the researcher-authored Markdown boundary, observed notebook style,
+  proportional verification, and implementation-model suitability.
+- [Maintained code and workflow implementation standard](agents/maintained-code-and-workflows.md)
+  defines source-package boundaries, portable execution, artifact and resume
+  reliability, proportional verification, and implementation-model suitability.
 
 ## Knowledge-base documentation
 

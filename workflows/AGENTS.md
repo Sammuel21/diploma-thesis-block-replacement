@@ -4,6 +4,8 @@
 
 - These instructions apply to `workflows/` and supplement the repository-root
   `AGENTS.md`.
+- Before modifying a maintained workflow, read
+  [`../docs/agents/maintained-code-and-workflows.md`](../docs/agents/maintained-code-and-workflows.md).
 - Before proposing or modifying a workflow intended to execute on TUKE Perun,
   read [`../docs/infrastructure/perun.md`](../docs/infrastructure/perun.md).
 - Before modifying a Perun Slurm file, also read
@@ -20,6 +22,34 @@
   scheduler file.
 - Do not claim parity with a notebook until inputs, operations, metrics, and
   artifact semantics have been compared explicitly.
+
+## Workflow reliability
+
+- Keep scientific defaults in a versioned configuration. Smoke overrides must
+  be explicit and must not silently replace those defaults.
+- Use repository-relative paths for portable inputs and outputs. Resolve paths
+  independently of the launcher's working directory.
+- Give every scientific run a unique output. Refuse accidental overwrites and
+  persist structured artifacts atomically.
+- For long or expensive stages, record status before expensive work, preserve
+  completed-stage summaries and failure information, and add resumable
+  checkpoints when replay cost justifies their complexity.
+- Validate resume inputs against configuration or artifact fingerprints and
+  restore the state needed for scientifically equivalent continuation.
+- Keep scheduler logs operational; they do not replace the structured science
+  artifact or crash-aware run state.
+
+## Verification and model routing
+
+- Check configuration ownership and schema, artifact contracts, path handling,
+  and failure behavior. Use a reduced smoke configuration for integration
+  checks when available; do not substitute smoke results for scientific runs.
+- Before delegating an implementation, classify it as low, medium, or high
+  risk using the linked standard and recommend a model tier. If the user has
+  not chosen a model, explicitly ask whether they want the cheaper eligible
+  model or the stronger recommended model.
+- Treat recovery, checkpoint/resume, artifact-schema, memory-lifetime, and
+  Perun-launch changes as high risk by default.
 
 ## Perun requirements
 
