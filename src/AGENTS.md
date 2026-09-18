@@ -32,8 +32,9 @@
 ## Verification and model routing
 
 - Match verification to risk: inspect imports and focused behavior for a local
-  change; use an existing smoke path for integration behavior; reserve an
-  expensive scientific run for changes that cannot be checked otherwise.
+  change, and use the intended scientific run when execution evidence is
+  required. Do not suggest, implement, or execute a smoke path unless the user
+  explicitly requests one in the current task.
 - Before delegating an implementation, classify it as low, medium, or high
   risk using the linked standard and recommend a model tier. If the user has
   not chosen a model, explicitly ask whether they want the cheaper eligible

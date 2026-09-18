@@ -45,8 +45,8 @@
 - Verify the notebook parses as JSON, inspect only the changed cells and their
   immediate dependencies, and check referenced artifact fields or imports.
 - Do not execute expensive model loading, fitting, or recovery merely to test a
-  reporting change. Use a cheap existing smoke path only when it meaningfully
-  checks changed behavior and the user has authorized execution.
+  reporting change. Do not suggest, implement, or execute a smoke path unless
+  the user explicitly requests one in the current task.
 
 ## Model suitability
 

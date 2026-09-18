@@ -14,6 +14,10 @@
 
 ## Quality rules
 - Prioritize correctness, clarity, and traceability over speed.
+- Do not suggest, implement, or run smoke tests, smoke jobs, or reduced-budget
+  smoke workflows unless I explicitly request one in the current task. Use
+  code inspection and the intended scientific run as the default validation
+  path for experiment workflows.
 - If the provided context, prompt, or codebase state is ambiguous, incomplete, or contradictory, do not force an answer.
 - Explicitly state what is unclear and ask for the missing details, files, notes, sources, or constraints.
 - Do not invent assumptions silently.

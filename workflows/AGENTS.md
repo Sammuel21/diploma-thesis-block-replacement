@@ -25,8 +25,9 @@
 
 ## Workflow reliability
 
-- Keep scientific defaults in a versioned configuration. Smoke overrides must
-  be explicit and must not silently replace those defaults.
+- Keep scientific defaults in a versioned configuration. Do not propose or add
+  smoke overrides, smoke jobs, or reduced-budget smoke workflows unless the
+  user explicitly requests them in the current task.
 - Use repository-relative paths for portable inputs and outputs. Resolve paths
   independently of the launcher's working directory.
 - Give every scientific run a unique output. Refuse accidental overwrites and
@@ -42,8 +43,9 @@
 ## Verification and model routing
 
 - Check configuration ownership and schema, artifact contracts, path handling,
-  and failure behavior. Use a reduced smoke configuration for integration
-  checks when available; do not substitute smoke results for scientific runs.
+  and failure behavior through code inspection and the intended scientific run.
+  Do not suggest or execute an existing smoke configuration unless the user
+  explicitly requests it in the current task.
 - Before delegating an implementation, classify it as low, medium, or high
   risk using the linked standard and recommend a model tier. If the user has
   not chosen a model, explicitly ask whether they want the cheaper eligible
@@ -64,5 +66,5 @@
 - Preserve unique structured artifacts and failure information for unattended
   runs.
 - Treat resource values as measured configuration, not permanent cluster facts.
-- Preserve unresolved infrastructure uncertainty and validate it with a smoke
-  job or current official documentation before relying on it.
+- Preserve unresolved infrastructure uncertainty and validate it with current
+  official documentation or measurements from the intended scientific job.
