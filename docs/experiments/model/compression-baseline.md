@@ -5,7 +5,7 @@ type: experiment-workflow
 category: experiments/model
 status: active
 created: 2026-09-10
-modified: 2026-09-11
+modified: 2026-09-18
 authorship:
   created_by: collaborative
 curation:
@@ -39,6 +39,43 @@ Two layer-selection variants are tested:
 
 Keeping these variants separate shows whether boundary blocks are unusually
 sensitive without mixing that question with importance-based allocation.
+
+## Pipeline at a glance
+
+```text
+SmolLM2-1.7B dense teacher
+|
++-- select every second MLP
+|   +-- including_boundaries
+|   `-- excluding_boundaries (protect layers 0 and 23)
+|
+`-- run each selection with three fitting conditions
+    +-- historical_random : 12,288 pairs, random initialization
+    +-- new_data_random   : 98,304 pairs, random initialization
+    `-- complete_method   : 98,304 pairs, teacher-derived initialization
+             |
+             v
+      capture MLP input/output pairs
+             |
+             v
+      fit one 50%-width SwiGLU per selected block
+             |
+             v
+      integrate all replacements simultaneously
+             |
+             v
+      pre-recovery loss / perplexity / teacher KL
+             |
+             v
+      one epoch of replacement-only KL recovery
+             |
+             v
+      post-recovery metrics and cross-method comparison
+```
+
+The historical artifact is the control input to the optimized stage. The
+optimized runner executes both initialization methods for both boundary
+variants and writes the combined comparison artifact.
 
 ## Shared configuration
 

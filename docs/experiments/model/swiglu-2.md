@@ -5,7 +5,7 @@ type: experiment-workflow
 category: experiments/model
 status: draft
 created: 2026-09-10
-modified: 2026-09-11
+modified: 2026-09-18
 authorship:
   created_by: collaborative
 curation:
@@ -15,7 +15,8 @@ curation:
 sources:
   notebooks:
     - notebooks/model/swiglu-2.ipynb
-  artifacts: []
+  artifacts:
+    - data/results/notebook-model-study/swiglu-2.json
   reference_artifacts:
     - data/results/notebook-model-study/swiglu-compression-optimized.json
 ---
@@ -24,9 +25,9 @@ sources:
 
 Notebook: [swiglu-2.ipynb](../../../notebooks/model/swiglu-2.ipynb)
 
-Status: implemented but not yet executed. The artifact described below is not
-present yet, so this document describes the planned pipeline rather than an
-empirical result.
+Status: implemented and executed in the notebook. The schema-1 result artifact
+is present. A sequential Python migration of the same dependent stages is also
+implemented under `workflows/runs/model/`.
 
 ## Purpose
 
@@ -43,6 +44,51 @@ It answers four connected questions:
 3. How strongly should the allocator separate important and unimportant blocks?
 4. Do the promising allocations remain good after full local fitting and
    model-wide recovery?
+
+## Pipeline at a glance
+
+```text
+optimized SwiGLU artifact (fixed model, data roles, BI scores, rankings)
+|
+v
+1. DUAL-WIDTH PROBES -- full 98,304-pair fits
+   every eligible block at retained widths 25% and 50%
+   -> local NMSE/cosine + singleton KL/loss/perplexity
+   -> six candidate block-importance scores
+|
+v
+2. WIDTH RESPONSE
+   representative best/middle/worst blocks
+   -> retained widths 20%, 30%, ..., 80%
+   -> inspect where local and singleton damage accelerates
+|
+v
+3. ALLOCATION CONSTRUCTION
+   six scores x temperatures {1, 2, 4} + uniform
+   -> 19 exact-budget policies at 50% eligible-MLP removal
+|
+v
+4. REDUCED-BUDGET QUALIFICATION -- 24,576 pairs per fit
+   fit and evaluate all policies on the allocation-selection split
+   -> promote uniform + BI/KL/loss family representatives
+|
+v
+5. MINIMUM-WIDTH ABLATION
+   best unbounded policy + retained-width floors {30%, 40%}
+   -> promote the best distinct bounded allocation
+|
+v
+6. FULL-BUDGET FINALISTS -- 98,304 pairs per fit
+   model evaluation -> one-epoch recovery for every finalist -> re-evaluation
+   -> winner = lowest post-recovery teacher KL
+|
+v
+swiglu-2.json (fits, histories, allocations, evaluations, winner, runtime)
+```
+
+This is a sequential tournament. Later fits and the final recovery set depend
+on promotion decisions made from earlier measurements, so the stages cannot be
+interpreted as independent sweeps.
 
 ## Inherited controls and data roles
 
@@ -190,10 +236,10 @@ driven by [`swiglu-2.json`](../../../workflows/configs/model/swiglu-2.json).
 It implements the six dependent stages above in one process because later
 promotion and finalist choices depend on earlier measurements. The notebook is
 retained as the explanatory and loading frontend. The runner writes the
-planned schema-1 science artifact and a sibling crash-aware `.run.json`
-operational record. Numerical parity still requires the first successful GPU
-execution; neither the notebook nor this migration has yet produced the final
-artifact.
+schema-1 science artifact and a sibling crash-aware `.run.json` operational
+record. The present artifact was produced by the notebook. Numerical parity of
+the Python migration still requires its first successful GPU execution and a
+comparison against that notebook artifact.
 
 ## Reporting and artifact
 
@@ -207,20 +253,19 @@ The notebook records:
 - total-model and MLP-parameter reductions; and
 - capture, fitting, evaluation, recovery, and total wall-clock times.
 
-The planned output is
-`data/results/notebook-model-study/swiglu-2.json`, schema version 1. Until that
-artifact exists, no winning score, temperature, width floor, or policy should
-be reported as an experimental finding.
+The notebook output is
+`data/results/notebook-model-study/swiglu-2.json`, schema version 1. It is the
+authoritative record for the completed notebook run, including its winning
+policy and all promotion decisions.
 
 ## Configuration appendix
 
-These values currently come from the notebook and its optimized reference
-artifact. The generated `swiglu-2.json` must be checked after execution and
-will then become the authoritative record.
+These values come from the notebook, its completed artifact, and the optimized
+reference artifact.
 
 | Setting | Value |
 | --- | --- |
-| Execution status | Run mode; artifact not yet produced |
+| Execution status | Notebook artifact present; Python migration not yet GPU-validated |
 | Model | `HuggingFaceTB/SmolLM2-1.7B` |
 | Model and tokenizer revision | `effd688a12921b4cc83e3312b6feb579f70f9c71` |
 | Reference artifact | `swiglu-compression-optimized.json`, schema 3 |

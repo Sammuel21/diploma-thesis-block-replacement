@@ -5,7 +5,7 @@ type: experiment-workflow
 category: experiments/model
 status: active
 created: 2026-09-10
-modified: 2026-09-11
+modified: 2026-09-18
 authorship:
   created_by: collaborative
 curation:
@@ -35,6 +35,43 @@ The first and last MLP blocks are protected. The remaining blocks share an
 exact target of 50% MLP-parameter removal in the main experiment. All policies
 therefore spend approximately the same parameter budget; the difference is
 where they spend it.
+
+## Pipeline at a glance
+
+```text
+SmolLM2-1.7B dense teacher
+|
++-- protect layers 0 and 23; score eligible layers 1..22
+|   +-- canonical block influence
+|   `-- residual-aware MLP influence
+|
+`-- reconcile exact global MLP budget for three policies
+    +-- uniform
+    +-- canonical_bi
+    `-- residual_aware_mlp_bi
+             |
+             v
+      assign one retained SwiGLU width per eligible layer
+             |
+             v
+      fit replacements in bounded six-layer capture groups
+      +-- historical_random : 12,288 pairs
+      +-- new_data_random   : 98,304 pairs
+      `-- complete_method   : 98,304 pairs + teacher initialization
+             |
+             v
+      integrate 22 replacements for each policy/method
+             |
+             v
+      pre-recovery evaluation -> one-epoch KL recovery -> post evaluation
+             |
+             v
+      compare quality at matched realized parameter removal
+```
+
+The main optimized comparison fixes removal at 50%. The historical branch also
+repeats the three allocation policies at 20%, 30%, 40%, and 50% removal to
+construct the first sparsity curve.
 
 ## Allocation policies
 

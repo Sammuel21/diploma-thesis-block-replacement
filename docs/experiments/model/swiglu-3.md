@@ -5,7 +5,7 @@ type: experiment-workflow
 category: experiments/model
 status: draft
 created: 2026-09-15
-modified: 2026-09-15
+modified: 2026-09-18
 authorship:
   created_by: collaborative
 curation:
@@ -13,16 +13,20 @@ curation:
   reviewed_by: null
   reviewed_on: null
 sources:
+  notebooks:
+    - notebooks/model/swiglu-3.ipynb
   artifacts:
     - data/results/notebook-model-study/swiglu-2.json
+    - data/results/workflows/models/swiglu-3/run-001.json
   reference_artifacts:
     - data/results/notebook-model-study/swiglu-compression-optimized.json
 ---
 
 # SwiGLU Calibration and Token-Budget Recovery Study
 
-Status: implemented as a headless workflow, not yet executed or GPU-validated.
-The retained `swiglu-3.ipynb` is not modified by this migration.
+Status: implemented and executed as a headless workflow. A completed schema-1
+run artifact is present. The retained `swiglu-3.ipynb` provides the notebook
+view of the same experiment family.
 
 ## Purpose and frozen starting point
 
@@ -39,6 +43,42 @@ removal. Its recorded pre-recovery allocation-selection metrics are KL
 0.652182838569085 and perplexity 29.706515026355348. Those values identify the
 starting artifact; the new workflow does not treat its short earlier recovery
 as a new control trajectory.
+
+## Pipeline at a glance
+
+```text
+swiglu-2 winner: singleton_kl_w25_t1
+exact 50% widths + protected layers 0 and 23
+|
+v
+1. NESTED CALIBRATION SWEEP
+   98,304 -> 196,608 -> 393,216 pairs per eligible block
+   same widths, teacher initialization, optimizer, and validation roles
+   -> assemble each model and measure allocation-selection teacher KL
+   -> select lowest KL; ties select the smaller calibration budget
+|
+v
+2. GLOBAL SPARSITY SWEEP
+   selected calibration budget at requested removals {50%, 40%, 30%, 20%}
+   -> reuse selected 50% states; fit newly required widths for other targets
+   -> record requested/realized MLP and whole-model removal
+   -> evaluate all four pre-recovery models
+|
+v
+3. INDEPENDENT RECOVERY TRAJECTORIES
+   one fixed compressed starting state per sparsity target
+   -> replacement-only KL on the same packed 100M-token C4 stream
+   -> checkpoint every 1M tokens
+   -> report the in-trajectory 10M milestone and selected <=100M checkpoint
+|
+v
+run JSON: calibration fits + sparsity curve + recovery histories + provenance
+assets: fitted operators, packed tokens, and resumable model checkpoints
+```
+
+The stages are dependent: the calibration winner supplies all sparsity fits,
+and each sparsity allocation supplies one independent recovery trajectory.
+The four trajectories do not pass trained weights to one another.
 
 ## Stage 1: nested calibration
 
@@ -151,11 +191,12 @@ control model-wide recovery batching; the smoke override remains two blocks.
 Recovery holds a BF16
 teacher and compressed student plus FP32 replacement parameters and optimizer
 state. Checkpoint storage is also substantial because reconstructable FP32
-replacement states are retained at 10M and 100M. Actual RAM, VRAM, disk,
-throughput, and wall time must be measured in a smoke run before scheduling the
-full study.
+replacement states are retained at 10M and 100M. The completed artifact records
+about 44.9 hours across all three stages, 37.9 GiB peak host RAM, and a maximum
+20.0 GiB peak VRAM across the four recovery trajectories.
 
-This implementation has not been run on a project GPU or Perun. It makes no
-numerical-parity, memory-fit, runtime, or cluster-readiness claim. A future
-Perun job may call the portable Python entry point, but this migration adds no
-Slurm harness.
+The completed artifact records a Linux run on the RTX 4090 darthmachinus host,
+so the configured workflow has demonstrated local GPU and memory fit. It does
+not establish numerical parity with an independently executed notebook or
+Perun readiness. A future Perun job may call the portable Python entry point,
+but this workflow includes no Slurm harness.

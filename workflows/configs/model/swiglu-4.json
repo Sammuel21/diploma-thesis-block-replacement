@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "workflow": "swiglu-4",
+  "seed": 21,
+  "references": {
+    "swiglu_3_artifact": "data/results/workflows/model/swiglu-3/run-001.json",
+    "selected_calibration_pairs": 393216,
+    "selected_sparsity_key": "0.5",
+    "selected_allocation_policy": "singleton_kl_w25_t1"
+  },
+  "model": {
+    "model_id": "HuggingFaceTB/SmolLM2-1.7B",
+    "revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "tokenizer_revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "device": "cuda",
+    "dtype": "bfloat16",
+    "trust_remote_code": false,
+    "hidden_size": 2048,
+    "intermediate_size": 8192,
+    "num_layers": 24,
+    "tie_word_embeddings": true
+  },
+  "recovery": {
+    "target_tokens": 10000000,
+    "tournament_qualifier_tokens": 5000000,
+    "rmsnorm_qualifier_tokens": 1000000,
+    "checkpoint_interval_tokens": 1000000,
+    "evaluation_tokens": [0, 1000000, 2000000, 5000000, 10000000],
+    "microbatch_sequences": 2,
+    "gradient_accumulation_steps": 8,
+    "optimizer": "AdamW",
+    "forward_autocast_dtype": "bfloat16",
+    "trainable_parameter_dtype": "float32",
+    "optimizer_state_dtype": "float32",
+    "validation_cache_dtype": "float16",
+    "fixed_selection_temperature": 1.0,
+    "selection_rule": "lowest_fixed_recovery_validation_kl_at_equal_token_budget",
+    "temporary_checkpoint_policy": "remove_after_success_retain_after_interruption"
+  },
+  "configuration_tournament": {
+    "optimizer_candidates": [
+      {
+        "id": "C0",
+        "label": "swiglu3_baseline",
+        "learning_rate": 0.00001,
+        "scheduler": "constant",
+        "warmup_fraction": 0.0,
+        "final_lr_ratio": 1.0,
+        "temperature": 1.0,
+        "ce_weight": 0.0,
+        "weight_decay": 0.0,
+        "initial_target": "full"
+      },
+      {
+        "id": "C1",
+        "label": "constant_3e-5",
+        "learning_rate": 0.00003,
+        "scheduler": "constant",
+        "warmup_fraction": 0.0,
+        "final_lr_ratio": 1.0,
+        "temperature": 1.0,
+        "ce_weight": 0.0,
+        "weight_decay": 0.0,
+        "initial_target": "qualifier"
+      },
+      {
+        "id": "C2",
+        "label": "warmup_cosine_1e-5",
+        "learning_rate": 0.00001,
+        "scheduler": "warmup_cosine",
+        "warmup_fraction": 0.01,
+        "final_lr_ratio": 0.1,
+        "temperature": 1.0,
+        "ce_weight": 0.0,
+        "weight_decay": 0.0,
+        "initial_target": "qualifier"
+      },
+      {
+        "id": "C3",
+        "label": "warmup_cosine_3e-5",
+        "learning_rate": 0.00003,
+        "scheduler": "warmup_cosine",
+        "warmup_fraction": 0.01,
+        "final_lr_ratio": 0.1,
+        "temperature": 1.0,
+        "ce_weight": 0.0,
+        "weight_decay": 0.0,
+        "initial_target": "qualifier"
+      }
+    ],
+    "objective_candidates": [
+      {
+        "id": "C4",
+        "label": "pure_kl_t2",
+        "temperature": 2.0,
+        "ce_weight": 0.0,
+        "weight_decay": 0.0
+      },
+      {
+        "id": "C5",
+        "label": "kl90_ce10_t1",
+        "temperature": 1.0,
+        "ce_weight": 0.1,
+        "weight_decay": 0.0
+      }
+    ],
+    "optional_weight_decay_candidate": {
+      "enabled": false,
+      "id": "C6",
+      "label": "winner_with_weight_decay_0.01",
+      "weight_decay": 0.01
+    }
+  },
+  "rmsnorm": {
+    "variants": [
+      {"id": "R1", "label": "rmsnorm_lr_1x", "learning_rate_multiplier": 1.0},
+      {"id": "R2", "label": "rmsnorm_lr_10x", "learning_rate_multiplier": 10.0}
+    ],
+    "scope": "post_attention_layernorm_for_replaced_layers"
+  },
+  "lora": {
+    "rank": 16,
+    "alpha": 32,
+    "dropout": 0.0,
+    "learning_rate": 0.0001,
+    "variants": [
+      {
+        "id": "L1",
+        "label": "replacement_mlp_lora",
+        "scope": "frozen_replacement_gate_up_down"
+      },
+      {
+        "id": "L2",
+        "label": "transformer_lora_assisted",
+        "scope": "trainable_replacements_plus_attention_and_protected_mlp_lora"
+      }
+    ],
+    "excluded_modules": ["input_embeddings", "lm_head"],
+    "target_attention_projections": ["q_proj", "k_proj", "v_proj", "o_proj"],
+    "target_protected_mlp_projections": ["gate_proj", "up_proj", "down_proj"]
+  },
+  "smoke_overrides": {
+    "recovery": {
+      "target_tokens": 8192,
+      "tournament_qualifier_tokens": 4096,
+      "rmsnorm_qualifier_tokens": 2048,
+      "checkpoint_interval_tokens": 2048,
+      "evaluation_tokens": [0, 2048, 4096, 8192],
+      "gradient_accumulation_steps": 2
+    }
+  }
+}

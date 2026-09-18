@@ -11,6 +11,7 @@ frontend.
 | `swiglu.ipynb` | `workflows.runs.model.swiglu` | `workflows/configs/model/swiglu.json` | optimized |
 | `swiglu-2.ipynb` | `workflows.runs.model.swiglu_2` | `workflows/configs/model/swiglu-2.json` | complete search |
 | `swiglu-3.ipynb` | `workflows.runs.model.swiglu_3` | `workflows/configs/model/swiglu-3.json` | calibration, sparsity, and recovery |
+| `swiglu-4.ipynb` | `workflows.runs.model.swiglu_4` | `workflows/configs/model/swiglu-4.json` | global-recovery analysis |
 
 The two older notebooks contain historical and optimized sections. Their
 runners expose `--stage historical`, `--stage optimized`, and `--stage all`.
@@ -35,6 +36,7 @@ python -m workflows.runs.model.compression_baseline --stage optimized
 python -m workflows.runs.model.swiglu --stage optimized
 python -m workflows.runs.model.swiglu_2
 python -m workflows.runs.model.swiglu_3
+python -m workflows.runs.model.swiglu_4
 ```
 
 Every runner accepts `--config` and `--output`. The two staged runners also
@@ -72,3 +74,9 @@ current/best state plus retained 10M and 100M milestone states beneath the
 output's sibling asset directory. See
 [`swiglu-3.md`](../../../docs/experiments/model/swiglu-3.md) for background
 launch, resume, and artifact semantics.
+
+`swiglu-4` accepts `--source`, `--resume`, and `--smoke`. It reuses the exact
+50% `swiglu-3` operators and packed token stream, keeps only temporary resume
+checkpoints during execution, and removes them after a successful run. See
+[`swiglu-4.md`](../../../docs/experiments/model/swiglu-4.md) for its tournament,
+LoRA scopes, reporting contract, and nohup commands.
