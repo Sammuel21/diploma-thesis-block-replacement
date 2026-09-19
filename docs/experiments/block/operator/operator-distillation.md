@@ -2,10 +2,10 @@
 metadata_version: 1
 title: Operator Distillation Workflow
 type: experiment-workflow
-category: experiments/block
+category: experiments/block/operator
 status: active
 created: 2026-09-11
-modified: 2026-09-11
+modified: 2026-09-19
 authorship:
   created_by: collaborative
 curation:
@@ -14,14 +14,14 @@ curation:
   reviewed_on: null
 sources:
   notebooks:
-    - notebooks/block/operator-distillation.ipynb
+    - notebooks/block/operator/operator-distillation.ipynb
   artifacts:
     - data/results/notebook-block-study/operator-distillation-v4.json
 ---
 
 # Operator Distillation Workflow
 
-Notebook: [operator-distillation.ipynb](../../../notebooks/block/operator-distillation.ipynb)
+Notebook: [operator-distillation.ipynb](../../../../notebooks/block/operator/operator-distillation.ipynb)
 
 Status: the latest executed artifact is `operator-distillation-v4.json`, using
 artifact schema version 5. The notebook currently remains in run mode.
@@ -91,7 +91,7 @@ into the same 384-update limit. Early stopping can end an individual fit before
 the maximum.
 
 See
-[operator calibration data and training budget](../../methodology/operator-calibration-data-and-training-budget.md)
+[operator calibration data and training budget](../../../methodology/operator-calibration-data-and-training-budget.md)
 for the full bookkeeping rationale.
 
 ## 2. Operator-batch-size screen
@@ -175,7 +175,7 @@ teacher-copy method over random initialization.
 ## Artifact contents
 
 The current
-[operator-distillation-v4.json](../../../data/results/notebook-block-study/operator-distillation-v4.json)
+[operator-distillation-v4.json](../../../../data/results/notebook-block-study/operator-distillation-v4.json)
 uses schema version 5 and records:
 
 - the corrected original-distillation configuration, metrics, and history;
@@ -204,7 +204,7 @@ fitting, importance ranking, and artifact writing should move into one Python
 job. The notebook should load the completed artifact and retain only tables and
 plots. The job should record stage runtimes, actual epochs and optimizer steps,
 GPU-hours, and peak memory following the
-[reporting framework](../../methodology/reporting-framework.md).
+[reporting framework](../../../methodology/reporting-framework.md).
 
 The notebook's final `Findings & Solutions` markdown contains statements from
 earlier iterations, including a claim that teacher initialization was not yet

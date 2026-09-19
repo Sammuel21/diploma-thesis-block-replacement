@@ -2,10 +2,10 @@
 metadata_version: 1
 title: Compression Baseline Workflow
 type: experiment-workflow
-category: experiments/model
+category: experiments/model/baseline
 status: active
 created: 2026-09-10
-modified: 2026-09-18
+modified: 2026-09-19
 authorship:
   created_by: collaborative
 curation:
@@ -14,7 +14,7 @@ curation:
   reviewed_on: null
 sources:
   notebooks:
-    - notebooks/model/compression-baseline.ipynb
+    - notebooks/model/baseline/compression-baseline.ipynb
   artifacts:
     - data/results/model-compression-baselines/compression-baseline.json
     - data/results/model-compression-baselines/compression-baseline-v2.json
@@ -22,7 +22,7 @@ sources:
 
 # Compression Baseline Workflow
 
-Notebook: [compression-baseline.ipynb](../../../notebooks/model/compression-baseline.ipynb)
+Notebook: [compression-baseline.ipynb](../../../../notebooks/model/baseline/compression-baseline.ipynb)
 
 ## Purpose
 
@@ -104,7 +104,7 @@ and evaluates the recovered model.
 
 The two boundary variants are independent model runs. Their results are loaded
 from
-[compression-baseline.json](../../../data/results/model-compression-baselines/compression-baseline.json)
+[compression-baseline.json](../../../../data/results/model-compression-baselines/compression-baseline.json)
 by default.
 
 ## Optimized run
@@ -133,7 +133,7 @@ larger data size, one epoch contains 48 updates instead of six, so the maximum
 budget rises from 384 to 3,072 updates. This is intentional: the optimized run
 asks how well the larger dataset can be learned, not how to distribute one
 fixed compute budget. See
-[operator calibration data and training budget](../../methodology/operator-calibration-data-and-training-budget.md).
+[operator calibration data and training budget](../../../methodology/operator-calibration-data-and-training-budget.md).
 
 The original calibration, operator-validation, recovery, and
 recovery-validation partitions are sampled before the additional calibration
@@ -165,9 +165,9 @@ the matched optimized validation partition.
 ## Python workflow
 
 The headless compute path is
-[`workflows.runs.model.compression_baseline`](../../../workflows/runs/model/compression_baseline.py),
+[`workflows.runs.model.baseline.compression`](../../../../workflows/runs/model/baseline/compression.py),
 driven by
-[`compression-baseline.json`](../../../workflows/configs/model/compression-baseline.json).
+[`compression.json`](../../../../workflows/configs/model/baseline/compression.json).
 It exposes historical, optimized, and combined stages and leaves this notebook
 unchanged as the explanatory and loading frontend. Each run writes the same
 science-artifact schema plus a sibling crash-aware `.run.json` operational
@@ -177,7 +177,7 @@ migration has not yet been run on Perun.
 ## Output and limits
 
 Optimized results and the historical comparison are stored in
-[compression-baseline-v2.json](../../../data/results/model-compression-baselines/compression-baseline-v2.json).
+[compression-baseline-v2.json](../../../../data/results/model-compression-baselines/compression-baseline-v2.json).
 Both notebook execution switches currently use load mode.
 
 This pipeline is a baseline, not an allocation search. It cannot establish

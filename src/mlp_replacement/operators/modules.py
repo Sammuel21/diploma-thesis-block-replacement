@@ -93,14 +93,26 @@ class BottleneckMLPReplacement(nn.Module):
 class GatedMLPReplacement(nn.Module):
     """Preserve a SwiGLU-style operator while reducing its intermediate width."""
 
-    def __init__(self, hidden_size, bottleneck_size, bias=False):
+    def __init__(
+        self,
+        hidden_size,
+        bottleneck_size,
+        bias=False,
+        down_bias=False,
+    ):
         super().__init__()
+        if bias and down_bias:
+            raise ValueError("Use either all-projection bias or down-only bias")
         if bottleneck_size < 1:
             raise ValueError("bottleneck_size must be positive")
         self.bottleneck_size = int(bottleneck_size)
         self.gate_projection = nn.Linear(hidden_size, bottleneck_size, bias=bias)
         self.up_projection = nn.Linear(hidden_size, bottleneck_size, bias=bias)
-        self.down_projection = nn.Linear(bottleneck_size, hidden_size, bias=bias)
+        self.down_projection = nn.Linear(
+            bottleneck_size,
+            hidden_size,
+            bias=bool(bias or down_bias),
+        )
         self.activation = nn.SiLU()
 
     def forward(self, inputs):

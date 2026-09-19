@@ -5,7 +5,7 @@ summary: Defines a project-proposed drop-in MLP replacement that adds a linear b
 type: method
 status: draft
 created: 2026-08-09
-updated: 2026-08-11
+updated: 2026-09-19
 
 authorship:
   created_by: collaborative
@@ -232,7 +232,7 @@ before any answer becomes an empirical finding.
 
 ## Repository Status
 
-- [`operator.ipynb`](../../../notebooks/block/operator.ipynb) records the
+- [`operator.ipynb`](../../../notebooks/block/operator/operator.ipynb) records the
   operator-family design space.
 - [`budget.ipynb`](../../../notebooks/analyses/budget.ipynb) records the
   internal allocation direction as future work.

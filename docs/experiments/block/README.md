@@ -5,7 +5,7 @@ type: index
 category: experiments/block
 status: active
 created: 2026-09-11
-modified: 2026-09-11
+modified: 2026-09-19
 authorship:
   created_by: collaborative
 curation:
@@ -23,10 +23,8 @@ artifact, and methodological status.
 
 | Workflow | Main question | Status |
 | --- | --- | --- |
-| [Single-block replacement baseline](baseline-testing.md) | How does one correctly sized 50% SwiGLU compare with simple learned and input-independent controls at layer 11? | Artifact present; marked exploratory-unverified |
-| [Baseline experiments](baseline-experiments.md) | How do calibration size, SwiGLU width, recovery budget, layer, and operator family affect isolated replacements? | Historical artifact present; notebook and artifact schemas differ |
-| [Operator study](operator.md) | How do several replacement architectures behave locally and after singleton model integration across depth? | Historical artifact present |
-| [Operator distillation](operator-distillation.md) | Which data, optimization, and initialization choices improve local SwiGLU fitting? | Current schema-5 artifact present |
+| [Block baselines](baseline/README.md) | What do controlled singleton baselines reveal about calibration, capacity, and recovery? | Historical artifacts present |
+| [Operator studies](operator/README.md) | Which replacement architectures and fitting choices work locally and after singleton integration? | Historical artifacts present |
 
 These are not simultaneous model-compression workflows. Even when a notebook
 covers all eligible layers, it inserts and evaluates one replacement at a time.

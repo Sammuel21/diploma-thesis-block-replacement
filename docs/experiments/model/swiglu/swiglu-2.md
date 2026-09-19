@@ -2,10 +2,10 @@
 metadata_version: 1
 title: SwiGLU Allocation Study Workflow
 type: experiment-workflow
-category: experiments/model
+category: experiments/model/swiglu
 status: draft
 created: 2026-09-10
-modified: 2026-09-18
+modified: 2026-09-19
 authorship:
   created_by: collaborative
 curation:
@@ -14,7 +14,7 @@ curation:
   reviewed_on: null
 sources:
   notebooks:
-    - notebooks/model/swiglu-2.ipynb
+    - notebooks/model/swiglu/swiglu-2.ipynb
   artifacts:
     - data/results/notebook-model-study/swiglu-2.json
   reference_artifacts:
@@ -23,7 +23,7 @@ sources:
 
 # SwiGLU Allocation Study Workflow
 
-Notebook: [swiglu-2.ipynb](../../../notebooks/model/swiglu-2.ipynb)
+Notebook: [swiglu-2.ipynb](../../../../notebooks/model/swiglu/swiglu-2.ipynb)
 
 Status: implemented and executed in the notebook. The schema-1 result artifact
 is present. A sequential Python migration of the same dependent stages is also
@@ -93,7 +93,7 @@ interpreted as independent sweeps.
 ## Inherited controls and data roles
 
 The notebook loads
-[swiglu-compression-optimized.json](../../../data/results/notebook-model-study/swiglu-compression-optimized.json)
+[swiglu-compression-optimized.json](../../../../data/results/notebook-model-study/swiglu-compression-optimized.json)
 to inherit the pinned model revision, data configuration, eligible layers,
 teacher-neuron rankings, operator fitting configuration, and recovery
 configuration.
@@ -231,8 +231,8 @@ loss, compression, and local fit reported alongside it.
 ## Python workflow
 
 The headless compute path is
-[`workflows.runs.model.swiglu_2`](../../../workflows/runs/model/swiglu_2.py),
-driven by [`swiglu-2.json`](../../../workflows/configs/model/swiglu-2.json).
+[`workflows.runs.model.swiglu.allocation`](../../../../workflows/runs/model/swiglu/allocation.py),
+driven by [`allocation.json`](../../../../workflows/configs/model/swiglu/allocation.json).
 It implements the six dependent stages above in one process because later
 promotion and finalist choices depend on earlier measurements. The notebook is
 retained as the explanatory and loading frontend. The runner writes the

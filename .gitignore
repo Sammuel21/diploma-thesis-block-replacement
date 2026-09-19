@@ -33,3 +33,4 @@ llm-wiki/*.canvas
 
 # LLM
 .agents
+plans/

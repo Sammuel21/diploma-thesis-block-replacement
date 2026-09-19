@@ -7,11 +7,13 @@ frontend.
 
 | Notebook | Python module | Configuration | Default stage |
 | --- | --- | --- | --- |
-| `compression-baseline.ipynb` | `workflows.runs.model.compression_baseline` | `workflows/configs/model/compression-baseline.json` | optimized |
-| `swiglu.ipynb` | `workflows.runs.model.swiglu` | `workflows/configs/model/swiglu.json` | optimized |
-| `swiglu-2.ipynb` | `workflows.runs.model.swiglu_2` | `workflows/configs/model/swiglu-2.json` | complete search |
-| `swiglu-3.ipynb` | `workflows.runs.model.swiglu_3` | `workflows/configs/model/swiglu-3.json` | calibration, sparsity, and recovery |
-| `swiglu-4.ipynb` | `workflows.runs.model.swiglu_4` | `workflows/configs/model/swiglu-4.json` | global-recovery analysis |
+| `baseline/compression-baseline.ipynb` | `workflows.runs.model.baseline.compression` | `workflows/configs/model/baseline/compression.json` | optimized |
+| `swiglu/swiglu.ipynb` | `workflows.runs.model.swiglu.initial` | `workflows/configs/model/swiglu/initial.json` | optimized |
+| `swiglu/swiglu-2.ipynb` | `workflows.runs.model.swiglu.allocation` | `workflows/configs/model/swiglu/allocation.json` | complete search |
+| `swiglu/swiglu-3.ipynb` | `workflows.runs.model.swiglu.calibration_recovery` | `workflows/configs/model/swiglu/calibration-recovery.json` | calibration, sparsity, and recovery |
+| `swiglu/swiglu-4.ipynb` | `workflows.runs.model.swiglu.recovery_analysis` | `workflows/configs/model/swiglu/recovery-analysis.json` | completed global-recovery analysis |
+| `swiglu/swiglu-5.ipynb` | `workflows.runs.model.swiglu.swiglu_5_search` | `workflows/configs/model/swiglu/swiglu-5-search.json` | bounded search |
+| `swiglu/swiglu-5.ipynb` | `workflows.runs.model.swiglu.swiglu_5_confirmation` | `workflows/configs/model/swiglu/swiglu-5-confirmation.json` | gated 100M confirmation |
 
 The two older notebooks contain historical and optimized sections. Their
 runners expose `--stage historical`, `--stage optimized`, and `--stage all`.
@@ -32,11 +34,15 @@ Run from the repository root with `src/` on `PYTHONPATH`:
 
 ```bash
 export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
-python -m workflows.runs.model.compression_baseline --stage optimized
-python -m workflows.runs.model.swiglu --stage optimized
-python -m workflows.runs.model.swiglu_2
-python -m workflows.runs.model.swiglu_3
-python -m workflows.runs.model.swiglu_4
+python -m workflows.runs.model.baseline.compression --stage optimized
+python -m workflows.runs.model.swiglu.initial --stage optimized
+python -m workflows.runs.model.swiglu.allocation
+python -m workflows.runs.model.swiglu.calibration_recovery
+python -m workflows.runs.model.swiglu.recovery_analysis
+python -m workflows.runs.model.swiglu.swiglu_5_search \
+  --config workflows/configs/model/swiglu/swiglu-5-search.json \
+  --source data/results/workflows/model/swiglu-3/run-001.json \
+  --output data/results/workflows/model/swiglu-5/search/<unique>.json
 ```
 
 Every runner accepts `--config` and `--output`. The two staged runners also
@@ -62,21 +68,26 @@ requires them. No activation cache is written to disk.
 
 The migration preserves the notebook inputs, partition order, operators,
 allocation equations, metrics, recovery procedure, and artifact keys by code
-inspection. It is not yet empirically parity-validated: this workstation has
-no usable project Python environment or GPU, and the repository has not yet
-recorded a Perun smoke run. Compare a runner artifact against the
-corresponding notebook artifact before treating numerical equivalence as
-established thesis evidence.
+inspection. SwiGLU-3 and SwiGLU-4 have completed darthmachinus artifacts; older
+runner migrations still require notebook-versus-runner comparison before
+numerical equivalence is established thesis evidence. Perun execution remains
+a separate infrastructure validation boundary.
 
 `swiglu-3` also accepts `--resume` with the same explicit `--output` and
 `--smoke` for checked-in reduced budgets. Its long recovery writes incremental
 current/best state plus retained 10M and 100M milestone states beneath the
 output's sibling asset directory. See
-[`swiglu-3.md`](../../../docs/experiments/model/swiglu-3.md) for background
+[`swiglu-3.md`](../../../docs/experiments/model/swiglu/swiglu-3.md) for background
 launch, resume, and artifact semantics.
 
 `swiglu-4` accepts `--source`, `--resume`, and `--smoke`. It reuses the exact
 50% `swiglu-3` operators and packed token stream, keeps only temporary resume
 checkpoints during execution, and removes them after a successful run. See
-[`swiglu-4.md`](../../../docs/experiments/model/swiglu-4.md) for its tournament,
+[`swiglu-4.md`](../../../docs/experiments/model/swiglu/swiglu-4.md) for its tournament,
 LoRA scopes, reporting contract, and nohup commands.
+
+`swiglu-5-search` accepts `--source`, `--output`, and `--resume`; it has no
+smoke mode. `swiglu-5-confirmation` additionally requires one explicit
+`--target 0.2` or `--target 0.5` and a completed `--search-artifact`. Implementing
+confirmation does not authorize launching it before the search is analyzed.
+See [`swiglu-5.md`](../../../docs/experiments/model/swiglu/swiglu-5.md).

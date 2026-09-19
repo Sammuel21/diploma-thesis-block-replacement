@@ -52,10 +52,10 @@ array can then coordinate independent processes.
 
 ## Model-wide notebook migrations
 
-The retained `compression-baseline.ipynb`, `swiglu.ipynb`, and
-`swiglu-2.ipynb` compute paths now have Python entry points under
-[`runs/model/`](runs/model/). Their explicit notebook-equivalent choices live
-under [`configs/model/`](configs/model/). See the
+The maintained model workflows are grouped by experiment class under
+[`runs/model/`](runs/model/): homogeneous SwiGLU studies under `swiglu/` and
+model baselines under `baseline/`. Their explicit choices use the same class
+layout under [`configs/model/`](configs/model/). See the
 [`runs/model` README](runs/model/README.md) for stage, dependency, artifact,
 and validation details.
 

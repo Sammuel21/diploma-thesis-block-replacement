@@ -1,4 +1,4 @@
-"""Headless migration of ``notebooks/model/swiglu.ipynb``."""
+"""Headless migration of ``notebooks/model/swiglu/swiglu.ipynb``."""
 
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ PINNED_REVISION = "effd688a12921b4cc83e3312b6feb579f70f9c71"
 DEFAULT_HISTORICAL_REFERENCE = Path(
     "data/results/notebook-model-study/swiglu-compression.json"
 )
-DEFAULT_CONFIG = Path("workflows/configs/model/swiglu.json")
+DEFAULT_CONFIG = Path("workflows/configs/model/swiglu/initial.json")
 
 SEED = 21
 PROTECTED_PREFIX = 1

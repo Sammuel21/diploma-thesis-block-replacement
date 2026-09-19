@@ -2,10 +2,10 @@
 metadata_version: 1
 title: SwiGLU Compression Workflow
 type: experiment-workflow
-category: experiments/model
+category: experiments/model/swiglu
 status: active
 created: 2026-09-10
-modified: 2026-09-18
+modified: 2026-09-19
 authorship:
   created_by: collaborative
 curation:
@@ -14,7 +14,7 @@ curation:
   reviewed_on: null
 sources:
   notebooks:
-    - notebooks/model/swiglu.ipynb
+    - notebooks/model/swiglu/swiglu.ipynb
   artifacts:
     - data/results/notebook-model-study/swiglu-compression.json
     - data/results/notebook-model-study/swiglu-compression-optimized.json
@@ -22,7 +22,7 @@ sources:
 
 # SwiGLU Compression Workflow
 
-Notebook: [swiglu.ipynb](../../../notebooks/model/swiglu.ipynb)
+Notebook: [swiglu.ipynb](../../../../notebooks/model/swiglu/swiglu.ipynb)
 
 ## Purpose
 
@@ -85,7 +85,7 @@ Canonical BI is a prior-work-motivated block-influence signal. The MLP-local
 variant and the exact replacement-width allocator are project adaptations and
 must not be presented as equations taken directly from MoDeGPT. Their
 methodological status is recorded in
-[global-to-local operator budget allocation](../../methodology/global-to-local-operator-budget-allocation.md).
+[global-to-local operator budget allocation](../../../methodology/global-to-local-operator-budget-allocation.md).
 
 Scores are converted to percentile ranks and then to removal propensities:
 
@@ -122,7 +122,7 @@ The historical section also sweeps target MLP sparsities of 20%, 30%, 40%, and
 curve rather than evaluating only one footprint.
 
 The default historical path loads
-[swiglu-compression.json](../../../data/results/notebook-model-study/swiglu-compression.json).
+[swiglu-compression.json](../../../../data/results/notebook-model-study/swiglu-compression.json).
 
 ## Optimized replication
 
@@ -174,13 +174,13 @@ model-level evaluation is needed because many individually fitted errors can
 interact downstream.
 
 Optimized results and comparisons are stored in
-[swiglu-compression-optimized.json](../../../data/results/notebook-model-study/swiglu-compression-optimized.json).
+[swiglu-compression-optimized.json](../../../../data/results/notebook-model-study/swiglu-compression-optimized.json).
 
 ## Python workflow
 
 The headless compute path is
-[`workflows.runs.model.swiglu`](../../../workflows/runs/model/swiglu.py),
-driven by [`swiglu.json`](../../../workflows/configs/model/swiglu.json).
+[`workflows.runs.model.swiglu.initial`](../../../../workflows/runs/model/swiglu/initial.py),
+driven by [`initial.json`](../../../../workflows/configs/model/swiglu/initial.json).
 It exposes historical, optimized, and combined stages while retaining the
 notebook as the explanatory and loading frontend. The optimized runner keeps
 the six-block, native-dtype CPU capture discipline described above. Each run

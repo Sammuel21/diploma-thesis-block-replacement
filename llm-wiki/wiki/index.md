@@ -10,7 +10,7 @@ Artifact-backed profiling now covers isolated replacement behavior across all
 eligible MLP layers for the baseline and generic operator-family suites. The
 active next direction is simultaneous multi-block replacement interaction:
 the initial skeleton is
-[`block-interaction.ipynb`](../../notebooks/model/block-interaction.ipynb).
+[`block-interaction.ipynb`](../../notebooks/model/interaction/block-interaction.ipynb).
 Its subset construction, operator controls, interaction metric, ordering, and
 recovery protocol remain to be designed. Singleton KL profiles must not be
 assumed to compose additively.

@@ -2,10 +2,10 @@
 metadata_version: 1
 title: Operator Study Workflow
 type: experiment-workflow
-category: experiments/block
+category: experiments/block/operator
 status: active
 created: 2026-09-11
-modified: 2026-09-11
+modified: 2026-09-19
 authorship:
   created_by: collaborative
 curation:
@@ -14,14 +14,14 @@ curation:
   reviewed_on: null
 sources:
   notebooks:
-    - notebooks/block/operator.ipynb
+    - notebooks/block/operator/operator.ipynb
   artifacts:
     - data/results/notebook-block-study/operator-experiments.json
 ---
 
 # Operator Study Workflow
 
-Notebook: [operator.ipynb](../../../notebooks/block/operator.ipynb)
+Notebook: [operator.ipynb](../../../../notebooks/block/operator/operator.ipynb)
 
 Status: an executed artifact is present and the notebook currently loads it.
 The experiment uses the historical local-fitting method.
@@ -116,7 +116,7 @@ The notebook reports:
   pre-recovery-KL-to-local-NMSE ratio.
 
 Results are stored in
-[operator-experiments.json](../../../data/results/notebook-block-study/operator-experiments.json),
+[operator-experiments.json](../../../../data/results/notebook-block-study/operator-experiments.json),
 schema version 1. It contains 220 local-fitting rows and 220 singleton
 sensitivity rows: 22 layers times ten operators.
 
@@ -143,7 +143,7 @@ experiments.
 
 The artifact does not record wall-clock time, GPU-hours, or peak memory. Those
 fields should be added to the future job artifact according to the
-[reporting framework](../../methodology/reporting-framework.md).
+[reporting framework](../../../methodology/reporting-framework.md).
 
 ## Configuration appendix
 

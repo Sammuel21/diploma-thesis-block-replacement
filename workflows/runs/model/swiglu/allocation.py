@@ -1,4 +1,4 @@
-"""Headless migration of ``notebooks/model/swiglu-2.ipynb``."""
+"""Headless migration of ``notebooks/model/swiglu/swiglu-2.ipynb``."""
 
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ from mlp_replacement.runlog import environment_record
 WORKFLOW = "swiglu-2"
 REFERENCE_SCHEMA = 3
 ARTIFACT_SCHEMA = 1
-DEFAULT_CONFIG = Path("workflows/configs/model/swiglu-2.json")
+DEFAULT_CONFIG = Path("workflows/configs/model/swiglu/allocation.json")
 
 PROBE_WIDTH_RATIOS = (0.25, 0.5)
 REFERENCE_WIDTH_RATIO = 0.5

@@ -17,11 +17,17 @@
 - Keep explicit migrated-workflow choices and budgets under `configs/`, split
   by `model/` and `block/` granularity.
 - Keep concrete block and model experiment orchestration under `runs/`.
+- Group model runners and configs by experiment class. `model/swiglu/` owns
+  the homogeneous SwiGLU progression, `model/baseline/` owns model baselines,
+  and `model/interaction/` owns block-interaction workflows. SwiGLU-5 artifact
+  adaptation and tournament orchestration stay in its SwiGLU workflow package.
 - Keep executor-specific resource requests and process launching under `jobs/`.
 - Do not put scientific selection, fitting, recovery, or evaluation logic in a
   scheduler file.
 - Do not claim parity with a notebook until inputs, operations, metrics, and
   artifact semantics have been compared explicitly.
+- Keep reusable allocation, reconstruction, cache, and recovery operations in
+  `src/mlp_replacement/`, not in another workflow runner.
 
 ## Workflow reliability
 

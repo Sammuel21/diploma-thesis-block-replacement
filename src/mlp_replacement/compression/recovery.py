@@ -1,6 +1,11 @@
+import hashlib
+import json
 import math
+import shutil
 from contextlib import nullcontext
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from time import perf_counter
 
 import torch
@@ -68,6 +73,497 @@ class TokenRecoveryResult:
     optimizer_updates: int
     elapsed_seconds: float
     first_step: dict | None
+
+
+@dataclass(frozen=True)
+class TeacherHiddenShard:
+    """Describe one immutable final-hidden-state cache shard."""
+
+    token_start: int
+    token_end: int
+    path: Path
+    sha256: str
+
+
+@dataclass(frozen=True)
+class TeacherFinalHiddenCache:
+    """Read dense final hidden states aligned with a packed token stream."""
+
+    root: Path
+    token_count: int
+    sequence_length: int
+    hidden_size: int
+    dtype: str
+    token_fingerprint: str
+    head_fingerprint: str
+    shards: tuple[TeacherHiddenShard, ...]
+    manifest: dict
+
+    def batch(self, token_offset, token_count):
+        """Load one contiguous token interval from immutable cache shards."""
+
+        token_offset = int(token_offset)
+        token_count = int(token_count)
+        if token_offset < 0 or token_count < 1:
+            raise ValueError("Teacher-hidden cache reads require positive ranges")
+        end = token_offset + token_count
+        if end > self.token_count:
+            raise ValueError("Teacher-hidden cache read exceeds its extent")
+        chunks = []
+        cursor = token_offset
+        for shard in self.shards:
+            if shard.token_end <= cursor or shard.token_start >= end:
+                continue
+            values = _load_hidden_shard(shard.path, shard.sha256)
+            start = max(cursor, shard.token_start) - shard.token_start
+            stop = min(end, shard.token_end) - shard.token_start
+            chunks.append(values[start:stop])
+            cursor = min(end, shard.token_end)
+            if cursor == end:
+                break
+        if cursor != end:
+            raise RuntimeError("Teacher-hidden cache has a gap in the requested range")
+        return torch.cat(chunks, dim=0) if len(chunks) > 1 else chunks[0]
+
+
+@lru_cache(maxsize=2)
+def _load_hidden_shard(path, sha256):
+    """Memory-map and retain the current sequential cache shards."""
+
+    path = Path(path)
+    try:
+        return torch.load(
+            path,
+            map_location="cpu",
+            weights_only=True,
+            mmap=True,
+        )
+    except TypeError:
+        return torch.load(path, map_location="cpu")
+
+
+def _sha256_file(path):
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _tensor_sha256(tensor):
+    values = tensor.detach().cpu().contiguous().view(torch.uint8)
+    return hashlib.sha256(values.numpy().tobytes()).hexdigest()
+
+
+def _atomic_json(path, value):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(value, indent=2, ensure_ascii=False, allow_nan=False),
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+
+
+def _load_teacher_hidden_cache(root, expected_fingerprint=None):
+    root = Path(root)
+    manifest_path = root / "manifest.json"
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"Teacher-hidden manifest is missing: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if expected_fingerprint is not None and (
+        manifest.get("fingerprint") != expected_fingerprint
+    ):
+        raise ValueError("Teacher-hidden cache fingerprint differs")
+    shards = []
+    cursor = 0
+    for row in manifest["shards"]:
+        token_start = int(row["token_start"])
+        token_end = int(row["token_end"])
+        if token_start != cursor or token_end <= token_start:
+            raise ValueError("Teacher-hidden manifest shard coverage is invalid")
+        path = root / row["file"]
+        if not path.is_file() or _sha256_file(path) != row["sha256"]:
+            raise ValueError(f"Teacher-hidden shard is missing or changed: {path}")
+        shards.append(
+            TeacherHiddenShard(
+                token_start=token_start,
+                token_end=token_end,
+                path=path,
+                sha256=row["sha256"],
+            )
+        )
+        cursor = token_end
+    if cursor != int(manifest["token_count"]):
+        raise ValueError("Teacher-hidden manifest does not cover its token extent")
+    expected_files = {manifest_path}
+    expected_files.update(shard.path for shard in shards)
+    unexpected = [path for path in root.iterdir() if path not in expected_files]
+    if unexpected:
+        raise FileExistsError(
+            "Completed teacher-hidden cache contains unexpected files: "
+            + ", ".join(str(path) for path in unexpected)
+        )
+    return TeacherFinalHiddenCache(
+        root=root,
+        token_count=int(manifest["token_count"]),
+        sequence_length=int(manifest["sequence_length"]),
+        hidden_size=int(manifest["hidden_size"]),
+        dtype=str(manifest["dtype"]),
+        token_fingerprint=str(manifest["token_fingerprint"]),
+        head_fingerprint=str(manifest["head_fingerprint"]),
+        shards=tuple(shards),
+        manifest=manifest,
+    )
+
+
+def build_teacher_final_hidden_cache(
+    model,
+    packed_tokens,
+    root,
+    token_count,
+    batch_sequences,
+    device,
+    model_identity,
+    cache_dtype=torch.bfloat16,
+    shard_tokens=65536,
+    minimum_free_gib=25.0,
+):
+    """Build or validate a sharded dense final-hidden-state cache."""
+
+    root = Path(root)
+    token_count = int(token_count)
+    batch_sequences = int(batch_sequences)
+    shard_tokens = int(shard_tokens)
+    sequence_length = int(packed_tokens.sequence_length)
+    if (
+        token_count < 1
+        or token_count > packed_tokens.token_count
+        or token_count % sequence_length
+        or shard_tokens % sequence_length
+        or batch_sequences < 1
+    ):
+        raise ValueError("Teacher-hidden cache geometry is inconsistent")
+    output_head = model.get_output_embeddings()
+    if output_head is None or not hasattr(output_head, "weight"):
+        raise TypeError("Dense teacher must expose a frozen output embedding")
+    head_fingerprint = _tensor_sha256(output_head.weight)
+    payload = {
+        "schema_version": 1,
+        "format": "final-normalized-hidden-bf16-shards-v1",
+        "model": model_identity,
+        "token_fingerprint": packed_tokens.fingerprint,
+        "token_count": token_count,
+        "sequence_length": sequence_length,
+        "hidden_size": int(output_head.weight.shape[1]),
+        "dtype": str(cache_dtype).removeprefix("torch."),
+        "head_fingerprint": head_fingerprint,
+        "shard_tokens": shard_tokens,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    fingerprint = hashlib.sha256(encoded).hexdigest()
+    manifest_path = root / "manifest.json"
+    partial_manifest_path = root / "partial-manifest.json"
+    if manifest_path.exists():
+        return _load_teacher_hidden_cache(root, fingerprint)
+    partial_manifest = None
+    if partial_manifest_path.is_file():
+        partial_manifest = json.loads(
+            partial_manifest_path.read_text(encoding="utf-8")
+        )
+        if partial_manifest.get("fingerprint") != fingerprint:
+            raise ValueError("Partial teacher-hidden cache fingerprint differs")
+    parent = root.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    if root.exists():
+        for temporary in root.glob("hidden-*.pt.tmp"):
+            if temporary.is_file():
+                temporary.unlink()
+    expected_shards = {
+        f"hidden-{start:012d}-{min(token_count, start + shard_tokens):012d}.pt": (
+            start,
+            min(token_count, start + shard_tokens),
+        )
+        for start in range(0, token_count, shard_tokens)
+    }
+    existing = tuple(root.iterdir()) if root.exists() else ()
+    unexpected = [
+        path
+        for path in existing
+        if not (
+            path == partial_manifest_path
+            or (path.is_file() and path.name in expected_shards)
+        )
+    ]
+    if unexpected:
+        raise FileExistsError(
+            "Teacher-hidden cache contains uncommitted or unexpected files: "
+            + ", ".join(str(path) for path in unexpected)
+        )
+    partial_rows = {}
+    if partial_manifest is not None:
+        for row in partial_manifest.get("shards", []):
+            file_name = str(row["file"])
+            if file_name in partial_rows or file_name not in expected_shards:
+                raise ValueError("Partial teacher-hidden shard manifest is invalid")
+            expected_start, expected_end = expected_shards[file_name]
+            path = root / file_name
+            if (
+                int(row["token_start"]) != expected_start
+                or int(row["token_end"]) != expected_end
+                or not path.is_file()
+                or _sha256_file(path) != row["sha256"]
+            ):
+                raise ValueError(
+                    f"Partial teacher-hidden shard is missing or changed: {path}"
+                )
+            partial_rows[file_name] = row
+    free_gib = shutil.disk_usage(parent).free / 1024**3
+    existing_shards = [
+        path for path in existing if path.is_file() and path.name in expected_shards
+    ]
+    if not existing_shards and free_gib < float(minimum_free_gib):
+        raise OSError(
+            f"Teacher-hidden cache requires {minimum_free_gib:.1f} GiB free; "
+            f"{free_gib:.1f} GiB is available"
+        )
+    root.mkdir(parents=True, exist_ok=True)
+    backbone = getattr(model, "model", None)
+    if backbone is None:
+        raise TypeError("Dense teacher does not expose its base Transformer as .model")
+    was_training = model.training
+    model.eval()
+    shard_rows = []
+    try:
+        with torch.no_grad():
+            for shard_start in range(0, token_count, shard_tokens):
+                shard_end = min(token_count, shard_start + shard_tokens)
+                path = root / f"hidden-{shard_start:012d}-{shard_end:012d}.pt"
+                if path.is_file():
+                    try:
+                        values = torch.load(
+                            path,
+                            map_location="cpu",
+                            weights_only=True,
+                            mmap=True,
+                        )
+                    except TypeError:
+                        values = torch.load(path, map_location="cpu")
+                    expected_shape = (
+                        shard_end - shard_start,
+                        int(output_head.weight.shape[1]),
+                    )
+                    if tuple(values.shape) != expected_shape or values.dtype != cache_dtype:
+                        raise ValueError(
+                            f"Incomplete cache shard has invalid content: {path}"
+                        )
+                    shard_sha256 = _sha256_file(path)
+                    partial_row = partial_rows.get(path.name)
+                    if (
+                        partial_row is not None
+                        and shard_sha256 != partial_row["sha256"]
+                    ):
+                        raise ValueError(
+                            f"Incomplete cache shard changed after commit: {path}"
+                        )
+                    shard_rows.append(
+                        {
+                            "token_start": shard_start,
+                            "token_end": shard_end,
+                            "file": path.name,
+                            "sha256": shard_sha256,
+                        }
+                    )
+                    _atomic_json(
+                        partial_manifest_path,
+                        {**payload, "fingerprint": fingerprint, "shards": shard_rows},
+                    )
+                    del values
+                    continue
+                chunks = []
+                cursor = shard_start
+                while cursor < shard_end:
+                    count = min(
+                        batch_sequences * sequence_length,
+                        shard_end - cursor,
+                    )
+                    batch = packed_tokens.batch(cursor, count, batch_sequences)
+                    input_ids = batch["input_ids"].to(device)
+                    attention_mask = batch["attention_mask"].to(device)
+                    with _autocast(device, cache_dtype):
+                        hidden = backbone(
+                            input_ids=input_ids,
+                            attention_mask=attention_mask,
+                            use_cache=False,
+                            return_dict=True,
+                        ).last_hidden_state
+                    chunks.append(
+                        hidden.detach().reshape(-1, hidden.shape[-1]).to(
+                            device="cpu", dtype=cache_dtype
+                        )
+                    )
+                    cursor += count
+                values = torch.cat(chunks, dim=0)
+                temporary = path.with_suffix(path.suffix + ".tmp")
+                try:
+                    torch.save(values, temporary)
+                    temporary.replace(path)
+                finally:
+                    temporary.unlink(missing_ok=True)
+                shard_rows.append(
+                    {
+                        "token_start": shard_start,
+                        "token_end": shard_end,
+                        "file": path.name,
+                        "sha256": _sha256_file(path),
+                    }
+                )
+                _atomic_json(
+                    partial_manifest_path,
+                    {**payload, "fingerprint": fingerprint, "shards": shard_rows},
+                )
+                del values, chunks
+    finally:
+        model.train(was_training)
+    manifest = {
+        **payload,
+        "fingerprint": fingerprint,
+        "shards": shard_rows,
+    }
+    _atomic_json(manifest_path, manifest)
+    partial_manifest_path.unlink(missing_ok=True)
+    return _load_teacher_hidden_cache(root, fingerprint)
+
+
+def cached_hidden_distillation_loss(
+    student,
+    teacher_head,
+    batch,
+    teacher_hidden,
+    temperature,
+    ce_weight,
+    device,
+    autocast_dtype,
+):
+    """Compute recovery loss from cached final teacher hidden states."""
+
+    if not 0.0 <= float(ce_weight) <= 1.0:
+        raise ValueError("CE loss weight must lie within [0, 1]")
+    input_ids = batch["input_ids"].to(device)
+    attention_mask = batch["attention_mask"].to(device)
+    hidden = teacher_hidden.reshape(
+        *input_ids.shape,
+        teacher_hidden.shape[-1],
+    ).to(device)
+    with torch.no_grad(), _autocast(device, autocast_dtype):
+        teacher_logits = teacher_head(hidden)
+    with _autocast(device, autocast_dtype):
+        student_logits = student(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            use_cache=False,
+        ).logits
+    mask = attention_mask.bool()
+    teacher_probabilities = torch.softmax(
+        teacher_logits[mask].float() / float(temperature), dim=-1
+    )
+    student_log_probabilities = torch.log_softmax(
+        student_logits[mask].float() / float(temperature), dim=-1
+    )
+    kl = F.kl_div(
+        student_log_probabilities,
+        teacher_probabilities,
+        reduction="batchmean",
+    ) * (float(temperature) ** 2)
+    ce = None
+    predicted_tokens = 0
+    if float(ce_weight):
+        labels = input_ids[:, 1:].contiguous()
+        valid = attention_mask[:, 1:].bool()
+        labels = labels.masked_fill(~valid, -100)
+        ce = F.cross_entropy(
+            student_logits[:, :-1, :].float().contiguous().view(
+                -1, student_logits.shape[-1]
+            ),
+            labels.view(-1),
+            ignore_index=-100,
+        )
+        predicted_tokens = int(valid.sum().item())
+        loss = (1.0 - float(ce_weight)) * kl + float(ce_weight) * ce
+    else:
+        loss = kl
+    return loss, kl, ce, int(mask.sum().item()), predicted_tokens
+
+
+def validate_teacher_final_hidden_cache(
+    model,
+    cache,
+    packed_tokens,
+    device,
+    sample_offsets,
+    batch_sequences=2,
+    temperature=1.0,
+    maximum_mean_kl=1e-5,
+):
+    """Compare cached and online dense distributions at fixed offsets."""
+
+    head = model.get_output_embeddings()
+    if head is None or getattr(model, "model", None) is None:
+        raise TypeError("Teacher cache validation requires model and output head")
+    losses = []
+    sample_tokens = int(batch_sequences) * int(cache.sequence_length)
+    model.eval()
+    with torch.no_grad():
+        for offset in sample_offsets:
+            offset = int(offset)
+            batch = packed_tokens.batch(offset, sample_tokens, batch_sequences)
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+            with _autocast(device, torch.bfloat16):
+                online_logits = model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    use_cache=False,
+                ).logits
+                hidden = cache.batch(offset, sample_tokens).reshape(
+                    *input_ids.shape,
+                    cache.hidden_size,
+                ).to(device)
+                cached_logits = head(hidden)
+            mask = attention_mask.bool()
+            online_probabilities = torch.softmax(
+                online_logits[mask].float() / float(temperature), dim=-1
+            )
+            cached_log_probabilities = torch.log_softmax(
+                cached_logits[mask].float() / float(temperature), dim=-1
+            )
+            losses.append(
+                float(
+                    (
+                        F.kl_div(
+                            cached_log_probabilities,
+                            online_probabilities,
+                            reduction="batchmean",
+                        )
+                        * (float(temperature) ** 2)
+                    ).item()
+                )
+            )
+    mean_kl = sum(losses) / len(losses)
+    record = {
+        "sample_offsets": [int(value) for value in sample_offsets],
+        "sample_kls": losses,
+        "mean_kl": mean_kl,
+        "maximum_mean_kl": float(maximum_mean_kl),
+        "passed": mean_kl <= float(maximum_mean_kl),
+    }
+    if not record["passed"]:
+        raise ValueError(
+            f"Cached teacher mean KL {mean_kl:.8g} exceeds "
+            f"{float(maximum_mean_kl):.8g}"
+        )
+    return record
 
 
 def cache_teacher_logits(model, loader, max_batches, device, cache_dtype="float16"):
@@ -400,6 +896,9 @@ def recover_trainable_by_tokens(
     optimizer_state=None,
     checkpoint_schedule=(),
     on_checkpoint=None,
+    teacher_hidden_at=None,
+    teacher_head=None,
+    optimizer_backend="single_tensor",
 ):
     """Recover an explicit set of parameter groups under a token budget."""
 
@@ -445,7 +944,14 @@ def recover_trainable_by_tokens(
         group_names.append(name)
     if not trainable:
         raise ValueError("Recovery received no trainable parameters")
-    optimizer = torch.optim.AdamW(optimizer_groups, foreach=False)
+    if optimizer_backend == "fused":
+        optimizer = torch.optim.AdamW(optimizer_groups, fused=True)
+    elif optimizer_backend == "foreach":
+        optimizer = torch.optim.AdamW(optimizer_groups, foreach=True)
+    elif optimizer_backend == "single_tensor":
+        optimizer = torch.optim.AdamW(optimizer_groups, foreach=False)
+    else:
+        raise ValueError(f"Unsupported optimizer backend: {optimizer_backend}")
     if optimizer_state is not None:
         optimizer.load_state_dict(optimizer_state)
         optimizer_state.clear()
@@ -460,8 +966,16 @@ def recover_trainable_by_tokens(
     total_loss_tokens = 0
     total_ce_tokens = 0
     started = perf_counter()
+    callback_seconds = 0.0
     student.eval()
-    teacher.eval()
+    if teacher_hidden_at is None:
+        if teacher is None:
+            raise ValueError("Online recovery requires a dense teacher")
+        teacher.eval()
+    elif teacher_head is None:
+        raise ValueError("Cached-hidden recovery requires the frozen teacher head")
+    if teacher_head is not None:
+        teacher_head.eval()
     for module in train_modules:
         module.train()
 
@@ -497,15 +1011,32 @@ def recover_trainable_by_tokens(
             step_ce_tokens = 0
             for count in microbatch_counts:
                 batch = batch_at(cursor, count)
-                loss, kl, ce, valid_tokens, predicted_tokens = online_recovery_loss(
-                    student,
-                    teacher,
-                    batch,
-                    float(temperature),
-                    float(ce_weight),
-                    device,
-                    autocast_dtype,
-                )
+                if teacher_hidden_at is None:
+                    loss, kl, ce, valid_tokens, predicted_tokens = (
+                        online_recovery_loss(
+                            student,
+                            teacher,
+                            batch,
+                            float(temperature),
+                            float(ce_weight),
+                            device,
+                            autocast_dtype,
+                        )
+                    )
+                else:
+                    hidden = teacher_hidden_at(cursor, count)
+                    loss, kl, ce, valid_tokens, predicted_tokens = (
+                        cached_hidden_distillation_loss(
+                            student,
+                            teacher_head,
+                            batch,
+                            hidden,
+                            float(temperature),
+                            float(ce_weight),
+                            device,
+                            autocast_dtype,
+                        )
+                    )
                 if valid_tokens != count:
                     raise ValueError(
                         "Packed recovery batches must contain only valid, unpadded tokens"
@@ -566,10 +1097,17 @@ def recover_trainable_by_tokens(
                     learning_rates=tuple(
                         float(group["lr"]) for group in optimizer.param_groups
                     ),
-                    elapsed_seconds=elapsed_seconds + perf_counter() - started,
+                    elapsed_seconds=(
+                        elapsed_seconds
+                        + perf_counter()
+                        - started
+                        - callback_seconds
+                    ),
                     requested_checkpoint_tokens=schedule[cursor],
                 )
+                callback_started = perf_counter()
                 on_checkpoint(event, optimizer, first_step)
+                callback_seconds += perf_counter() - callback_started
                 student.eval()
                 for module in train_modules:
                     module.train()
@@ -582,7 +1120,9 @@ def recover_trainable_by_tokens(
     return TokenRecoveryResult(
         tokens_seen=cursor,
         optimizer_updates=updates,
-        elapsed_seconds=elapsed_seconds + perf_counter() - started,
+        elapsed_seconds=(
+            elapsed_seconds + perf_counter() - started - callback_seconds
+        ),
         first_step=first_step,
     )
 

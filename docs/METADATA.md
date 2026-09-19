@@ -116,7 +116,7 @@ and existing result artifacts:
 ```yaml
 sources:
   notebooks:
-    - notebooks/block/operator-distillation.ipynb
+    - notebooks/block/operator/operator-distillation.ipynb
   artifacts:
     - data/results/notebook-block-study/operator-distillation-v4.json
 ```

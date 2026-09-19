@@ -156,7 +156,7 @@ remain fixed during the initial comparison.
 ## Implementation impact
 
 The fixed-epoch and batch-size experiments are implemented in
-`notebooks/block/operator-distillation.ipynb`. Its result artifact now records
+`notebooks/block/operator/operator-distillation.ipynb`. Its result artifact now records
 the epoch limits, batch-size candidates, completed updates, pair presentations,
 and selected-checkpoint metrics.
 

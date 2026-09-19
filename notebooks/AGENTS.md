@@ -24,9 +24,12 @@
 - Implement the minimum code needed for the stated experiment or report.
 - Use the nearest relevant maintained notebook as the primary style and
   structure reference. For model-level reporting and allocation work, prefer
-  `model/swiglu-2.ipynb`; for local-fitting methodology, prefer
-  `block/operator-distillation.ipynb`. Do not use
-  `block/activation-analysis.ipynb` as a style source.
+  `model/swiglu/swiglu-2.ipynb`; for local-fitting methodology, prefer
+  `block/operator/operator-distillation.ipynb`. Do not use
+  `block/analysis/activation-analysis.ipynb` as a style source.
+- Route homogeneous SwiGLU reports to `model/swiglu/`, model baselines to
+  `model/baseline/`, model interaction studies to `model/interaction/`, and
+  block work to `block/{baseline,operator,analysis}/`.
 - Keep the experiment readable in execution order: setup, configuration and
   data, experiment or artifact loading, reporting, then artifact handling.
 - Prefer direct cells, plain dictionaries and DataFrames, and a small local

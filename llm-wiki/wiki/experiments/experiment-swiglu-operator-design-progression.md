@@ -5,7 +5,7 @@ summary: Records an artifact-backed full-depth comparison of generic whole-MLP s
 type: experiment
 status: draft
 created: 2026-08-11
-updated: 2026-08-20
+updated: 2026-09-19
 
 authorship:
   created_by: collaborative
@@ -199,7 +199,7 @@ realized footprint, pre-recovery KL, and post-recovery KL under the same
 protocol. Learned fits report their stopping behavior; closed-form fits report
 their solver and regularization.
 
-Inputs are [`operator.ipynb`](../../../notebooks/block/operator.ipynb),
+Inputs are [`operator.ipynb`](../../../notebooks/block/operator/operator.ipynb),
 [`analysis/sensitivity.py`](../../../src/mlp_replacement/analysis/sensitivity.py),
 and the baseline conventions in
 [[experiment-baseline-operator-analysis]]. The draft baseline runner is not yet

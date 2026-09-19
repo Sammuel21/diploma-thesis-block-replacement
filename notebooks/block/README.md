@@ -3,13 +3,13 @@
 These notebooks contain the maintained block-level characterization and
 operator studies:
 
-- `baseline-testing.ipynb` defines the initial single-block comparison.
-- `baseline-experiments.ipynb` studies calibration, capacity, recovery, and
+- `baseline/baseline-testing.ipynb` defines the initial single-block comparison.
+- `baseline/baseline-experiments.ipynb` studies calibration, capacity, recovery, and
   behavior across blocks.
-- `operator.ipynb` compares replacement-operator classes and block profiles.
-- `operator-distillation.ipynb` studies calibration budgets, fitting choices,
+- `operator/operator.ipynb` compares replacement-operator classes and block profiles.
+- `operator/operator-distillation.ipynb` studies calibration budgets, fitting choices,
   teacher-derived initialization, and reduced-SwiGLU widths.
-- `activation-analysis.ipynb` is retained as an activation-geometry analysis,
+- `analysis/activation-analysis.ipynb` is retained as an activation-geometry analysis,
   but it is excluded from the repository's notebook coding-style reference set.
 
 The notebooks import scientific logic from `src/mlp_replacement/`. They should

@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "workflow": "swiglu-5-confirmation",
+  "experiment_family": "swiglu-5",
+  "experiment_class": "homogeneous-swiglu-global-recovery",
+  "seed": 21,
+  "model": {
+    "model_id": "HuggingFaceTB/SmolLM2-1.7B",
+    "revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "tokenizer_revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "device": "cuda",
+    "dtype": "bfloat16",
+    "trust_remote_code": false,
+    "hidden_size": 2048,
+    "intermediate_size": 8192,
+    "num_layers": 24,
+    "tie_word_embeddings": true
+  },
+  "compatibility": {
+    "search_workflow": "swiglu-5-search",
+    "search_schema_version": 1,
+    "source_workflow": "swiglu-3",
+    "source_schema_version": 1,
+    "allowed_targets": [0.2, 0.5],
+    "sequence_length": 128,
+    "effective_batch_tokens": 2048
+  },
+  "recovery": {
+    "start_tokens": 5000000,
+    "target_tokens": 100000000,
+    "validation_interval_tokens": 5000000,
+    "full_evaluation_tokens": [10000000, 25000000, 50000000, 100000000],
+    "durable_checkpoint_interval_tokens": 5000000,
+    "effective_batch_tokens": 2048,
+    "microbatch_candidates": [
+      {"microbatch_sequences": 2, "gradient_accumulation_steps": 8},
+      {"microbatch_sequences": 4, "gradient_accumulation_steps": 4},
+      {"microbatch_sequences": 8, "gradient_accumulation_steps": 2}
+    ],
+    "maximum_peak_vram_gib": 22.0,
+    "optimizer": "AdamW",
+    "optimizer_backend": "fused",
+    "learning_rate": 0.00003,
+    "weight_decay": 0.0,
+    "temperature": 1.0,
+    "ce_weight": 0.0,
+    "scheduler": "constant",
+    "warmup_fraction": 0.0,
+    "final_lr_ratio": 1.0,
+    "teacher_mode_after_search": "online"
+  },
+  "comparison": {
+    "swiglu_3_equal_token_milestones": [10000000, 100000000],
+    "metrics": [
+      "recovery_validation_kl",
+      "wikitext_validation_loss",
+      "wikitext_validation_perplexity",
+      "optimizer_updates",
+      "elapsed_seconds",
+      "tokens_per_second",
+      "peak_ram_gib",
+      "peak_vram_gib"
+    ]
+  }
+}

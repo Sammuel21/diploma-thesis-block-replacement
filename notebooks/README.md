@@ -45,32 +45,41 @@ This directory studies what happens inside an individual MLP and how candidate
 replacement operators behave. See [`block/README.md`](block/README.md) for the
 current experimental sequence and execution notes.
 
-### [`activation-analysis.ipynb`](block/activation-analysis.ipynb)
+### [`activation-analysis.ipynb`](block/analysis/activation-analysis.ipynb)
 
 Analyzes captured MLP activations, covariance spectra, effective dimensionality,
 and held-out reconstruction behavior. It provides diagnostic evidence about
 activation geometry without replacing model blocks.
 
-### [`baseline-testing.ipynb`](block/baseline-testing.ipynb)
+### [`baseline-testing.ipynb`](block/baseline/baseline-testing.ipynb)
 
 Runs the practical single-block replacement baseline. It compares a SwiGLU
 whose intermediate width is fixed at 50% of the original MLP `d_ff` with the
 original MLP and simple controls, reporting both approximation quality and
 parameter footprint.
 
-### [`degradation-analysis.ipynb`](block/degradation-analysis.ipynb)
+### [`baseline-experiments.ipynb`](block/baseline/baseline-experiments.ipynb)
 
-Studies model-quality degradation after independently fitted dense-linear
-replacements are inserted into selected blocks. It compares BI-based and random
-selection behavior and examines how degradation accumulates across multiple
-replacements.
+Studies calibration, capacity, recovery, and depth effects for isolated
+replacement baselines.
 
-### [`operator.ipynb`](block/operator.ipynb)
+### [`operator.ipynb`](block/operator/operator.ipynb)
 
 A working notebook for operator-level surgery and candidate compression
 strategies. It separates complete MLP replacement from replacement of internal
 SwiGLU components and records possible operator families such as compact MLPs,
 linear structures, hybrids, and low-rank factorizations.
+
+### [`operator-distillation.ipynb`](block/operator/operator-distillation.ipynb)
+
+Studies local fitting budgets and teacher-derived initialization for reduced
+SwiGLU replacements.
+
+## `model/`: integrated model experiments
+
+Model-level notebooks are grouped into `baseline/`, `interaction/`, and
+`swiglu/`. The homogeneous SwiGLU progression, including the load-only
+SwiGLU-5 report, lives under [`model/swiglu/`](model/swiglu/).
 
 ## `mvp/`: frozen historical prototype
 
@@ -100,16 +109,16 @@ implementation is retained for provenance rather than future extension.
 Loads and summarizes historical MVP runs, including fixed and search
 experiments and BI-related observations under the earlier compute budget.
 
-## Root-level notebooks
+## Historical notebooks
 
-### [`data-load.ipynb`](data-load.ipynb)
+### [`data-load.ipynb`](old/data-load.ipynb)
 
 Documents the early data-loading and conversion path from the provided sampling
 utilities into calibration and validation batches expected by the model
 pipeline. Confirm that its data assumptions still match the active experiment
 before reuse.
 
-### [`block-replacement.ipynb`](block-replacement.ipynb)
+### [`block-replacement.ipynb`](old/block-replacement.ipynb)
 
 Currently an empty placeholder. It does not define an active experiment or
 workflow; use the notebooks under `analyses/` and `block/` instead.

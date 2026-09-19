@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "workflow": "swiglu-5-search",
+  "experiment_family": "swiglu-5",
+  "experiment_class": "homogeneous-swiglu-global-recovery",
+  "seed": 21,
+  "references": {
+    "swiglu_3_artifact": "data/results/workflows/model/swiglu-3/run-001.json",
+    "required_schema_version": 1,
+    "selected_calibration_pairs": 393216,
+    "selected_allocation_policy": "singleton_kl_w25_t1"
+  },
+  "model": {
+    "model_id": "HuggingFaceTB/SmolLM2-1.7B",
+    "revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "tokenizer_revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "device": "cuda",
+    "dtype": "bfloat16",
+    "trust_remote_code": false,
+    "hidden_size": 2048,
+    "intermediate_size": 8192,
+    "num_layers": 24,
+    "tie_word_embeddings": true
+  },
+  "compatibility": {
+    "eligible_layers": [
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+      12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22
+    ],
+    "protected_layers": [0, 23],
+    "target_mlp_removals": [0.2, 0.5],
+    "sequence_length": 128,
+    "effective_batch_tokens": 2048,
+    "packed_token_count": 100000000,
+    "packed_token_fingerprint": "4290c435bf4254c1c2aa6e7cd5927e5d176aa46685e4b6369e6ef92c7fc94006",
+    "local_source": {
+      "path": "allenai/c4",
+      "name": null,
+      "split": "train",
+      "text_column": "text",
+      "revision": null,
+      "data_file": "en/c4-train.00000-of-01024.json.gz",
+      "streaming": false
+    },
+    "recovery_source": {
+      "path": "allenai/c4",
+      "name": null,
+      "split": "train",
+      "text_column": "text",
+      "revision": null,
+      "data_file": "en/c4-train.00001-of-01024.json.gz",
+      "streaming": true
+    },
+    "model_validation_source": {
+      "path": "Salesforce/wikitext",
+      "name": "wikitext-2-raw-v1",
+      "split": "validation",
+      "text_column": "text",
+      "revision": null,
+      "data_file": null,
+      "streaming": false
+    },
+    "recovery_validation_batches": 24,
+    "allocation_selection_batches": 12,
+    "model_validation_batches": 24,
+    "evaluation_temperature": 1.0,
+    "forward_autocast_dtype": "bfloat16",
+    "trainable_parameter_dtype": "float32",
+    "optimizer_state_dtype": "float32"
+  },
+  "local_fitting": {
+    "parameter_dtype": "float32",
+    "optimizer": "AdamW",
+    "learning_rate": 0.001,
+    "batch_size": 2048,
+    "weight_decay": 0.0,
+    "max_epochs": 64,
+    "early_stopping_patience": 3,
+    "early_stopping_min_delta": 0.0,
+    "scheduler": "constant",
+    "capture_group_size": 6
+  },
+  "allocation": {
+    "width_ratios": [0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0],
+    "selection_metric": "singleton_fixed_teacher_kl_t1",
+    "allow_dense_layers": true,
+    "boundary_width_policy": "best_interpolated_marginal_gain"
+  },
+  "teacher_hidden_cache": {
+    "target_tokens": 5001216,
+    "shard_tokens": 65536,
+    "capture_batch_sequences": 16,
+    "dtype": "bfloat16",
+    "minimum_free_gib": 25.0,
+    "validation_sample_offsets": [0, 2499584, 4999168],
+    "maximum_mean_kl": 0.00001
+  },
+  "storage_preflight": {
+    "reserve_fraction": 0.15
+  },
+  "recovery": {
+    "qualifier_tokens": 2000000,
+    "finalist_tokens": 5000000,
+    "validation_interval_tokens": 1000000,
+    "full_evaluation_tokens": [0, 2000000, 5000000],
+    "durable_checkpoint_tokens": [2000000, 4000000, 5000000],
+    "effective_batch_tokens": 2048,
+    "profile_optimizer_updates": 16,
+    "microbatch_candidates": [
+      {"microbatch_sequences": 4, "gradient_accumulation_steps": 4},
+      {"microbatch_sequences": 8, "gradient_accumulation_steps": 2},
+      {"microbatch_sequences": 16, "gradient_accumulation_steps": 1}
+    ],
+    "maximum_peak_vram_gib": 22.0,
+    "optimizer": "AdamW",
+    "optimizer_backend": "fused",
+    "learning_rate": 0.00003,
+    "weight_decay": 0.0,
+    "temperature": 1.0,
+    "ce_weight": 0.0,
+    "scheduler": "constant",
+    "warmup_fraction": 0.0,
+    "final_lr_ratio": 1.0,
+    "compile_mode": "auto_reduce_overhead",
+    "compile_minimum_speedup": 0.1,
+    "compile_maximum_loss_difference": 0.0001
+  },
+  "selection": {
+    "challenger_finalists": 2,
+    "primary_metric": "recovery_validation_kl_t1",
+    "ppl_guardrail": "not_worse_than_s5_c0",
+    "kl_tie_tolerance": 0.000001,
+    "tie_breakers": ["wikitext_validation_perplexity", "candidate_id"]
+  },
+  "runtime_guard": {
+    "maximum_projected_seconds": 21600,
+    "reserve_fraction": 0.15,
+    "on_exceed": "budget_guard_rejected"
+  }
+}

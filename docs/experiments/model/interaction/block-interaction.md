@@ -2,10 +2,10 @@
 metadata_version: 1
 title: Block Interaction Analysis
 type: experiment-workflow
-category: experiments/model
+category: experiments/model/interaction
 status: active
 created: 2026-09-18
-modified: 2026-09-18
+modified: 2026-09-19
 authorship:
   created_by: collaborative
 curation:
@@ -14,14 +14,14 @@ curation:
   reviewed_on: null
 sources:
   notebooks:
-    - notebooks/model/block-interaction.ipynb
+    - notebooks/model/interaction/block-interaction.ipynb
   artifacts:
     - data/results/notebook-model-study/block-interaction.json
 ---
 
 # Block Interaction Analysis
 
-Notebook: [block-interaction.ipynb](../../../notebooks/model/block-interaction.ipynb)
+Notebook: [block-interaction.ipynb](../../../../notebooks/model/interaction/block-interaction.ipynb)
 
 Status: executed as a notebook. Its schema-2 JSON artifact is present. This
 study has no headless Python runner.

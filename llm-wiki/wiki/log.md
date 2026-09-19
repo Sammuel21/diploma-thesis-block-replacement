@@ -742,3 +742,14 @@ This file is append-only. Entries use the format:
   recommendations.
 - Made GPT-5.6 Sol the high-risk delegated model while reserving Astra for
   manual selection by the researcher as the primary session model.
+
+## [2026-09-19] update | Group maintained experiments by class
+
+- Moved maintained model notebooks, workflow runners, configurations, and
+  human experiment documents into baseline, interaction, and homogeneous
+  SwiGLU class directories without moving historical result artifacts.
+- Moved block notebooks and documents into analysis, baseline, and operator
+  class directories while preserving notebook content, outputs, metadata, and
+  stable wiki page IDs.
+- Updated maintained repository links and agent routing to the new canonical
+  paths. No scientific wiki claim or verification status was changed.

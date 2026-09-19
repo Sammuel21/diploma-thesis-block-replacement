@@ -5,7 +5,7 @@ type: index
 category: experiments/model
 status: active
 created: 2026-09-10
-modified: 2026-09-18
+modified: 2026-09-19
 authorship:
   created_by: collaborative
 curation:
@@ -27,12 +27,9 @@ and interpretation of each pipeline.
 
 | Workflow | Main question | Status |
 | --- | --- | --- |
-| [Compression baseline](compression-baseline.md) | Do the improved calibration and initialization methods help under a simple fixed replacement pattern? | Notebook artifacts present; Python runner not yet executed |
-| [SwiGLU compression](swiglu.md) | Does nonuniform block-width allocation improve a fixed model-wide compression budget? | Notebook artifacts present; Python runner not yet executed |
-| [Block interaction](block-interaction.md) | How do locally fitted replacements interact across adjacent windows and block pairs? | Notebook artifact present; no Python runner |
-| [SwiGLU allocation study](swiglu-2.md) | Which block score and allocation temperature should determine the nonuniform widths? | Notebook artifact present; Python runner implemented |
-| [SwiGLU calibration and recovery](swiglu-3.md) | How much calibration data is useful, and how do fixed allocations recover over 100M tokens? | Completed Python-runner artifact present |
-| [SwiGLU global recovery](swiglu-4.md) | Which optimizer, objective, and trainable scope recover the fixed 50% SwiGLU model most effectively by 10M tokens? | Python runner and reporting notebook implemented; not yet GPU-validated |
+| [Compression baseline](baseline/compression-baseline.md) | Do the improved calibration and initialization methods help under a simple fixed replacement pattern? | Notebook artifacts present; Python runner not yet executed |
+| [Block interaction](interaction/block-interaction.md) | How do locally fitted replacements interact across adjacent windows and block pairs? | Notebook artifact present; no Python runner |
+| [SwiGLU progression](swiglu/README.md) | How do allocation, calibration, and recovery improve homogeneous reduced-width SwiGLU replacement? | SwiGLU-3 and SwiGLU-4 completed; SwiGLU-5 search implemented but unexecuted |
 
 Reusable definitions belong under [methodology](../../methodology/). Results
 and run metadata belong in JSON artifacts. The Python migrations require an

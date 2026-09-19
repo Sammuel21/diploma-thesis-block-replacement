@@ -25,12 +25,12 @@ researcher's request because that notebook is not a style reference.
 
 The strongest current references are:
 
-- `model/swiglu-2.ipynb` for model-level experiment sequencing, reporting, and
+- `model/swiglu/swiglu-2.ipynb` for model-level experiment sequencing, reporting, and
   artifact construction;
-- `block/operator-distillation.ipynb` for local-fitting studies and compact
+- `block/operator/operator-distillation.ipynb` for local-fitting studies and compact
   transition cells;
-- `model/swiglu-3.ipynb` for a load-only reporting notebook; and
-- `model/block-interaction.ipynb` for model-level interaction analysis.
+- `model/swiglu/swiglu-3.ipynb` for a load-only reporting notebook; and
+- `model/interaction/block-interaction.ipynb` for model-level interaction analysis.
 
 Across the eligible corpus, notebooks use direct sequential cells, a small
 number of local functions, no notebook-defined framework classes, visible

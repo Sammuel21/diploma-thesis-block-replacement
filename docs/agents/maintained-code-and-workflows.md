@@ -46,6 +46,13 @@ and budgets in `workflows/configs/`, and executor-specific resource requests
 and process launching in `workflows/jobs/`. Scheduler files must not implement
 selection, fitting, recovery, or evaluation logic.
 
+Within maintained experiments, group by scientific class. The homogeneous
+SwiGLU progression belongs under `model/swiglu/`; model baselines and
+interaction studies belong under `model/baseline/` and `model/interaction/`;
+block studies use `block/baseline/`, `block/operator/`, and `block/analysis/`.
+Reusable allocation and recovery behavior remains package code even when only
+SwiGLU-5 currently consumes it.
+
 Reuse an existing abstraction when it expresses the required domain operation.
 Add a shared helper when multiple callers need it or when the operation deserves
 a stable scientific name. Do not add a generic framework, registry, result
@@ -116,9 +123,9 @@ The SwiGLU-3 workflow is the current reference for this boundary:
 Do not copy this checkpoint machinery into a short workflow. Its complexity is
 justified by recovery runs whose loss would be material.
 
-Smoke configuration is a reduced integration check. Keep it explicit and
-separate from scientific defaults, label its outputs, and never interpret smoke
-metrics as thesis results.
+Do not add or run reduced-budget smoke workflows unless the researcher asks for
+one in the current task. When explicitly requested, keep them separate from
+scientific defaults and never interpret their metrics as thesis results.
 
 ## Verification
 
@@ -128,8 +135,9 @@ Verification follows the change's failure cost and scientific reach:
   imports and paths, and exercise the focused transformation when cheap;
 - reusable scientific behavior: add or run a focused test when it checks a
   stable or risky invariant rather than mirroring implementation;
-- workflow integration: use the existing smoke path to check stage order,
-  artifact creation, and failure handling;
+- workflow integration: inspect stage order, artifact creation, and failure
+  handling, then use the intended scientific run unless a smoke path was
+  explicitly requested;
 - checkpoint or resume behavior: check fingerprints, state restoration,
   atomic commits, and continuation from a small interrupted run; and
 - full scientific equivalence: compare inputs, operations, metrics, and

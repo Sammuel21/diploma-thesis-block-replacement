@@ -23,7 +23,7 @@ from workflows.runs.model._common import (
     release_cuda,
     resolve_path,
 )
-from workflows.runs.model.swiglu_3 import (
+from workflows.runs.model.swiglu._shared import (
     atomic_json,
     atomic_torch_save,
     build_local_data,
@@ -60,7 +60,7 @@ from mlp_replacement.runlog import environment_record
 WORKFLOW = "swiglu-4"
 ARTIFACT_SCHEMA = 1
 SOURCE_SCHEMA = 1
-DEFAULT_CONFIG = Path("workflows/configs/model/swiglu-4.json")
+DEFAULT_CONFIG = Path("workflows/configs/model/swiglu/recovery-analysis.json")
 
 
 def utc_now():

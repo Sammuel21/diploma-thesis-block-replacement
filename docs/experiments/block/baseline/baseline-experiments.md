@@ -2,10 +2,10 @@
 metadata_version: 1
 title: Baseline Experiments Workflow
 type: experiment-workflow
-category: experiments/block
+category: experiments/block/baseline
 status: active
 created: 2026-09-11
-modified: 2026-09-11
+modified: 2026-09-19
 authorship:
   created_by: collaborative
 curation:
@@ -14,14 +14,14 @@ curation:
   reviewed_on: null
 sources:
   notebooks:
-    - notebooks/block/baseline-experiments.ipynb
+    - notebooks/block/baseline/baseline-experiments.ipynb
   artifacts:
     - data/results/notebook-block-study/baseline-experiments.json
 ---
 
 # Baseline Experiments Workflow
 
-Notebook: [baseline-experiments.ipynb](../../../notebooks/block/baseline-experiments.ipynb)
+Notebook: [baseline-experiments.ipynb](../../../../notebooks/block/baseline/baseline-experiments.ipynb)
 
 Status: an executed historical artifact is present, but it predates the current
 notebook artifact schema.
@@ -135,7 +135,7 @@ The notebook reports:
 - local NMSE against KL and the global-to-local ratio across depth.
 
 The available
-[baseline-experiments.json](../../../data/results/notebook-block-study/baseline-experiments.json)
+[baseline-experiments.json](../../../../data/results/notebook-block-study/baseline-experiments.json)
 is schema version 2. It stores the dense baseline, calibration scaling, width
 scaling, width recovery, and 110-row full-depth KL analyses.
 
@@ -144,7 +144,7 @@ scaling, width recovery, and 110-row full-depth KL analyses.
 The artifact records the historical 48-batch, random-initialization method. It
 is useful for exploratory comparisons but is not the optimized 384-batch,
 teacher-initialized operator recipe established later in
-[operator distillation](operator-distillation.md).
+[operator distillation](../operator/operator-distillation.md).
 
 There is also a concrete schema mismatch. The current notebook constructs a
 schema-3 artifact containing `calibration_recovery`, while the available

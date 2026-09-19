@@ -2,10 +2,10 @@
 metadata_version: 1
 title: Single-Block Replacement Baseline Workflow
 type: experiment-workflow
-category: experiments/block
+category: experiments/block/baseline
 status: draft
 created: 2026-09-11
-modified: 2026-09-11
+modified: 2026-09-19
 authorship:
   created_by: collaborative
 curation:
@@ -14,14 +14,14 @@ curation:
   reviewed_on: null
 sources:
   notebooks:
-    - notebooks/block/baseline-testing.ipynb
+    - notebooks/block/baseline/baseline-testing.ipynb
   artifacts:
     - data/results/notebook-block-study/baselines-layer-11.json
 ---
 
 # Single-Block Replacement Baseline Workflow
 
-Notebook: [baseline-testing.ipynb](../../../notebooks/block/baseline-testing.ipynb)
+Notebook: [baseline-testing.ipynb](../../../../notebooks/block/baseline/baseline-testing.ipynb)
 
 Status: the saved artifact is explicitly marked `exploratory-unverified`.
 
@@ -86,7 +86,7 @@ The notebook reports:
 - the narrow-SwiGLU training and validation history.
 
 Results are stored in
-[baselines-layer-11.json](../../../data/results/notebook-block-study/baselines-layer-11.json),
+[baselines-layer-11.json](../../../../data/results/notebook-block-study/baselines-layer-11.json),
 schema version 2. The artifact contains six result rows and records the model
 revision, data configuration, environment, candidate definitions, and training
 history.

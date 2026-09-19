@@ -1,4 +1,4 @@
-"""Headless migration of ``notebooks/model/compression-baseline.ipynb``."""
+"""Headless migration of ``notebooks/model/baseline/compression-baseline.ipynb``."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ SCHEMA_OPTIMIZED = 2
 DEFAULT_HISTORICAL_REFERENCE = Path(
     "data/results/model-compression-baselines/compression-baseline.json"
 )
-DEFAULT_CONFIG = Path("workflows/configs/model/compression-baseline.json")
+DEFAULT_CONFIG = Path("workflows/configs/model/baseline/compression.json")
 
 
 def parse_args() -> argparse.Namespace:

@@ -28,13 +28,13 @@ WORKFLOW_NAME="$1"
 shift
 case "$WORKFLOW_NAME" in
     compression-baseline)
-        WORKFLOW_MODULE="workflows.runs.model.compression_baseline"
+        WORKFLOW_MODULE="workflows.runs.model.baseline.compression"
         ;;
     swiglu)
-        WORKFLOW_MODULE="workflows.runs.model.swiglu"
+        WORKFLOW_MODULE="workflows.runs.model.swiglu.initial"
         ;;
     swiglu-2)
-        WORKFLOW_MODULE="workflows.runs.model.swiglu_2"
+        WORKFLOW_MODULE="workflows.runs.model.swiglu.allocation"
         ;;
     *)
         echo "Unsupported model workflow: $WORKFLOW_NAME" >&2

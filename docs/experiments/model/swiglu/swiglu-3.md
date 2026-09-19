@@ -2,10 +2,10 @@
 metadata_version: 1
 title: SwiGLU Calibration and Token-Budget Recovery Study
 type: experiment-workflow
-category: experiments/model
+category: experiments/model/swiglu
 status: draft
 created: 2026-09-15
-modified: 2026-09-18
+modified: 2026-09-19
 authorship:
   created_by: collaborative
 curation:
@@ -14,10 +14,10 @@ curation:
   reviewed_on: null
 sources:
   notebooks:
-    - notebooks/model/swiglu-3.ipynb
+    - notebooks/model/swiglu/swiglu-3.ipynb
   artifacts:
     - data/results/notebook-model-study/swiglu-2.json
-    - data/results/workflows/models/swiglu-3/run-001.json
+    - data/results/workflows/model/swiglu-3/run-001.json
   reference_artifacts:
     - data/results/notebook-model-study/swiglu-compression-optimized.json
 ---
@@ -151,8 +151,8 @@ fingerprint. Milestone checkpoints contain reconstructable replacement states.
 
 ## Artifacts and execution
 
-The runner is `workflows.runs.model.swiglu_3`, configured by
-`workflows/configs/model/swiglu-3.json`. It writes a unique incremental science
+The runner is `workflows.runs.model.swiglu.calibration_recovery`, configured by
+`workflows/configs/model/swiglu/calibration-recovery.json`. It writes a unique incremental science
 JSON, a sibling `.run.json`, an asset directory with local operator states, the
 packed-token cache, current/best recovery state, and retained 10M and 100M
 milestone states.
@@ -165,7 +165,7 @@ From the repository root on a prepared Linux GPU host:
 ```bash
 export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 mkdir -p data/results/workflows/model/swiglu-3
-nohup python -u -m workflows.runs.model.swiglu_3 \
+nohup python -u -m workflows.runs.model.swiglu.calibration_recovery \
   --output data/results/workflows/model/swiglu-3/run-001.json \
   > data/results/workflows/model/swiglu-3/run-001.log 2>&1 &
 ```
@@ -173,7 +173,7 @@ nohup python -u -m workflows.runs.model.swiglu_3 \
 After an interruption, use the same output explicitly:
 
 ```bash
-python -u -m workflows.runs.model.swiglu_3 \
+python -u -m workflows.runs.model.swiglu.calibration_recovery \
   --output data/results/workflows/model/swiglu-3/run-001.json --resume
 ```
 

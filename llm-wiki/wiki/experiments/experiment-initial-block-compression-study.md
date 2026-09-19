@@ -5,7 +5,7 @@ summary: Defines the working activation, practical single-block replacement, and
 type: experiment
 status: draft
 created: 2026-07-27
-updated: 2026-08-28
+updated: 2026-09-19
 
 authorship:
   created_by: collaborative
@@ -98,10 +98,10 @@ are owned by the two downstream experiment pages.
 
 Primary inputs are:
 
-- [`activation-analysis.ipynb`](../../../notebooks/block/activation-analysis.ipynb)
-- [`baseline-testing.ipynb`](../../../notebooks/block/baseline-testing.ipynb)
-- [`block-interaction.ipynb`](../../../notebooks/model/block-interaction.ipynb)
-- [`operator.ipynb`](../../../notebooks/block/operator.ipynb)
+- [`activation-analysis.ipynb`](../../../notebooks/block/analysis/activation-analysis.ipynb)
+- [`baseline-testing.ipynb`](../../../notebooks/block/baseline/baseline-testing.ipynb)
+- [`block-interaction.ipynb`](../../../notebooks/model/interaction/block-interaction.ipynb)
+- [`operator.ipynb`](../../../notebooks/block/operator/operator.ipynb)
 - [`src/mlp_replacement/`](../../../src/mlp_replacement/)
 
 Results are written under `data/results/notebook-block-study/`; raw activation

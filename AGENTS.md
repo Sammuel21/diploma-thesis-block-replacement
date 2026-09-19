@@ -35,6 +35,10 @@
   MVP implementation paths, not the target production architecture.
 - `src/` contains maintained reusable implementation; `workflows/` contains
   maintained process entry points and executor-specific job definitions.
+- Maintained experiments are grouped by class: `model/swiglu/` owns the
+  homogeneous SwiGLU progression (including SwiGLU-5), `model/baseline/` owns
+  model baselines, `model/interaction/` owns block-interaction studies, and
+  `block/{baseline,operator,analysis}/` own the corresponding block studies.
 
 ## Instruction routing
 - For work under `notebooks/`, read and follow `notebooks/AGENTS.md` and the
@@ -49,6 +53,9 @@
   needed for the requested operation.
 - Treat scoped instructions as additions to these global approval and quality
   rules, not permission to bypass them.
+- Route reusable recovery and allocation behavior to `src/mlp_replacement/`;
+  keep SwiGLU-5 orchestration and source-artifact adaptation in
+  `workflows/runs/model/swiglu/`.
 - Keep this root file as a navigation and governance map; detailed wiki rules
   belong in `llm-wiki/SCHEMA.md`.
 

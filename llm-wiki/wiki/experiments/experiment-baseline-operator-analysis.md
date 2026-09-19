@@ -5,7 +5,7 @@ summary: Records the artifact-backed calibration, capacity, recovery, and isolat
 type: experiment
 status: draft
 created: 2026-08-18
-updated: 2026-08-20
+updated: 2026-09-19
 
 authorship:
   created_by: collaborative
@@ -185,8 +185,8 @@ is not a universal block-importance or intrinsic-linearity score.
 
 ## Inputs, Artifacts, and Reproducibility
 
-- [`baseline-experiments.ipynb`](../../../notebooks/block/baseline-experiments.ipynb)
-- [`baseline-testing.ipynb`](../../../notebooks/block/baseline-testing.ipynb)
+- [`baseline-experiments.ipynb`](../../../notebooks/block/baseline/baseline-experiments.ipynb)
+- [`baseline-testing.ipynb`](../../../notebooks/block/baseline/baseline-testing.ipynb)
 - [`src/mlp_replacement/operators/baselines.py`](../../../src/mlp_replacement/operators/baselines.py)
 - [`src/mlp_replacement/compression/recovery.py`](../../../src/mlp_replacement/compression/recovery.py)
 - [`baseline-experiments.json`](../../../data/results/notebook-block-study/baseline-experiments.json)

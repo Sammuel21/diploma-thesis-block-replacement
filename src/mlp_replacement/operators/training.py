@@ -1,12 +1,13 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from time import perf_counter
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from ..evaluation.operator import module_dtype
+from ..evaluation.operator import evaluate_operator, module_dtype
 from .modules import (
+    GatedMLPReplacement,
     LinearReplacement,
     initialize_gated_mlp_from_teacher,
     make_replacement_operator,
@@ -57,6 +58,161 @@ class DetailedOperatorFitResult:
     best_epoch: int
     best_validation_mse: float
     updates: int
+
+
+@dataclass(frozen=True)
+class GatedReconstructionResult:
+    """Return both phases of output-aware SwiGLU reconstruction."""
+
+    module: GatedMLPReplacement
+    down_only_fit: DetailedOperatorFitResult
+    full_fit: DetailedOperatorFitResult
+    neuron_indices: tuple[int, ...]
+    initial_mean_residual: tuple[float, ...]
+    down_only_validation_mse: float
+    down_only_validation_nmse: float
+    down_only_validation_cosine: float
+
+
+def initialize_gated_mlp_with_output_reconstruction(
+    student,
+    teacher,
+    calibration_pairs,
+    neuron_indices,
+    down_only_config,
+):
+    """Warm-start a reduced SwiGLU by reconstructing its dense output.
+
+    The supplied configuration is the established full local-fitting contract.
+    The reconstruction phase derives an eight-epoch, patience-two variant,
+    optimizes only the selected down projection and its residual-mean bias, and
+    then performs the complete fit from that validation-best state.
+    """
+
+    if isinstance(calibration_pairs, (tuple, list)):
+        if len(calibration_pairs) != 2:
+            raise ValueError(
+                "Calibration pairs must be one pair set or (training, validation)"
+            )
+        training_pairs, validation_pairs = calibration_pairs
+    else:
+        training_pairs = validation_pairs = calibration_pairs
+    if not isinstance(student, GatedMLPReplacement):
+        raise TypeError("student must be a GatedMLPReplacement")
+    if student.down_projection.bias is None:
+        raise ValueError("Output-aware reconstruction requires a down bias")
+    indices = torch.as_tensor(
+        neuron_indices,
+        dtype=torch.long,
+        device=teacher.gate_proj.weight.device,
+    )
+    if indices.ndim != 1 or indices.numel() != student.bottleneck_size:
+        raise ValueError("neuron_indices must match the replacement width")
+    if torch.unique(indices).numel() != indices.numel():
+        raise ValueError("neuron_indices must be unique")
+
+    with torch.no_grad():
+        student.gate_projection.weight.copy_(
+            teacher.gate_proj.weight.index_select(0, indices).to(
+                student.gate_projection.weight
+            )
+        )
+        student.up_projection.weight.copy_(
+            teacher.up_proj.weight.index_select(0, indices).to(
+                student.up_projection.weight
+            )
+        )
+        student.down_projection.weight.copy_(
+            teacher.down_proj.weight.index_select(1, indices).to(
+                student.down_projection.weight
+            )
+        )
+        if student.gate_projection.bias is not None:
+            student.gate_projection.bias.zero_()
+        if student.up_projection.bias is not None:
+            student.up_projection.bias.zero_()
+        student.down_projection.bias.zero_()
+
+    calculation_device = torch.device(
+        next(student.parameters()).device
+    )
+    batch_size = int(down_only_config.batch_size)
+    residual_sum = torch.zeros(
+        training_pairs.hidden_size,
+        dtype=torch.float64,
+    )
+    token_count = 0
+    student.eval()
+    with torch.no_grad():
+        for start in range(0, training_pairs.num_tokens, batch_size):
+            inputs = training_pairs.inputs[start : start + batch_size].to(
+                device=calculation_device,
+                dtype=torch.float32,
+            )
+            targets = training_pairs.targets[start : start + batch_size].to(
+                device=calculation_device,
+                dtype=torch.float32,
+            )
+            residual_sum += (
+                targets - student(inputs)
+            ).sum(dim=0).detach().cpu().double()
+            token_count += inputs.shape[0]
+    if token_count == 0:
+        raise ValueError("Output reconstruction received no calibration pairs")
+    mean_residual = (residual_sum / token_count).float()
+    with torch.no_grad():
+        student.down_projection.bias.copy_(
+            mean_residual.to(student.down_projection.bias)
+        )
+
+    for parameter in student.parameters():
+        parameter.requires_grad = False
+    student.down_projection.weight.requires_grad = True
+    student.down_projection.bias.requires_grad = True
+    warmup_config = replace(
+        down_only_config,
+        epochs=min(8, int(down_only_config.epochs)),
+        early_stopping_patience=(
+            2
+            if down_only_config.early_stopping_patience is None
+            else min(2, int(down_only_config.early_stopping_patience))
+        ),
+    )
+    down_only_fit = fit_operator_fp32_detailed(
+        student,
+        training_pairs,
+        validation_pairs,
+        warmup_config,
+        calculation_device,
+    )
+    down_only_validation = evaluate_operator(
+        student,
+        validation_pairs,
+        calculation_device,
+        down_only_config.batch_size,
+    )
+
+    for parameter in student.parameters():
+        parameter.requires_grad = True
+    full_fit = fit_operator_fp32_detailed(
+        student,
+        training_pairs,
+        validation_pairs,
+        down_only_config,
+        calculation_device,
+    )
+    return GatedReconstructionResult(
+        module=full_fit.module,
+        down_only_fit=down_only_fit,
+        full_fit=full_fit,
+        neuron_indices=tuple(int(index) for index in indices.detach().cpu()),
+        initial_mean_residual=tuple(float(value) for value in mean_residual),
+        down_only_validation_mse=float(down_only_validation.mse),
+        down_only_validation_nmse=float(down_only_validation.relative_mse),
+        down_only_validation_cosine=float(
+            down_only_validation.cosine_similarity
+        ),
+    )
 
 
 def evaluate_operator_mse(module, pairs, device, batch_size):

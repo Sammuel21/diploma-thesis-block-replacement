@@ -2,10 +2,10 @@
 metadata_version: 1
 title: SwiGLU Global-Recovery Analysis
 type: experiment-workflow
-category: experiments/model
+category: experiments/model/swiglu
 status: draft
 created: 2026-09-18
-modified: 2026-09-18
+modified: 2026-09-19
 authorship:
   created_by: collaborative
 curation:
@@ -14,13 +14,15 @@ curation:
   reviewed_on: null
 sources:
   reference_artifacts:
-    - data/results/workflows/models/swiglu-3/run-001.json
+    - data/results/workflows/model/swiglu-3/run-001.json
+  artifacts:
+    - data/results/workflows/model/swiglu-4/run-001.json
 ---
 
 # SwiGLU Global-Recovery Analysis
 
-Status: implemented as a headless workflow and load-only reporting notebook;
-not yet executed or GPU-validated.
+Status: completed on darthmachinus. The schema-1 artifact and populated
+load-only reporting notebook are present.
 
 ## Purpose and fixed starting state
 
@@ -217,8 +219,8 @@ LoRA scopes. The maximum planned training is about 76M token positions: up to
 
 ## Artifact and interruption behavior
 
-The runner is `workflows.runs.model.swiglu_4`, configured by
-`workflows/configs/model/swiglu-4.json`. Its persistent scientific products are
+The runner is `workflows.runs.model.swiglu.recovery_analysis`, configured by
+`workflows/configs/model/swiglu/recovery-analysis.json`. Its persistent scientific products are
 the main JSON and sibling `.run.json`; the shell log remains the external nohup
 log. The main JSON contains all histories, milestones, trainable parameter
 counts, target paths, memory measurements, runtime, source fingerprints,
@@ -236,7 +238,7 @@ From the repository root on darthmachinus:
 ```bash
 export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 mkdir -p data/results/workflows/model/swiglu-4
-nohup python -u -m workflows.runs.model.swiglu_4 \
+nohup python -u -m workflows.runs.model.swiglu.recovery_analysis \
   --source data/results/workflows/model/swiglu-3/run-001.json \
   --output data/results/workflows/model/swiglu-4/run-001.json \
   > data/results/workflows/model/swiglu-4/run-001.log 2>&1 &
@@ -245,7 +247,7 @@ nohup python -u -m workflows.runs.model.swiglu_4 \
 Resume an interrupted run with the same source and output:
 
 ```bash
-python -u -m workflows.runs.model.swiglu_4 \
+python -u -m workflows.runs.model.swiglu.recovery_analysis \
   --source data/results/workflows/model/swiglu-3/run-001.json \
   --output data/results/workflows/model/swiglu-4/run-001.json \
   --resume
@@ -257,14 +259,19 @@ checkpointing, and artifact construction.
 
 ## Notebook view and validation boundary
 
-`notebooks/model/swiglu-4.ipynb` is a load-only view. It discovers or accepts a
+`notebooks/model/swiglu/swiglu-4.ipynb` is a load-only view. It discovers or accepts a
 completed artifact and reconstructs the configuration, RMSNorm, LoRA, and final
 comparison tables and charts without loading a model or dataset. This keeps the
 headless job and notebook logically equivalent while avoiding accidental
 retraining in an interactive session.
 
-This implementation has not been compiled in the project environment, smoke
-run on a GPU, or measured on darthmachinus. The source asset paths in the local
-checkout are not present with the pulled JSON artifact. A GPU smoke run is
-required before using the estimated full runtime or interpreting scientific
-results.
+The completed run reproduced the published SwiGLU-3 10M row exactly in `C0`.
+The constant-`3e-5`, pure-T=1 replacement-only configuration `C1` improved
+fixed validation KL from 0.286172 to 0.266991 and WikiText perplexity from
+24.6861 to 24.0373. RMSNorm changed the result only slightly (`R1`: KL
+0.266596, PPL 24.0115). Replacement-only LoRA was substantially worse (`L1`:
+KL 0.309782, PPL 25.5665), while transformer-assisted LoRA was the best listed
+10M result (`L2`: KL 0.265047, PPL 23.9864) but trained 560,922,624 parameters
+and took 6,076 seconds. These results motivate SwiGLU-5's use of the `C1`
+recovery configuration and its exclusion of RMSNorm and LoRA from the bounded
+search matrix.
