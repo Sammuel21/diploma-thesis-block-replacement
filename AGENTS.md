@@ -25,6 +25,10 @@
 - If confidence is low, say so directly.
 - Preserve unrelated user changes and historical artifacts.
 - Distinguish observed repository state from interpretation or recommendation.
+- Do not prefix project-authored modules, functions, classes, variables,
+  parameters, or aliases with a single underscore merely to mark them private
+  or unused. Use descriptive unprefixed names. Python-required double-underscore
+  names and externally defined attributes are exempt.
 
 ## Repository map
 - `docs/annotation.md` defines the baseline thesis scope.

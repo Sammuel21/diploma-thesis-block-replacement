@@ -12,13 +12,13 @@ class TokenSequenceDataset(Dataset):
     """Expose fixed-length token sequences in the format expected by the model."""
 
     def __init__(self, sequences):
-        self._sequences = tuple(sequence.detach().clone().long() for sequence in sequences)
+        self.sequences = tuple(sequence.detach().clone().long() for sequence in sequences)
 
     def __len__(self):
-        return len(self._sequences)
+        return len(self.sequences)
 
     def __getitem__(self, index):
-        input_ids = self._sequences[index]
+        input_ids = self.sequences[index]
         return {
             "input_ids": input_ids,
             "attention_mask": torch.ones_like(input_ids),

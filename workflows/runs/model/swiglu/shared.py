@@ -12,7 +12,7 @@ from pathlib import Path, PurePosixPath
 import torch
 import torch.nn.functional as F
 
-from workflows.runs.model._common import resolve_path
+from workflows.runs.model.common import resolve_path
 
 from mlp_replacement.config import DatasetSpec, ModelConfig
 from mlp_replacement.data import (

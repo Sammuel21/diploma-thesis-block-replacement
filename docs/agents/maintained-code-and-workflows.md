@@ -5,7 +5,7 @@ type: architecture
 category: agents/code-and-workflows
 status: active
 created: 2026-09-18
-modified: 2026-09-18
+modified: 2026-09-20
 authorship:
   created_by: collaborative
 curation:
@@ -57,6 +57,12 @@ Reuse an existing abstraction when it expresses the required domain operation.
 Add a shared helper when multiple callers need it or when the operation deserves
 a stable scientific name. Do not add a generic framework, registry, result
 hierarchy, or duplicate configuration type for one current workflow.
+
+Use descriptive unprefixed names for project-authored modules, functions,
+classes, variables, parameters, and aliases. Do not add a single leading
+underscore merely to signal internal scope or an intentionally unused value.
+Python-required double-underscore names and attributes defined by external
+libraries are exempt.
 
 ## Scientific contract
 

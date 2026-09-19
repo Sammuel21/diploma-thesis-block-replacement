@@ -27,7 +27,7 @@ def collect_block_io(model, block_path: str, loader, max_batches: int, device: s
             if i >= max_batches:
                 break
             batch = {k: v.to(device) for k, v in batch.items()}
-            _ = model(**batch)
+            unused_output = model(**batch)
 
     h1.remove()
     h2.remove()

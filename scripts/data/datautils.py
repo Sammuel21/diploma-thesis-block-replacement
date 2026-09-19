@@ -35,7 +35,7 @@ def get_wikitext2(nsamples, seed, seqlen, model, tokenizer):
 
     random.seed(seed)
     trainloader = []
-    for _ in range(nsamples):
+    for sample_index in range(nsamples):
         i = random.randint(0, trainenc.input_ids.shape[1] - seqlen - 1)
         j = i + seqlen
         inp = trainenc.input_ids[:, i:j]
@@ -53,7 +53,7 @@ def get_ptb(nsamples, seed, seqlen, model, tokenizer):
 
     random.seed(seed)
     trainloader = []
-    for _ in range(nsamples):
+    for sample_index in range(nsamples):
         i = random.randint(0, trainenc.input_ids.shape[1] - seqlen - 1)
         j = i + seqlen
         inp = trainenc.input_ids[:, i:j]
@@ -72,7 +72,7 @@ def get_c4(nsamples, seed, seqlen, model, tokenizer):
 
     random.seed(seed)
     trainloader = []
-    for _ in range(nsamples):
+    for sample_index in range(nsamples):
         while True:
             i = random.randint(0, len(traindata) - 1)
             trainenc = tokenizer(traindata[i]['text'], return_tensors='pt')

@@ -78,12 +78,12 @@ def compute_module_input_output_scores(
     handles = []
 
     for ref in target_refs:
-        def pre_hook(_module, args, index=ref.index):
+        def pre_hook(unused_module, args, index=ref.index):
             """Remember the representation entering one screened module."""
 
             pending[index].append(first_tensor(args).detach())
 
-        def post_hook(_module, _args, output, index=ref.index):
+        def post_hook(unused_module, unused_args, output, index=ref.index):
             """Accumulate cosine distance without retaining full activations."""
 
             if not pending[index]:
@@ -146,12 +146,12 @@ def compute_mlp_bi_scores(model, loader, max_batches, device, layer_indices=None
     handles = []
 
     for index in selected:
-        def mlp_hook(_module, _args, output, layer_index=index):
+        def mlp_hook(unused_module, unused_args, output, layer_index=index):
             """Remember the raw MLP update before its residual addition."""
 
             pending_mlp_outputs[layer_index].append(first_tensor(output).detach())
 
-        def layer_hook(_module, _args, output, layer_index=index):
+        def layer_hook(unused_module, unused_args, output, layer_index=index):
             """Compare the residual stream immediately before and after the MLP."""
 
             if not pending_mlp_outputs[layer_index]:

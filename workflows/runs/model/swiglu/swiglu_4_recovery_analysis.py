@@ -16,14 +16,14 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-from workflows.runs.model._common import (
+from workflows.runs.model.common import (
     default_artifact_path,
     load_artifact,
     load_workflow_config,
     release_cuda,
     resolve_path,
 )
-from workflows.runs.model.swiglu._shared import (
+from workflows.runs.model.swiglu.shared import (
     atomic_json,
     atomic_torch_save,
     build_local_data,
@@ -546,7 +546,7 @@ def tied_embedding_record(model):
 
 def build_student(context, spec):
     torch.manual_seed(int(context.settings["seed"]))
-    student, _ = load_model_and_tokenizer(context.model_config)
+    student, unused_tokenizer = load_model_and_tokenizer(context.model_config)
     embedding_record = tied_embedding_record(student)
     expected_tied = bool(context.settings["model"]["tie_word_embeddings"])
     if embedding_record["weight_storage_tied"] != expected_tied:

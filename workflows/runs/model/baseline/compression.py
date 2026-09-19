@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 import torch
 
-from workflows.runs.model._common import (
+from workflows.runs.model.common import (
     default_artifact_path,
     json_records,
     load_artifact,
@@ -227,9 +227,16 @@ def result_frames(results, dense_row):
 
 def run_historical(output: Path, settings: dict) -> dict:
     output = require_new_path(output)
-    model_config, data_config, capture, _, recovery, _, _, experiments = (
-        base_configs(settings)
-    )
+    (
+        model_config,
+        data_config,
+        capture,
+        unused_operator,
+        recovery,
+        unused_selections,
+        unused_workflow,
+        experiments,
+    ) = base_configs(settings)
     variants = tuple(experiments)
     run_log = start_run_log(
         output,
@@ -270,7 +277,7 @@ def run_historical(output: Path, settings: dict) -> dict:
             if index:
                 del model
                 release_cuda(torch)
-                model, _ = load_model_and_tokenizer(model_config)
+                model, unused_tokenizer = load_model_and_tokenizer(model_config)
             run_log.begin(f"experiment_{variant}")
             results[variant] = run_replacement_experiment(
                 model, loaders, experiments[variant]
@@ -404,9 +411,16 @@ def run_optimized(
     )
     if not resolved_revision:
         raise ValueError("Historical artifact does not record a model revision")
-    model_config, base_data, capture, _, recovery, selections, workflow, _ = base_configs(
-        settings, resolved_revision
-    )
+    (
+        model_config,
+        base_data,
+        capture,
+        unused_operator,
+        recovery,
+        selections,
+        workflow,
+        unused_experiments,
+    ) = base_configs(settings, resolved_revision)
     data_values = settings["data"]
     operator_values = settings["operator"]
     seed = int(settings["seed"])
@@ -479,7 +493,7 @@ def run_optimized(
                 if not first:
                     del model
                     release_cuda(torch)
-                    model, _ = load_model_and_tokenizer(model_config)
+                    model, unused_tokenizer = load_model_and_tokenizer(model_config)
                 first = False
                 stage = f"experiment_{methodology}_{variant}"
                 run_log.begin(stage)

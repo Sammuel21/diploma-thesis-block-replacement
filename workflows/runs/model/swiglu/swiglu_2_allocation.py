@@ -13,7 +13,7 @@ from time import perf_counter
 import pandas as pd
 import torch
 
-from workflows.runs.model._common import (
+from workflows.runs.model.common import (
     default_artifact_path,
     json_records,
     load_artifact,

@@ -44,12 +44,12 @@ def collect_module_io(model, module_path, loader, max_batches, device, storage_d
     target_chunks = []
     pending = []
 
-    def pre_hook(_module, args):
+    def pre_hook(unused_module, args):
         """Remember the input paired with the next observed module output."""
 
         pending.append(first_tensor(args).detach())
 
-    def post_hook(_module, _args, output):
+    def post_hook(unused_module, unused_args, output):
         """Move the paired module input and output into activation storage."""
 
         if not pending:
@@ -119,10 +119,10 @@ def collect_modules_io(
     for path in paths:
         module = model.get_submodule(path)
 
-        def pre_hook(_module, args, module_path=path):
+        def pre_hook(unused_module, args, module_path=path):
             pending[module_path].append(first_tensor(args).detach())
 
-        def post_hook(_module, _args, output, module_path=path):
+        def post_hook(unused_module, unused_args, output, module_path=path):
             if not pending[module_path]:
                 raise RuntimeError(
                     f"Module output for {module_path} has no matching input"

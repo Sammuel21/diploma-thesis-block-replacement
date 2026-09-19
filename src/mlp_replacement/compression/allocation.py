@@ -46,7 +46,7 @@ class DiscreteSwiGLUAllocation:
     boundary_layer: int | None
 
 
-def _nonincreasing_isotonic(values):
+def nonincreasing_isotonic(values):
     """Pool adjacent violations so cost cannot rise with additional width."""
 
     blocks = []
@@ -59,7 +59,7 @@ def _nonincreasing_isotonic(values):
             mean = (left[2] * left[3] + right[2] * right[3]) / count
             blocks.append([left[0], right[1], mean, count])
     result = [0.0] * len(values)
-    for start, end, mean, _ in blocks:
+    for start, end, mean, unused_count in blocks:
         result[start:end] = [mean] * (end - start)
     return tuple(result)
 
@@ -106,7 +106,7 @@ def build_swiglu_width_curve(
     normalized.sort(key=lambda row: row["width"])
     if len({row["width"] for row in normalized}) != len(normalized):
         raise ValueError("Width-curve points must have unique widths")
-    monotone = _nonincreasing_isotonic(
+    monotone = nonincreasing_isotonic(
         [row["teacher_kl"] for row in normalized]
     )
     return tuple(
@@ -189,7 +189,7 @@ def allocate_discrete_swiglu_widths(
             raise ValueError("No discrete allocation fits the requested budget")
         states = next_states
 
-    used_units, (_, selected) = min(
+    used_units, (unused_objective, selected) = min(
         states.items(),
         key=lambda item: (
             item[1][0],
@@ -221,7 +221,7 @@ def allocate_discrete_swiglu_widths(
             ) / capacity
             choices.append((-improvement, layer, point, next_point))
         if choices:
-            _, boundary_layer, point, next_point = min(choices)
+            unused_improvement, boundary_layer, point, next_point = min(choices)
             width = point.replacement_width + extra_neurons
             fraction = extra_neurons / (
                 next_point.replacement_width - point.replacement_width
@@ -291,7 +291,7 @@ def rank_normalize(values):
         while end < len(ordered) and ordered[end][1] == ordered[start][1]:
             end += 1
         average_zero_based_rank = (start + end - 1) / 2
-        for layer, _ in ordered[start:end]:
+        for layer, unused_score in ordered[start:end]:
             ranks[layer] = average_zero_based_rank / (len(ordered) - 1)
         start = end
     return ranks

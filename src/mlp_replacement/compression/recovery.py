@@ -114,7 +114,7 @@ class TeacherFinalHiddenCache:
         for shard in self.shards:
             if shard.token_end <= cursor or shard.token_start >= end:
                 continue
-            values = _load_hidden_shard(shard.path, shard.sha256)
+            values = load_hidden_shard(shard.path, shard.sha256)
             start = max(cursor, shard.token_start) - shard.token_start
             stop = min(end, shard.token_end) - shard.token_start
             chunks.append(values[start:stop])
@@ -128,11 +128,11 @@ class TeacherFinalHiddenCache:
     def release(self):
         """Release process-local memory maps before deleting cache shards."""
 
-        _load_hidden_shard.cache_clear()
+        load_hidden_shard.cache_clear()
 
 
 @lru_cache(maxsize=2)
-def _load_hidden_shard(path, sha256):
+def load_hidden_shard(path, sha256):
     """Memory-map and retain the current sequential cache shards."""
 
     path = Path(path)
@@ -147,7 +147,7 @@ def _load_hidden_shard(path, sha256):
         return torch.load(path, map_location="cpu")
 
 
-def _sha256_file(path):
+def sha256_file(path):
     digest = hashlib.sha256()
     with Path(path).open("rb") as source:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
@@ -155,12 +155,12 @@ def _sha256_file(path):
     return digest.hexdigest()
 
 
-def _tensor_sha256(tensor):
+def tensor_sha256(tensor):
     values = tensor.detach().cpu().contiguous().view(torch.uint8)
     return hashlib.sha256(values.numpy().tobytes()).hexdigest()
 
 
-def _atomic_json(path, value):
+def atomic_json(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -171,7 +171,7 @@ def _atomic_json(path, value):
     temporary.replace(path)
 
 
-def _load_teacher_hidden_cache(root, expected_fingerprint=None):
+def load_teacher_hidden_cache(root, expected_fingerprint=None):
     root = Path(root)
     manifest_path = root / "manifest.json"
     if not manifest_path.is_file():
@@ -189,7 +189,7 @@ def _load_teacher_hidden_cache(root, expected_fingerprint=None):
         if token_start != cursor or token_end <= token_start:
             raise ValueError("Teacher-hidden manifest shard coverage is invalid")
         path = root / row["file"]
-        if not path.is_file() or _sha256_file(path) != row["sha256"]:
+        if not path.is_file() or sha256_file(path) != row["sha256"]:
             raise ValueError(f"Teacher-hidden shard is missing or changed: {path}")
         shards.append(
             TeacherHiddenShard(
@@ -253,7 +253,7 @@ def build_teacher_final_hidden_cache(
     output_head = model.get_output_embeddings()
     if output_head is None or not hasattr(output_head, "weight"):
         raise TypeError("Dense teacher must expose a frozen output embedding")
-    head_fingerprint = _tensor_sha256(output_head.weight)
+    head_fingerprint = tensor_sha256(output_head.weight)
     payload = {
         "schema_version": 1,
         "format": "final-normalized-hidden-bf16-shards-v1",
@@ -271,7 +271,7 @@ def build_teacher_final_hidden_cache(
     manifest_path = root / "manifest.json"
     partial_manifest_path = root / "partial-manifest.json"
     if manifest_path.exists():
-        return _load_teacher_hidden_cache(root, fingerprint)
+        return load_teacher_hidden_cache(root, fingerprint)
     partial_manifest = None
     if partial_manifest_path.is_file():
         partial_manifest = json.loads(
@@ -318,7 +318,7 @@ def build_teacher_final_hidden_cache(
                 int(row["token_start"]) != expected_start
                 or int(row["token_end"]) != expected_end
                 or not path.is_file()
-                or _sha256_file(path) != row["sha256"]
+                or sha256_file(path) != row["sha256"]
             ):
                 raise ValueError(
                     f"Partial teacher-hidden shard is missing or changed: {path}"
@@ -363,7 +363,7 @@ def build_teacher_final_hidden_cache(
                         raise ValueError(
                             f"Incomplete cache shard has invalid content: {path}"
                         )
-                    shard_sha256 = _sha256_file(path)
+                    shard_sha256 = sha256_file(path)
                     partial_row = partial_rows.get(path.name)
                     if (
                         partial_row is not None
@@ -380,7 +380,7 @@ def build_teacher_final_hidden_cache(
                             "sha256": shard_sha256,
                         }
                     )
-                    _atomic_json(
+                    atomic_json(
                         partial_manifest_path,
                         {**payload, "fingerprint": fingerprint, "shards": shard_rows},
                     )
@@ -396,7 +396,7 @@ def build_teacher_final_hidden_cache(
                     batch = packed_tokens.batch(cursor, count, batch_sequences)
                     input_ids = batch["input_ids"].to(device)
                     attention_mask = batch["attention_mask"].to(device)
-                    with _autocast(device, cache_dtype):
+                    with autocast_context(device, cache_dtype):
                         hidden = backbone(
                             input_ids=input_ids,
                             attention_mask=attention_mask,
@@ -421,10 +421,10 @@ def build_teacher_final_hidden_cache(
                         "token_start": shard_start,
                         "token_end": shard_end,
                         "file": path.name,
-                        "sha256": _sha256_file(path),
+                        "sha256": sha256_file(path),
                     }
                 )
-                _atomic_json(
+                atomic_json(
                     partial_manifest_path,
                     {**payload, "fingerprint": fingerprint, "shards": shard_rows},
                 )
@@ -436,9 +436,9 @@ def build_teacher_final_hidden_cache(
         "fingerprint": fingerprint,
         "shards": shard_rows,
     }
-    _atomic_json(manifest_path, manifest)
+    atomic_json(manifest_path, manifest)
     partial_manifest_path.unlink(missing_ok=True)
-    return _load_teacher_hidden_cache(root, fingerprint)
+    return load_teacher_hidden_cache(root, fingerprint)
 
 
 def cached_hidden_distillation_loss(
@@ -461,9 +461,9 @@ def cached_hidden_distillation_loss(
         *input_ids.shape,
         teacher_hidden.shape[-1],
     ).to(device)
-    with torch.no_grad(), _autocast(device, autocast_dtype):
+    with torch.no_grad(), autocast_context(device, autocast_dtype):
         teacher_logits = teacher_head(hidden)
-    with _autocast(device, autocast_dtype):
+    with autocast_context(device, autocast_dtype):
         student_logits = student(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -525,7 +525,7 @@ def validate_teacher_final_hidden_cache(
             batch = packed_tokens.batch(offset, sample_tokens, batch_sequences)
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
-            with _autocast(device, torch.bfloat16):
+            with autocast_context(device, torch.bfloat16):
                 online_logits = model(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
@@ -652,7 +652,7 @@ def recover_replacements(student, training_cache, validation_cache, target_paths
         return RecoveryResult((), None)
 
     original_flags = [(parameter, parameter.requires_grad) for parameter in student.parameters()]
-    for parameter, _ in original_flags:
+    for parameter, original_requires_grad in original_flags:
         parameter.requires_grad = False
     trainable = replacement_parameters(student, target_paths)
     for parameter in trainable:
@@ -749,7 +749,7 @@ def token_checkpoint_schedule(target_tokens, interval_tokens, effective_batch_to
     )
 
 
-def _autocast(device, dtype):
+def autocast_context(device, dtype):
     device = torch.device(device)
     if device.type != "cuda":
         return nullcontext()
@@ -761,13 +761,13 @@ def online_distillation_loss(student, teacher, batch, temperature, device, autoc
 
     input_ids = batch["input_ids"].to(device)
     attention_mask = batch["attention_mask"].to(device)
-    with torch.no_grad(), _autocast(device, autocast_dtype):
+    with torch.no_grad(), autocast_context(device, autocast_dtype):
         teacher_logits = teacher(
             input_ids=input_ids,
             attention_mask=attention_mask,
             use_cache=False,
         ).logits
-    with _autocast(device, autocast_dtype):
+    with autocast_context(device, autocast_dtype):
         student_logits = student(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -803,13 +803,13 @@ def online_recovery_loss(
         raise ValueError("CE loss weight must lie within [0, 1]")
     input_ids = batch["input_ids"].to(device)
     attention_mask = batch["attention_mask"].to(device)
-    with torch.no_grad(), _autocast(device, autocast_dtype):
+    with torch.no_grad(), autocast_context(device, autocast_dtype):
         teacher_logits = teacher(
             input_ids=input_ids,
             attention_mask=attention_mask,
             use_cache=False,
         ).logits
-    with _autocast(device, autocast_dtype):
+    with autocast_context(device, autocast_dtype):
         student_logits = student(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -921,7 +921,7 @@ def recover_trainable_by_tokens(
         raise ValueError("Recovery cursor must lie on a complete microbatch")
 
     original_flags = [(parameter, parameter.requires_grad) for parameter in student.parameters()]
-    for parameter, _ in original_flags:
+    for parameter, original_requires_grad in original_flags:
         parameter.requires_grad = False
     optimizer_groups = []
     trainable = []
@@ -992,7 +992,7 @@ def recover_trainable_by_tokens(
             microbatches = min(accumulation_steps, remaining_microbatches)
             microbatch_counts = []
             planned_cursor = cursor
-            for _ in range(microbatches):
+            for microbatch_index in range(microbatches):
                 count = min(microbatch_tokens, target_tokens - planned_cursor)
                 microbatch_counts.append(count)
                 planned_cursor += count
@@ -1171,7 +1171,7 @@ def recover_replacements_by_tokens(
         raise ValueError("Recovery cursor must lie on a complete microbatch")
 
     original_flags = [(parameter, parameter.requires_grad) for parameter in student.parameters()]
-    for parameter, _ in original_flags:
+    for parameter, original_requires_grad in original_flags:
         parameter.requires_grad = False
     trainable = replacement_parameters(student, target_paths)
     if any(parameter.dtype != torch.float32 for parameter in trainable):
@@ -1209,7 +1209,7 @@ def recover_replacements_by_tokens(
             microbatches = min(accumulation_steps, remaining_microbatches)
             microbatch_counts = []
             planned_cursor = cursor
-            for _ in range(microbatches):
+            for microbatch_index in range(microbatches):
                 count = min(microbatch_tokens, target_tokens - planned_cursor)
                 microbatch_counts.append(count)
                 planned_cursor += count

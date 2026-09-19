@@ -16,7 +16,7 @@ from time import perf_counter
 import torch
 import torch.nn.functional as F
 
-from workflows.runs.model._common import (
+from workflows.runs.model.common import (
     default_artifact_path,
     load_artifact,
     load_workflow_config,
@@ -1157,7 +1157,7 @@ def run_recovery_stage(context, selected_pairs, model_config):
         context.device,
         recovery["validation_cache_dtype"],
     )
-    allocations, _ = build_sparsity_allocations(context)
+    allocations, unused_allocation_summary = build_sparsity_allocations(context)
     layers = tuple(sorted(winning_widths(context)))
     save_schedule = token_checkpoint_schedule(
         target_tokens,
@@ -1202,7 +1202,7 @@ def run_recovery_stage(context, selected_pairs, model_config):
         context.persist("recovery")
         if torch.device(context.device).type == "cuda":
             torch.cuda.reset_peak_memory_stats(context.device)
-        student, _ = load_model_and_tokenizer(model_config)
+        student, unused_tokenizer = load_model_and_tokenizer(model_config)
         student_blocks = {block.index: block for block in discover_mlp_blocks(student)}
         target_paths = [student_blocks[layer].path for layer in layers]
         for layer in layers:

@@ -87,7 +87,7 @@ def evaluate_replacement_sensitivity(
     records = []
 
     try:
-        for parameter, _ in original_flags:
+        for parameter, original_requires_grad in original_flags:
             parameter.requires_grad = False
         model.eval()
 

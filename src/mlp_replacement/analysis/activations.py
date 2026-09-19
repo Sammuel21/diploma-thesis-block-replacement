@@ -58,7 +58,7 @@ class ReconstructionMetrics:
     output_relative_mse: float | None
 
 
-def _validate_activations(activations):
+def validate_activations(activations):
     if activations.ndim != 2:
         raise ValueError(
             f"Expected a two-dimensional token-by-feature matrix, got {activations.shape}"
@@ -78,7 +78,7 @@ def covariance_eigendecomposition(activations, device=None, with_eigenvectors=Fa
     accelerator. Results are returned on CPU so they do not retain GPU memory.
     """
 
-    _validate_activations(activations)
+    validate_activations(activations)
     calculation_device = torch.device(device) if device is not None else activations.device
     values = activations.to(device=calculation_device, dtype=torch.float32)
     mean = values.mean(dim=0)
@@ -128,7 +128,7 @@ def explained_variance_dimension(eigenvalues, threshold):
 def summarize_activation_spectrum(activations, decomposition=None, device=None):
     """Compute participation-ratio and stable-rank activation diagnostics."""
 
-    _validate_activations(activations)
+    validate_activations(activations)
     if decomposition is None:
         decomposition = covariance_eigendecomposition(
             activations,
@@ -164,7 +164,7 @@ def summarize_activation_spectrum(activations, decomposition=None, device=None):
 def coordinate_orders(calibration, seed=21):
     """Return nested random and top-variance coordinate orderings."""
 
-    _validate_activations(calibration)
+    validate_activations(calibration)
     variances = calibration.float().var(dim=0, unbiased=True)
     top_variance = torch.argsort(variances, descending=True).cpu()
     generator = torch.Generator(device="cpu").manual_seed(seed)
@@ -175,7 +175,7 @@ def coordinate_orders(calibration, seed=21):
     }
 
 
-def _relative_error(numerator, denominator):
+def relative_error(numerator, denominator):
     return float(numerator / denominator) if denominator > 0 else 0.0
 
 
@@ -198,7 +198,7 @@ def evaluate_reconstruction(
     coordinate baselines comparable to centered PCA reconstruction.
     """
 
-    _validate_activations(values)
+    validate_activations(values)
     dimension = int(values.shape[1])
     requested_ranks = tuple(sorted(set(int(rank) for rank in ranks)))
     if not requested_ranks or requested_ranks[0] < 1 or requested_ranks[-1] > dimension:
@@ -284,12 +284,12 @@ def evaluate_reconstruction(
             ReconstructionMetrics(
                 method=method,
                 rank=rank,
-                activation_relative_mse=_relative_error(
+                activation_relative_mse=relative_error(
                     activation_error,
                     activation_energy,
                 ),
                 output_relative_mse=(
-                    _relative_error(output_error, output_energy)
+                    relative_error(output_error, output_energy)
                     if weight_device is not None
                     else None
                 ),

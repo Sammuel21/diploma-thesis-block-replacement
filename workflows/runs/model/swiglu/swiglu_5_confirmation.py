@@ -5,9 +5,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from workflows.runs.model._common import load_workflow_config
+from workflows.runs.model.common import load_workflow_config
 
-from ._swiglu_5 import (
+from .swiglu_5 import (
     CONFIRMATION_WORKFLOW,
     prepare_confirmation_context,
     run_confirmation,

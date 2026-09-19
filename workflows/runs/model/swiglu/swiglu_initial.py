@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 import torch
 
-from workflows.runs.model._common import (
+from workflows.runs.model.common import (
     default_artifact_path,
     json_records,
     load_artifact,
@@ -1072,7 +1072,13 @@ def run_historical(output: Path, settings: dict) -> dict:
         )
 
         run_log.begin("main_operator_fitting")
-        fitted, fitting, history, _, _ = fit_grouped_allocations(
+        (
+            fitted,
+            fitting,
+            history,
+            unused_rankings,
+            unused_importance,
+        ) = fit_grouped_allocations(
             model,
             loaders,
             data_config,

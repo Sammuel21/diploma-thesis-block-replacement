@@ -111,10 +111,16 @@ def discover_mlp_blocks(model):
         raise ValueError("No modules ending in '.mlp' were found in the model")
 
     parsed = [(extract_layer_index(path), path, module) for path, module in candidates]
-    if all(index is not None for index, _, _ in parsed):
+    if all(
+        index is not None
+        for index, unused_path, unused_module in parsed
+    ):
         parsed.sort(key=lambda item: int(item[0]))
     else:
-        parsed = [(index, path, module) for index, (_, path, module) in enumerate(parsed)]
+        parsed = [
+            (index, path, module)
+            for index, (unused_index, path, module) in enumerate(parsed)
+        ]
 
     refs = tuple(BlockRef(index=int(index), path=path, module=module) for index, path, module in parsed)
     indices = [ref.index for ref in refs]

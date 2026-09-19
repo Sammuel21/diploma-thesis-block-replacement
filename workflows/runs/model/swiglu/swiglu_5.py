@@ -20,7 +20,7 @@ from time import perf_counter
 
 import torch
 
-from workflows.runs.model._common import (
+from workflows.runs.model.common import (
     load_artifact,
     release_cuda,
     report_memory,
@@ -53,7 +53,7 @@ from mlp_replacement.operators import (
 )
 from mlp_replacement.runlog import environment_record
 
-from ._shared import (
+from .shared import (
     atomic_json,
     atomic_torch_save,
     build_local_data,
@@ -94,12 +94,12 @@ def default_output(workflow, target=None):
     )
 
 
-def _asset_directory(output):
+def asset_directory(output):
     output = Path(output)
     return output.with_suffix("").with_name(output.stem + ".assets")
 
 
-def _checkpoint_rng():
+def checkpoint_rng():
     return {
         "torch_rng_state": torch.get_rng_state(),
         "cuda_rng_states": (
@@ -108,13 +108,13 @@ def _checkpoint_rng():
     }
 
 
-def _restore_rng(checkpoint):
+def restore_rng(checkpoint):
     torch.set_rng_state(checkpoint["torch_rng_state"])
     if torch.cuda.is_available() and checkpoint.get("cuda_rng_states") is not None:
         torch.cuda.set_rng_state_all(checkpoint["cuda_rng_states"])
 
 
-def _replacement_state(model, paths):
+def replacement_state(model, paths):
     return {
         path: {
             name: tensor.detach().cpu().clone()
@@ -124,13 +124,13 @@ def _replacement_state(model, paths):
     }
 
 
-def _load_replacement_state(model, state):
+def load_replacement_state(model, state):
     for path, values in state.items():
         model.get_submodule(path).load_state_dict(values)
 
 
 @contextmanager
-def _temporary_fp32_replacements(model, blocks, replacements):
+def temporary_fp32_replacements(model, blocks, replacements):
     originals = {layer: blocks[layer].module for layer in replacements}
     try:
         for layer, replacement in replacements.items():
@@ -183,7 +183,7 @@ class SwiGLU5Context:
         )
 
 
-def _strict_source_assets(source, source_path, calibration_pairs, targets):
+def strict_source_assets(source, source_path, calibration_pairs, targets):
     assets = {}
     packed = source["results"]["recovery"]["packed_token_cache"]
     token_path = resolve_source_asset(packed["path"], source_path)
@@ -205,7 +205,7 @@ def _strict_source_assets(source, source_path, calibration_pairs, targets):
     assets["operators"] = {}
     for target in targets:
         key = str(float(target))
-        rows, _ = source_operator_rows(source, calibration_pairs, key)
+        rows, unused_allocation = source_operator_rows(source, calibration_pairs, key)
         assets["operators"][key] = {}
         for layer, row in sorted(rows.items()):
             path = resolve_source_asset(row["state_path"], source_path)
@@ -223,7 +223,7 @@ def prepare_search_context(settings, config_path, source_path, output):
     effective["workflow"] = SEARCH_WORKFLOW
     contract = validate_swiglu3_contract(effective, source)
     targets = effective["compatibility"]["target_mlp_removals"]
-    source_assets, _ = _strict_source_assets(
+    source_assets, unused_token_path = strict_source_assets(
         source,
         source_path,
         int(effective["references"]["selected_calibration_pairs"]),
@@ -245,7 +245,7 @@ def prepare_search_context(settings, config_path, source_path, output):
         {"configuration": effective, "source_sha256": provenance["swiglu_3"]["sha256"]}
     )
     output = resolve_path(Path(output or default_output(SEARCH_WORKFLOW)))
-    asset_dir = _asset_directory(output)
+    asset_dir = asset_directory(output)
     if output.exists() or asset_dir.exists():
         raise FileExistsError(f"SwiGLU-5 output already exists: {output}")
     artifact = {
@@ -287,7 +287,7 @@ def prepare_search_context(settings, config_path, source_path, output):
     return context
 
 
-def _load_search_resources(context):
+def load_search_resources(context):
     model_config = make_model_config(context.settings["model"])
     context.model, context.tokenizer = load_model_and_tokenizer(model_config)
     context.device = next(context.model.parameters()).device
@@ -316,7 +316,7 @@ def _load_search_resources(context):
     return model_config
 
 
-def _operator_config(context):
+def operator_config(context):
     values = context.settings["local_fitting"]
     return OperatorConfig(
         kind="swiglu",
@@ -334,7 +334,7 @@ def _operator_config(context):
     )
 
 
-def _packed_source_cache(context):
+def packed_source_cache(context):
     record = context.source["results"]["recovery"]["packed_token_cache"]
     path = resolve_source_asset(record["path"], context.source_path)
     expected_bytes = int(record["token_count"]) * 4
@@ -348,7 +348,7 @@ def _packed_source_cache(context):
     )
 
 
-def _import_swiglu3_evidence(context):
+def import_swiglu3_evidence(context):
     imported = {}
     for target in context.settings["compatibility"]["target_mlp_removals"]:
         key = str(float(target))
@@ -375,7 +375,7 @@ def _import_swiglu3_evidence(context):
     context.persist("import_swiglu_3")
 
 
-def _storage_preflight(context):
+def storage_preflight(context):
     """Conservatively bound the low-storage search before local fitting."""
 
     context.asset_dir.mkdir(parents=True, exist_ok=True)
@@ -467,11 +467,11 @@ def _storage_preflight(context):
     return record
 
 
-def _fit_key(initialization, layer, width, context_kind="dense"):
+def fit_key(initialization, layer, width, context_kind="dense"):
     return f"{initialization}:{context_kind}:layer-{int(layer):02d}:width-{int(width):05d}"
 
 
-def _operator_state_path(context, initialization, layer, width, context_kind="dense"):
+def operator_state_path(context, initialization, layer, width, context_kind="dense"):
     return (
         context.asset_dir
         / "operators"
@@ -481,14 +481,14 @@ def _operator_state_path(context, initialization, layer, width, context_kind="de
     )
 
 
-def _history_rows(fit_key, phase, history):
+def history_rows(fit_key, phase, history):
     return [
         {"fit_key": fit_key, "phase": phase, **asdict(epoch)}
         for epoch in history
     ]
 
 
-def _fit_operator(
+def fit_operator(
     context,
     layer,
     width,
@@ -498,7 +498,7 @@ def _fit_operator(
     neuron_indices,
     context_kind="dense",
 ):
-    fit_key = _fit_key(initialization, layer, width, context_kind)
+    fit_key = fit_key(initialization, layer, width, context_kind)
     existing = {
         row["fit_key"]: row for row in context.artifact["results"]["local_fitting"]
     }
@@ -509,7 +509,7 @@ def _fit_operator(
             raise ValueError(f"Persisted local-fit state changed: {state_path}")
         return row
 
-    config = _operator_config(context)
+    config = operator_config(context)
     teacher = context.blocks[layer].module
     down_bias = initialization in {"output_aware", "composition_aware"}
     module = GatedMLPReplacement(
@@ -554,7 +554,7 @@ def _fit_operator(
                 abs(value) for value in reconstruction.initial_mean_residual
             ),
         }
-        down_history = _history_rows(
+        down_history = history_rows(
             fit_key, "down_only", reconstruction.down_only_fit.history
         )
     else:
@@ -562,7 +562,7 @@ def _fit_operator(
     final_metrics = evaluate_operator(
         fit.module, validation_pairs, context.device, config.batch_size
     )
-    state_path = _operator_state_path(
+    state_path = operator_state_path(
         context, initialization, layer, width, context_kind
     )
     state = {
@@ -603,7 +603,7 @@ def _fit_operator(
         "state_path": relative_to_root(state_path),
         "state_sha256": sha256_file(state_path),
         "parameter_count": sum(value.numel() for value in state.values()),
-        "history": down_history + _history_rows(fit_key, "full", fit.history),
+        "history": down_history + history_rows(fit_key, "full", fit.history),
     }
     context.artifact["results"]["local_fitting"].append(row)
     context.persist("local_fitting")
@@ -613,7 +613,7 @@ def _fit_operator(
     return row
 
 
-def _load_fit_operator(context, row, device=None):
+def load_fit_operator(context, row, device=None):
     return load_operator(
         resolve_source_asset(row["state_path"], context.output),
         int(context.settings["model"]["hidden_size"]),
@@ -623,11 +623,11 @@ def _load_fit_operator(context, row, device=None):
     )
 
 
-def _singleton_kl(context, row, selection_cache):
+def singleton_kl(context, row, selection_cache):
     layer = int(row["layer"])
-    module = _load_fit_operator(context, row)
+    module = load_fit_operator(context, row)
     try:
-        with _temporary_fp32_replacements(
+        with temporary_fp32_replacements(
             context.model, context.blocks, {layer: module}
         ):
             metrics = evaluate_teacher_cache_mixed(
@@ -642,7 +642,7 @@ def _singleton_kl(context, row, selection_cache):
     return metrics
 
 
-def _curve_lookup(context, initialization, layer, width):
+def curve_lookup(context, initialization, layer, width):
     rows = context.artifact["results"]["width_curves"][initialization]
     return next(
         (
@@ -655,7 +655,7 @@ def _curve_lookup(context, initialization, layer, width):
     )
 
 
-def _capture_dense_pairs(context, layers):
+def capture_dense_pairs(context, layers):
     selected_pairs = int(context.settings["references"]["selected_calibration_pairs"])
     batch_size = int(context.data["batch_size"])
     sequence_length = int(context.data["sequence_length"])
@@ -684,7 +684,7 @@ def _capture_dense_pairs(context, layers):
     return training, validation
 
 
-def _selected_neurons(context, layer, pairs, width):
+def selected_neurons(context, layer, pairs, width):
     scores = swiglu_neuron_importance_scores(
         context.blocks[layer].module,
         pairs.inputs,
@@ -693,7 +693,7 @@ def _selected_neurons(context, layer, pairs, width):
     return torch.argsort(scores, descending=True)[: int(width)].sort().values
 
 
-def _build_width_curves(context, selection_cache):
+def build_width_curves(context, selection_cache):
     layers = tuple(
         int(value) for value in context.settings["compatibility"]["eligible_layers"]
     )
@@ -704,14 +704,14 @@ def _build_width_curves(context, selection_cache):
     for offset in range(0, len(layers), group_size):
         group = layers[offset : offset + group_size]
         needed = any(
-            _curve_lookup(context, initialization, layer, width) is None
+            curve_lookup(context, initialization, layer, width) is None
             for initialization in ("legacy_subset", "output_aware")
             for layer in group
             for width in widths
         )
         if not needed:
             continue
-        training_by_path, validation_by_path = _capture_dense_pairs(context, group)
+        training_by_path, validation_by_path = capture_dense_pairs(context, group)
         for layer in group:
             path = context.blocks[layer].path
             training_pairs = training_by_path[path]
@@ -724,7 +724,7 @@ def _build_width_curves(context, selection_cache):
             ranking = torch.argsort(scores, descending=True)
             for initialization in ("legacy_subset", "output_aware"):
                 for width in widths:
-                    if _curve_lookup(context, initialization, layer, width) is not None:
+                    if curve_lookup(context, initialization, layer, width) is not None:
                         continue
                     if width == original_width:
                         raw_kl = 0.0
@@ -733,7 +733,7 @@ def _build_width_curves(context, selection_cache):
                         parameter_count = 3 * int(context.settings["model"]["hidden_size"]) * original_width
                     else:
                         selected = ranking[:width].sort().values
-                        fit_row = _fit_operator(
+                        fit_row = fit_operator(
                             context,
                             layer,
                             width,
@@ -742,7 +742,7 @@ def _build_width_curves(context, selection_cache):
                             validation_pairs,
                             selected,
                         )
-                        singleton = _singleton_kl(context, fit_row, selection_cache)
+                        singleton = singleton_kl(context, fit_row, selection_cache)
                         raw_kl = float(singleton["teacher_kl"])
                         state_path = fit_row["state_path"]
                         fit_key = fit_row["fit_key"]
@@ -793,7 +793,7 @@ def _build_width_curves(context, selection_cache):
     context.persist("width_curves")
 
 
-def _discrete_allocation(context, initialization, target):
+def discrete_allocation(context, initialization, target):
     curves = {}
     for layer in context.settings["compatibility"]["eligible_layers"]:
         rows = [
@@ -820,7 +820,7 @@ def _discrete_allocation(context, initialization, target):
     )
 
 
-def _ensure_fit_for_width(
+def ensure_fit_for_width(
     context,
     initialization,
     layer,
@@ -837,18 +837,18 @@ def _ensure_fit_for_width(
         (
             row
             for row in context.artifact["results"]["local_fitting"]
-            if row["fit_key"] == _fit_key(initialization, layer, width, context_kind)
+            if row["fit_key"] == fit_key(initialization, layer, width, context_kind)
         ),
         None,
     )
     if existing is not None:
         return existing
     selected = (
-        _selected_neurons(context, layer, training_pairs, width)
+        selected_neurons(context, layer, training_pairs, width)
         if neuron_ranking is None
         else neuron_ranking[: int(width)].sort().values
     )
-    return _fit_operator(
+    return fit_operator(
         context,
         layer,
         width,
@@ -860,7 +860,7 @@ def _ensure_fit_for_width(
     )
 
 
-def _candidate_parameter_summary(context, allocation_rows):
+def candidate_parameter_summary(context, allocation_rows):
     hidden = int(context.settings["model"]["hidden_size"])
     original_width = int(context.settings["model"]["intermediate_size"])
     original = len(allocation_rows) * 3 * hidden * original_width
@@ -873,7 +873,7 @@ def _candidate_parameter_summary(context, allocation_rows):
     }
 
 
-def _legacy_candidate(context, target):
+def legacy_candidate(context, target):
     key = str(float(target))
     state_rows, allocation = source_operator_rows(
         context.source,
@@ -902,11 +902,11 @@ def _legacy_candidate(context, target):
         "initialization": "exact_swiglu_3",
         "allocation_method": "exact_swiglu_3_ranked_widths",
         "allocation": rows,
-        **_candidate_parameter_summary(context, rows),
+        **candidate_parameter_summary(context, rows),
     }
 
 
-def _candidate_modules(context, candidate, device):
+def candidate_modules(context, candidate, device):
     modules = {}
     for row in candidate["allocation"]:
         if row.get("retains_dense_module"):
@@ -929,10 +929,10 @@ def _candidate_modules(context, candidate, device):
     return modules
 
 
-def _evaluate_candidate(context, candidate, selection_cache, validation_cache):
-    modules = _candidate_modules(context, candidate, context.device)
+def evaluate_candidate(context, candidate, selection_cache, validation_cache):
+    modules = candidate_modules(context, candidate, context.device)
     try:
-        with _temporary_fp32_replacements(context.model, context.blocks, modules):
+        with temporary_fp32_replacements(context.model, context.blocks, modules):
             recovery_kl = evaluate_validation_kl_mixed(
                 context.model,
                 validation_cache,
@@ -963,20 +963,20 @@ def _evaluate_candidate(context, candidate, selection_cache, validation_cache):
     }
 
 
-def _build_c1_c3_candidates(context, selection_cache, validation_cache):
+def build_c1_c3_candidates(context, selection_cache, validation_cache):
     results = context.artifact["results"]["candidates"]
     layers = tuple(int(value) for value in context.settings["compatibility"]["eligible_layers"])
     group_size = int(context.settings["local_fitting"]["capture_group_size"])
     targets = tuple(float(value) for value in context.settings["compatibility"]["target_mlp_removals"])
     allocations = {
-        (initialization, target): _discrete_allocation(context, initialization, target)
+        (initialization, target): discrete_allocation(context, initialization, target)
         for initialization in ("legacy_subset", "output_aware")
         for target in targets
     }
     descriptors = {}
     for target in targets:
         key = str(target)
-        descriptors[(key, "S5-C0")] = _legacy_candidate(context, target)
+        descriptors[(key, "S5-C0")] = legacy_candidate(context, target)
         legacy_widths = {
             int(row["layer"]): int(row["replacement_width"])
             for row in descriptors[(key, "S5-C0")]["allocation"]
@@ -1025,7 +1025,7 @@ def _build_c1_c3_candidates(context, selection_cache, validation_cache):
 
     for offset in range(0, len(layers), group_size):
         group = layers[offset : offset + group_size]
-        training_by_path, validation_by_path = _capture_dense_pairs(context, group)
+        training_by_path, validation_by_path = capture_dense_pairs(context, group)
         rankings = {}
         for layer in group:
             path = context.blocks[layer].path
@@ -1041,7 +1041,7 @@ def _build_c1_c3_candidates(context, selection_cache, validation_cache):
             for layer in group:
                 width = descriptor["widths"][layer]
                 path = context.blocks[layer].path
-                fit_row = _ensure_fit_for_width(
+                fit_row = ensure_fit_for_width(
                     context,
                     descriptor["initialization"],
                     layer,
@@ -1100,10 +1100,10 @@ def _build_c1_c3_candidates(context, selection_cache, validation_cache):
         if candidate_id != "S5-C0":
             descriptor.pop("widths", None)
             descriptor["allocation"].sort(key=lambda row: int(row["layer"]))
-            descriptor.update(_candidate_parameter_summary(context, descriptor["allocation"]))
+            descriptor.update(candidate_parameter_summary(context, descriptor["allocation"]))
         target_results = results.setdefault(key, {})
         if candidate_id not in target_results:
-            descriptor["pre_recovery"] = _evaluate_candidate(
+            descriptor["pre_recovery"] = evaluate_candidate(
                 context, descriptor, selection_cache, validation_cache
             )
             descriptor["recovery"] = {
@@ -1117,7 +1117,7 @@ def _build_c1_c3_candidates(context, selection_cache, validation_cache):
             context.persist("candidate_assembly")
 
 
-def _dense_targets(module, inputs, batch_size, device):
+def dense_targets(module, inputs, batch_size, device):
     chunks = []
     module.eval()
     with torch.no_grad():
@@ -1130,7 +1130,7 @@ def _dense_targets(module, inputs, batch_size, device):
     return torch.cat(chunks, dim=0)
 
 
-def _build_composition_candidates(context, selection_cache, validation_cache):
+def build_composition_candidates(context, selection_cache, validation_cache):
     results = context.artifact["results"]["candidates"]
     layers = tuple(int(value) for value in context.settings["compatibility"]["eligible_layers"])
     group_size = int(context.settings["local_fitting"]["capture_group_size"])
@@ -1151,10 +1151,10 @@ def _build_composition_candidates(context, selection_cache, validation_cache):
                 row["candidate_id"],
             ),
         )
-        parent_modules = _candidate_modules(context, parent, context.device)
+        parent_modules = candidate_modules(context, parent, context.device)
         composition_rows = []
         try:
-            with _temporary_fp32_replacements(context.model, context.blocks, parent_modules):
+            with temporary_fp32_replacements(context.model, context.blocks, parent_modules):
                 for offset in range(0, len(layers), group_size):
                     group = layers[offset : offset + group_size]
                     paths = [context.blocks[layer].path for layer in group]
@@ -1188,7 +1188,7 @@ def _build_composition_candidates(context, selection_cache, validation_cache):
                         valid_inputs = captured_validation[path].inputs
                         training_pairs = ActivationPairs(
                             train_inputs,
-                            _dense_targets(
+                            dense_targets(
                                 dense,
                                 train_inputs,
                                 int(context.settings["local_fitting"]["batch_size"]),
@@ -1197,15 +1197,15 @@ def _build_composition_candidates(context, selection_cache, validation_cache):
                         )
                         validation_pairs = ActivationPairs(
                             valid_inputs,
-                            _dense_targets(
+                            dense_targets(
                                 dense,
                                 valid_inputs,
                                 int(context.settings["local_fitting"]["batch_size"]),
                                 context.device,
                             ),
                         )
-                        selected = _selected_neurons(context, layer, training_pairs, width)
-                        fit_row = _fit_operator(
+                        selected = selected_neurons(context, layer, training_pairs, width)
+                        fit_row = fit_operator(
                             context,
                             layer,
                             width,
@@ -1250,8 +1250,8 @@ def _build_composition_candidates(context, selection_cache, validation_cache):
             "recapture_rounds": 1,
             "allocation": sorted(composition_rows, key=lambda row: int(row["layer"])),
         }
-        candidate.update(_candidate_parameter_summary(context, candidate["allocation"]))
-        candidate["pre_recovery"] = _evaluate_candidate(
+        candidate.update(candidate_parameter_summary(context, candidate["allocation"]))
+        candidate["pre_recovery"] = evaluate_candidate(
             context, candidate, selection_cache, validation_cache
         )
         candidate["recovery"] = {
@@ -1265,10 +1265,10 @@ def _build_composition_candidates(context, selection_cache, validation_cache):
         context.persist("composition_aware")
 
 
-def _load_candidate_student(context, candidate, model_config):
+def load_candidate_student(context, candidate, model_config):
     student, tokenizer = load_model_and_tokenizer(model_config)
     blocks = {block.index: block for block in discover_mlp_blocks(student)}
-    modules = _candidate_modules(context, candidate, next(student.parameters()).device)
+    modules = candidate_modules(context, candidate, next(student.parameters()).device)
     for layer, module in modules.items():
         replace_submodule(student, blocks[layer].path, module)
     target_paths = [blocks[layer].path for layer in sorted(modules)]
@@ -1283,7 +1283,7 @@ def _load_candidate_student(context, candidate, model_config):
     return student, target_paths, train_modules
 
 
-def _clone_teacher_head(model, device):
+def clone_teacher_head(model, device):
     head = deepcopy(model.get_output_embeddings()).to(device)
     for parameter in head.parameters():
         parameter.requires_grad = False
@@ -1291,7 +1291,7 @@ def _clone_teacher_head(model, device):
     return head
 
 
-def _profile_trial(
+def profile_trial(
     context,
     model_config,
     candidate,
@@ -1305,7 +1305,7 @@ def _profile_trial(
     torch.manual_seed(int(context.settings["seed"]))
     torch.cuda.manual_seed_all(int(context.settings["seed"]))
     torch.cuda.reset_peak_memory_stats(context.device)
-    student, _, train_modules = _load_candidate_student(
+    student, unused_target_paths, train_modules = load_candidate_student(
         context, candidate, model_config
     )
     execution_model = student
@@ -1345,7 +1345,7 @@ def _profile_trial(
                 }
             ],
             train_modules=train_modules,
-            batch_at=lambda offset, count: _packed_source_cache(context).batch(
+            batch_at=lambda offset, count: packed_source_cache(context).batch(
                 offset, count, microbatch_sequences
             ),
             target_tokens=profile_tokens,
@@ -1360,7 +1360,7 @@ def _profile_trial(
             device=context.device,
             autocast_dtype=torch.bfloat16,
             checkpoint_schedule=((profile_tokens, (profile_tokens,)),),
-            on_checkpoint=lambda event, _optimizer, _first: events.append(event),
+            on_checkpoint=lambda event, unused_optimizer, unused_first_step: events.append(event),
             teacher_hidden_at=cache.batch,
             teacher_head=teacher_head,
             optimizer_backend=str(context.settings["recovery"]["optimizer_backend"]),
@@ -1388,7 +1388,7 @@ def _profile_trial(
         release_cuda(torch)
 
 
-def _calibrate_recovery(context, model_config, cache, teacher_head):
+def calibrate_recovery(context, model_config, cache, teacher_head):
     existing = context.artifact["results"]["kernel_calibration"]
     if existing.get("selected_geometry"):
         return existing
@@ -1397,13 +1397,13 @@ def _calibrate_recovery(context, model_config, cache, teacher_head):
         or context.settings["recovery"]["optimizer_backend"] != "fused"
     ):
         raise ValueError("SwiGLU-5 search requires fused CUDA AdamW")
-    pre_profile_rng = _checkpoint_rng()
+    pre_profile_rng = checkpoint_rng()
     control = context.artifact["results"]["candidates"]["0.2"]["S5-C0"]
     profiles = []
     for geometry in context.settings["recovery"]["microbatch_candidates"]:
         try:
             profiles.append(
-                _profile_trial(
+                profile_trial(
                     context,
                     model_config,
                     control,
@@ -1431,7 +1431,7 @@ def _calibrate_recovery(context, model_config, cache, teacher_head):
     compiled = None
     compile_selected = False
     try:
-        compiled = _profile_trial(
+        compiled = profile_trial(
             context,
             model_config,
             control,
@@ -1479,11 +1479,11 @@ def _calibrate_recovery(context, model_config, cache, teacher_head):
     }
     context.artifact["results"]["kernel_calibration"] = record
     context.persist("kernel_calibration")
-    _restore_rng(pre_profile_rng)
+    restore_rng(pre_profile_rng)
     return record
 
 
-def _requested_actual_map(requested_values, effective_batch, limit):
+def requested_actual_map(requested_values, effective_batch, limit):
     mapped = {}
     for requested in requested_values:
         requested = int(requested)
@@ -1492,14 +1492,14 @@ def _requested_actual_map(requested_values, effective_batch, limit):
     return {actual: tuple(values) for actual, values in sorted(mapped.items())}
 
 
-def _find_full_evaluation(trajectory, requested_tokens):
+def find_full_evaluation(trajectory, requested_tokens):
     for row in trajectory["full_evaluations"]:
         if int(requested_tokens) in [int(value) for value in row["requested_tokens"]]:
             return row
     raise ValueError(f"Candidate has no full evaluation at {requested_tokens:,} tokens")
 
 
-def _recover_candidate(
+def recover_candidate(
     context,
     candidate,
     model_config,
@@ -1525,11 +1525,11 @@ def _recover_candidate(
     recovery_dir = context.asset_dir / "recovery" / target_key / candidate_id
     current_path = recovery_dir / "current.pt"
     if current_path.is_file():
-        student, target_paths, train_modules = _blank_candidate_student(
+        student, target_paths, train_modules = blank_candidate_student(
             context, model_config, candidate
         )
     else:
-        student, target_paths, train_modules = _load_candidate_student(
+        student, target_paths, train_modules = load_candidate_student(
             context, candidate, model_config
         )
     execution_model = student
@@ -1549,14 +1549,14 @@ def _recover_candidate(
             raise ValueError("Candidate recovery checkpoint recipe differs")
         if checkpoint.get("packed_token_fingerprint") != token_cache.fingerprint:
             raise ValueError("Candidate recovery token stream differs")
-        _load_replacement_state(student, checkpoint["replacement_state"])
+        load_replacement_state(student, checkpoint["replacement_state"])
         optimizer_state = checkpoint["optimizer_state"]
         recovery.clear()
         recovery.update(checkpoint["recovery"])
         start_tokens = int(checkpoint["tokens_seen"])
         start_updates = int(checkpoint["optimizer_updates"])
         elapsed = float(checkpoint["training_seconds"])
-        _restore_rng(checkpoint)
+        restore_rng(checkpoint)
     elif start_tokens:
         raise FileNotFoundError(
             f"Candidate continuation checkpoint is missing: {current_path}"
@@ -1604,9 +1604,9 @@ def _recover_candidate(
             if start_tokens < next_optimizer_boundary(value, effective, actual_target) <= actual_target
         }
     )
-    schedule_map = _requested_actual_map(requested_union, effective, actual_target)
-    validation_map = _requested_actual_map(validation_requested, effective, actual_target)
-    full_map = _requested_actual_map(full_requested, effective, actual_target)
+    schedule_map = requested_actual_map(requested_union, effective, actual_target)
+    validation_map = requested_actual_map(validation_requested, effective, actual_target)
+    full_map = requested_actual_map(full_requested, effective, actual_target)
     geometry = kernel["selected_geometry"]
     microbatch_sequences = int(geometry["microbatch_sequences"])
     microbatch_tokens = microbatch_sequences * int(token_cache.sequence_length)
@@ -1686,10 +1686,10 @@ def _recover_candidate(
                 "optimizer_updates": event.optimizer_updates,
                 "training_seconds": event.elapsed_seconds,
                 "packed_token_fingerprint": token_cache.fingerprint,
-                "replacement_state": _replacement_state(student, target_paths),
+                "replacement_state": replacement_state(student, target_paths),
                 "optimizer_state": optimizer.state_dict(),
                 "recovery": deepcopy(recovery),
-                **_checkpoint_rng(),
+                **checkpoint_rng(),
             }
             atomic_torch_save(current_path, checkpoint)
             checkpoint_seconds += perf_counter() - checkpoint_started
@@ -1760,7 +1760,7 @@ def _recover_candidate(
         release_cuda(torch)
 
 
-def _prune_search_candidate_checkpoints(context, candidate):
+def prune_search_candidate_checkpoints(context, candidate):
     """Prune non-selected recovery state while preserving its manifest."""
 
     recovery = candidate["recovery"]
@@ -1796,7 +1796,7 @@ def _prune_search_candidate_checkpoints(context, candidate):
         context.persist("checkpoint_pruning")
 
 
-def _retain_search_winner_endpoint(context, candidate):
+def retain_search_winner_endpoint(context, candidate):
     recovery = candidate["recovery"]
     requested = int(context.settings["recovery"]["finalist_tokens"])
     actual = int(recovery["tokens_seen"])
@@ -1830,7 +1830,7 @@ def _retain_search_winner_endpoint(context, candidate):
     return record
 
 
-def _pending_candidate_fit_keys(context):
+def pending_candidate_fit_keys(context):
     needed = set()
     for candidates in context.artifact["results"]["candidates"].values():
         for candidate in candidates.values():
@@ -1844,7 +1844,7 @@ def _pending_candidate_fit_keys(context):
     return needed
 
 
-def _prune_search_local_fit_states(context, retain_fit_keys=(), stage="search_complete"):
+def prune_search_local_fit_states(context, retain_fit_keys=(), stage="search_complete"):
     """Delete fitted tensors once no untrained candidate can consume them."""
 
     retain_fit_keys = set(retain_fit_keys)
@@ -1856,7 +1856,7 @@ def _prune_search_local_fit_states(context, retain_fit_keys=(), stage="search_co
             continue
         if row["fit_key"] in retain_fit_keys:
             continue
-        path = _operator_state_path(
+        path = operator_state_path(
             context,
             row["initialization"],
             row["layer"],
@@ -1891,7 +1891,7 @@ def _prune_search_local_fit_states(context, retain_fit_keys=(), stage="search_co
     }
 
 
-def _prune_teacher_hidden_cache(context, hidden_cache):
+def prune_teacher_hidden_cache(context, hidden_cache):
     """Remove the search-only teacher cache after its last consumer."""
 
     hidden_cache.release()
@@ -1916,7 +1916,7 @@ def _prune_teacher_hidden_cache(context, hidden_cache):
     return {"removed": True, "bytes_removed": removed_bytes}
 
 
-def _runtime_guard(context, observed_tokens_per_second):
+def runtime_guard(context, observed_tokens_per_second):
     completed_seconds = sum(
         float(row["seconds"]) for row in context.artifact["results"]["runtime"]
     )
@@ -1941,7 +1941,7 @@ def _runtime_guard(context, observed_tokens_per_second):
     return record
 
 
-def _rank_qualifier_challengers(context, target_key, candidate_ids):
+def rank_qualifier_challengers(context, target_key, candidate_ids):
     candidates = context.artifact["results"]["candidates"][target_key]
     qualifier_requested = int(context.settings["recovery"]["qualifier_tokens"])
     challengers = []
@@ -1953,12 +1953,15 @@ def _rank_qualifier_challengers(context, target_key, candidate_ids):
             if qualifier_requested in [int(value) for value in row["requested_tokens"]]
         )
         challengers.append((float(endpoint["recovery_validation_kl"]), candidate_id))
-    return [candidate_id for _, candidate_id in sorted(challengers)]
+    return [
+        candidate_id
+        for unused_validation_kl, candidate_id in sorted(challengers)
+    ]
 
 
-def _select_finalists(context, target_key):
+def select_finalists(context, target_key):
     count = int(context.settings["selection"]["challenger_finalists"])
-    selected = _rank_qualifier_challengers(
+    selected = rank_qualifier_challengers(
         context,
         target_key,
         ("S5-C1", "S5-C2", "S5-C3", "S5-C4"),
@@ -1966,15 +1969,15 @@ def _select_finalists(context, target_key):
     return ["S5-C0", *selected]
 
 
-def _select_winner(context, target_key, finalists):
+def select_winner(context, target_key, finalists):
     candidates = context.artifact["results"]["candidates"][target_key]
     requested = int(context.settings["recovery"]["finalist_tokens"])
-    control_eval = _find_full_evaluation(candidates["S5-C0"]["recovery"], requested)
+    control_eval = find_full_evaluation(candidates["S5-C0"]["recovery"], requested)
     control_ppl = float(control_eval["wikitext_validation"]["perplexity"])
     eligible = []
     decisions = []
     for candidate_id in finalists:
-        evaluation = _find_full_evaluation(candidates[candidate_id]["recovery"], requested)
+        evaluation = find_full_evaluation(candidates[candidate_id]["recovery"], requested)
         ppl = float(evaluation["wikitext_validation"]["perplexity"])
         passes = candidate_id == "S5-C0" or ppl <= control_ppl
         row = {
@@ -2013,7 +2016,7 @@ def _select_winner(context, target_key, finalists):
     )
     dense = context.artifact["results"]["dense_baseline"]
     control = next(row for row in decisions if row["candidate_id"] == "S5-C0")
-    winner_eval = _find_full_evaluation(winner_candidate["recovery"], requested)
+    winner_eval = find_full_evaluation(winner_candidate["recovery"], requested)
     return {
         "finalists": finalists,
         "guardrail_decisions": decisions,
@@ -2045,7 +2048,7 @@ def _select_winner(context, target_key, finalists):
     }
 
 
-def _record_stage_runtime(context, stage, started):
+def record_stage_runtime(context, stage, started):
     context.artifact["results"]["runtime"].append(
         {"stage": stage, "seconds": perf_counter() - started}
     )
@@ -2056,9 +2059,9 @@ def run_search(context):
     """Execute the complete compute-bounded SwiGLU-5 tournament."""
 
     started = perf_counter()
-    _import_swiglu3_evidence(context)
-    _storage_preflight(context)
-    model_config = _load_search_resources(context)
+    import_swiglu3_evidence(context)
+    storage_preflight(context)
+    model_config = load_search_resources(context)
     context.artifact["results"]["data"] = {
         "partition_order": list(context.data["partition_batches"]),
         "partition_batches": deepcopy(context.data["partition_batches"]),
@@ -2067,7 +2070,7 @@ def run_search(context):
         ),
         "sequence_length": int(context.data["sequence_length"]),
     }
-    _record_stage_runtime(context, "load_model_and_data", started)
+    record_stage_runtime(context, "load_model_and_data", started)
 
     started = perf_counter()
     cache_dtype = context.source["configuration"]["recovery"].get(
@@ -2107,27 +2110,27 @@ def run_search(context):
             int(context.settings["data"]["model_validation_batches"]),
         ),
     }
-    _record_stage_runtime(context, "dense_and_fixed_evaluation_caches", started)
+    record_stage_runtime(context, "dense_and_fixed_evaluation_caches", started)
 
     started = perf_counter()
-    _build_width_curves(context, selection_cache)
-    _record_stage_runtime(context, "width_curves", started)
+    build_width_curves(context, selection_cache)
+    record_stage_runtime(context, "width_curves", started)
 
     started = perf_counter()
-    _build_c1_c3_candidates(context, selection_cache, validation_cache)
-    _build_composition_candidates(context, selection_cache, validation_cache)
-    _record_stage_runtime(context, "candidate_assembly", started)
+    build_c1_c3_candidates(context, selection_cache, validation_cache)
+    build_composition_candidates(context, selection_cache, validation_cache)
+    record_stage_runtime(context, "candidate_assembly", started)
     context.artifact["results"]["local_fit_state_pruning"] = [
-        _prune_search_local_fit_states(
+        prune_search_local_fit_states(
             context,
-            _pending_candidate_fit_keys(context),
+            pending_candidate_fit_keys(context),
             stage="candidate_assembly",
         )
     ]
     context.persist("candidate_state_pruning")
 
     started = perf_counter()
-    token_cache = _packed_source_cache(context)
+    token_cache = packed_source_cache(context)
     hidden_settings = context.settings["teacher_hidden_cache"]
     hidden_cache = build_teacher_final_hidden_cache(
         context.model,
@@ -2158,8 +2161,8 @@ def run_search(context):
         "manifest": deepcopy(hidden_cache.manifest),
         "equivalence_validation": equivalence,
     }
-    teacher_head = _clone_teacher_head(context.model, context.device)
-    _record_stage_runtime(context, "teacher_final_hidden_cache", started)
+    teacher_head = clone_teacher_head(context.model, context.device)
+    record_stage_runtime(context, "teacher_final_hidden_cache", started)
 
     del context.model, context.blocks
     context.model = None
@@ -2168,18 +2171,18 @@ def run_search(context):
     release_cuda(torch)
 
     started = perf_counter()
-    kernel = _calibrate_recovery(context, model_config, hidden_cache, teacher_head)
-    _record_stage_runtime(context, "kernel_calibration", started)
-    guard = _runtime_guard(context, kernel["observed_tokens_per_second"])
+    kernel = calibrate_recovery(context, model_config, hidden_cache, teacher_head)
+    record_stage_runtime(context, "kernel_calibration", started)
+    guard = runtime_guard(context, kernel["observed_tokens_per_second"])
     if not guard["passed"]:
         context.artifact["results"]["local_fit_state_pruning"].append(
-            _prune_search_local_fit_states(
+            prune_search_local_fit_states(
                 context,
                 stage="budget_guard_rejected",
             )
         )
         context.artifact["results"]["teacher_hidden_cache_cleanup"] = (
-            _prune_teacher_hidden_cache(context, hidden_cache)
+            prune_teacher_hidden_cache(context, hidden_cache)
         )
         context.artifact["status"] = "budget_guard_rejected"
         context.artifact["completed_at_utc"] = utc_now()
@@ -2194,7 +2197,7 @@ def run_search(context):
     )
     for target_key in ("0.2", "0.5"):
         candidates = context.artifact["results"]["candidates"][target_key]
-        _recover_candidate(
+        recover_candidate(
             context,
             candidates["S5-C0"],
             model_config,
@@ -2207,15 +2210,15 @@ def run_search(context):
             kernel,
         )
         context.artifact["results"]["local_fit_state_pruning"].append(
-            _prune_search_local_fit_states(
+            prune_search_local_fit_states(
                 context,
-                _pending_candidate_fit_keys(context),
+                pending_candidate_fit_keys(context),
                 stage=f"{target_key}-S5-C0-qualified",
             )
         )
         completed_challengers = []
         for candidate_id in ("S5-C1", "S5-C2", "S5-C3", "S5-C4"):
-            _recover_candidate(
+            recover_candidate(
                 context,
                 candidates[candidate_id],
                 model_config,
@@ -2229,7 +2232,7 @@ def run_search(context):
             )
             completed_challengers.append(candidate_id)
             retained = set(
-                _rank_qualifier_challengers(
+                rank_qualifier_challengers(
                     context,
                     target_key,
                     completed_challengers,
@@ -2237,25 +2240,25 @@ def run_search(context):
             )
             for completed_id in completed_challengers:
                 if completed_id not in retained:
-                    _prune_search_candidate_checkpoints(
+                    prune_search_candidate_checkpoints(
                         context,
                         candidates[completed_id],
                     )
             context.artifact["results"]["local_fit_state_pruning"].append(
-                _prune_search_local_fit_states(
+                prune_search_local_fit_states(
                     context,
-                    _pending_candidate_fit_keys(context),
+                    pending_candidate_fit_keys(context),
                     stage=f"{target_key}-{candidate_id}-qualified",
                 )
             )
-        finalists = _select_finalists(context, target_key)
+        finalists = select_finalists(context, target_key)
         qualifier_selection[target_key] = {
             "requested_tokens": qualifier,
             "finalists": finalists,
         }
         context.persist("qualifier_selection")
         for candidate_id in finalists:
-            _recover_candidate(
+            recover_candidate(
                 context,
                 candidates[candidate_id],
                 model_config,
@@ -2268,25 +2271,25 @@ def run_search(context):
                 kernel,
             )
             context.artifact["results"]["local_fit_state_pruning"].append(
-                _prune_search_local_fit_states(
+                prune_search_local_fit_states(
                     context,
-                    _pending_candidate_fit_keys(context),
+                    pending_candidate_fit_keys(context),
                     stage=f"{target_key}-{candidate_id}-finalist",
                 )
             )
-        selection = _select_winner(
+        selection = select_winner(
             context, target_key, finalists
         )
         winner = selection["winner_candidate_id"]
-        selection["winner_endpoint"] = _retain_search_winner_endpoint(
+        selection["winner_endpoint"] = retain_search_winner_endpoint(
             context, candidates[winner]
         )
         context.artifact["results"]["selection"][target_key] = selection
         for candidate_id, candidate in candidates.items():
             if candidate_id != winner:
-                _prune_search_candidate_checkpoints(context, candidate)
+                prune_search_candidate_checkpoints(context, candidate)
         context.persist("winner_selection")
-    _record_stage_runtime(context, "candidate_recovery_and_selection", started)
+    record_stage_runtime(context, "candidate_recovery_and_selection", started)
     context.artifact["results"]["recovery_work"] = {
         "qualifier_candidate_token_positions": 20_000_000,
         "continuation_candidate_token_positions": 18_000_000,
@@ -2298,13 +2301,13 @@ def run_search(context):
         ),
     }
     context.artifact["results"]["local_fit_state_pruning"].append(
-        _prune_search_local_fit_states(
+        prune_search_local_fit_states(
             context,
             stage="search_complete",
         )
     )
     context.artifact["results"]["teacher_hidden_cache_cleanup"] = (
-        _prune_teacher_hidden_cache(context, hidden_cache)
+        prune_teacher_hidden_cache(context, hidden_cache)
     )
     context.artifact["status"] = "completed"
     context.artifact["completed_at_utc"] = utc_now()
@@ -2377,7 +2380,7 @@ def prepare_confirmation_context(
         }
     )
     output = resolve_path(Path(output or default_output(CONFIRMATION_WORKFLOW, target_key)))
-    asset_dir = _asset_directory(output)
+    asset_dir = asset_directory(output)
     if output.exists() or asset_dir.exists():
         raise FileExistsError(f"Confirmation output already exists: {output}")
     artifact = {
@@ -2424,13 +2427,13 @@ def prepare_confirmation_context(
     return context
 
 
-def _confirmation_candidate(context):
+def confirmation_candidate(context):
     key = str(float(context.settings["target"]))
     candidate_id = context.settings["selected_candidate_id"]
     return context.search["results"]["candidates"][key][candidate_id]
 
 
-def _blank_candidate_student(context, model_config, candidate):
+def blank_candidate_student(context, model_config, candidate):
     student, tokenizer = load_model_and_tokenizer(model_config)
     blocks = {block.index: block for block in discover_mlp_blocks(student)}
     hidden = int(context.settings["model"]["hidden_size"])
@@ -2452,13 +2455,13 @@ def _blank_candidate_student(context, model_config, candidate):
     return student, target_paths, train_modules
 
 
-def _load_selected_search_checkpoint(context):
+def load_selected_search_checkpoint(context):
     record = context.artifact["provenance"]
     path = resolve_path(Path(record["selected_endpoint"]["resolved_path"]))
     checkpoint = torch.load(path, map_location="cpu", weights_only=False)
     if checkpoint.get("run_fingerprint") != context.search["run_fingerprint"]:
         raise ValueError("Selected endpoint belongs to a different search run")
-    candidate = _confirmation_candidate(context)
+    candidate = confirmation_candidate(context)
     expected = fingerprint(
         {key: value for key, value in candidate.items() if key != "recovery"}
     )
@@ -2467,14 +2470,14 @@ def _load_selected_search_checkpoint(context):
     return checkpoint
 
 
-def _online_profile_trial(context, model_config, candidate, teacher, geometry):
-    checkpoint = _load_selected_search_checkpoint(context)
-    student, _, train_modules = _blank_candidate_student(
+def online_profile_trial(context, model_config, candidate, teacher, geometry):
+    checkpoint = load_selected_search_checkpoint(context)
+    student, unused_target_paths, train_modules = blank_candidate_student(
         context, model_config, candidate
     )
-    _load_replacement_state(student, checkpoint["replacement_state"])
-    _restore_rng(checkpoint)
-    token_cache = _packed_source_cache(context)
+    load_replacement_state(student, checkpoint["replacement_state"])
+    restore_rng(checkpoint)
+    token_cache = packed_source_cache(context)
     microbatch_sequences = int(geometry["microbatch_sequences"])
     microbatch_tokens = microbatch_sequences * token_cache.sequence_length
     effective = int(context.settings["recovery"]["effective_batch_tokens"])
@@ -2518,7 +2521,7 @@ def _online_profile_trial(context, model_config, candidate, teacher, geometry):
             elapsed_seconds=0.0,
             optimizer_state=checkpoint["optimizer_state"],
             checkpoint_schedule=((target_tokens, (target_tokens,)),),
-            on_checkpoint=lambda event, _optimizer, _first: events.append(event),
+            on_checkpoint=lambda event, unused_optimizer, unused_first_step: events.append(event),
             optimizer_backend=str(context.settings["recovery"]["optimizer_backend"]),
         )
         peak = torch.cuda.max_memory_allocated(context.device) / 1024**3
@@ -2538,7 +2541,7 @@ def _online_profile_trial(context, model_config, candidate, teacher, geometry):
         release_cuda(torch)
 
 
-def _calibrate_online_confirmation(context, model_config, candidate, teacher):
+def calibrate_online_confirmation(context, model_config, candidate, teacher):
     existing = context.artifact["results"]["kernel_calibration"]
     if existing.get("selected_geometry"):
         return existing
@@ -2551,7 +2554,7 @@ def _calibrate_online_confirmation(context, model_config, candidate, teacher):
     for geometry in context.settings["recovery"]["microbatch_candidates"]:
         try:
             profiles.append(
-                _online_profile_trial(
+                online_profile_trial(
                     context, model_config, candidate, teacher, geometry
                 )
             )
@@ -2582,7 +2585,7 @@ def _calibrate_online_confirmation(context, model_config, candidate, teacher):
     return record
 
 
-def _source_comparison_row(context, milestone, current, trajectory):
+def source_comparison_row(context, milestone, current, trajectory):
     source_current = milestone["current"]
     requested = int(milestone["requested_tokens"][0])
     source_elapsed = None
@@ -2699,8 +2702,8 @@ def run_confirmation(context):
         raise ValueError("Confirmation teacher must retain tied embeddings")
     del teacher_blocks
     context.data = build_local_data(context)
-    token_cache = _packed_source_cache(context)
-    endpoint = _load_selected_search_checkpoint(context)
+    token_cache = packed_source_cache(context)
+    endpoint = load_selected_search_checkpoint(context)
     if endpoint.get("packed_token_fingerprint") != token_cache.fingerprint:
         raise ValueError("Search endpoint and SwiGLU-3 token stream differ")
     start_requested = int(context.settings["recovery"]["start_tokens"])
@@ -2733,9 +2736,9 @@ def run_confirmation(context):
     )
     context.persist("load_and_validate")
 
-    candidate = _confirmation_candidate(context)
+    candidate = confirmation_candidate(context)
     stage_started = perf_counter()
-    kernel = _calibrate_online_confirmation(
+    kernel = calibrate_online_confirmation(
         context, model_config, candidate, teacher
     )
     context.artifact["results"]["runtime"].append(
@@ -2743,20 +2746,20 @@ def run_confirmation(context):
     )
     context.persist("kernel_calibration")
 
-    student, target_paths, train_modules = _blank_candidate_student(
+    student, target_paths, train_modules = blank_candidate_student(
         context, model_config, candidate
     )
-    endpoint = _load_selected_search_checkpoint(context)
+    endpoint = load_selected_search_checkpoint(context)
     trajectory = context.artifact["results"]["trajectory"]
     best_path = context.asset_dir / "recovery" / "best.pt"
     final_path = context.asset_dir / "recovery" / "final.pt"
-    _load_replacement_state(student, endpoint["replacement_state"])
+    load_replacement_state(student, endpoint["replacement_state"])
     optimizer_state = endpoint["optimizer_state"]
-    _restore_rng(endpoint)
+    restore_rng(endpoint)
     start_tokens = int(endpoint["tokens_seen"])
     start_updates = int(endpoint["optimizer_updates"])
     training_seconds = float(endpoint["training_seconds"])
-    search_full = _find_full_evaluation(candidate["recovery"], start_requested)
+    search_full = find_full_evaluation(candidate["recovery"], start_requested)
     trajectory.update(
         {
             "status": "running",
@@ -2798,9 +2801,9 @@ def run_confirmation(context):
         if value > start_requested
     ]
     requested_union = sorted(set(validation_requested + full_requested))
-    schedule_map = _requested_actual_map(requested_union, effective, target_tokens)
-    validation_map = _requested_actual_map(validation_requested, effective, target_tokens)
-    full_map = _requested_actual_map(full_requested, effective, target_tokens)
+    schedule_map = requested_actual_map(requested_union, effective, target_tokens)
+    validation_map = requested_actual_map(validation_requested, effective, target_tokens)
+    full_map = requested_actual_map(full_requested, effective, target_tokens)
     geometry = kernel["selected_geometry"]
     microbatch_sequences = int(geometry["microbatch_sequences"])
     microbatch_tokens = microbatch_sequences * token_cache.sequence_length
@@ -2809,7 +2812,7 @@ def run_confirmation(context):
     if torch.device(context.device).type == "cuda":
         torch.cuda.reset_peak_memory_stats(context.device)
 
-    def on_checkpoint(event, _optimizer, first_step):
+    def on_checkpoint(event, unused_optimizer, first_step):
         evaluation_started = perf_counter()
         validation_kl = evaluate_validation_kl_mixed(
             student,
@@ -2870,7 +2873,7 @@ def run_confirmation(context):
                     "run_fingerprint": context.run_fingerprint,
                     "tokens_seen": event.tokens_seen,
                     "optimizer_updates": event.optimizer_updates,
-                    "replacement_state": _replacement_state(student, target_paths),
+                    "replacement_state": replacement_state(student, target_paths),
                 },
             )
             trajectory["checkpoint_seconds"] = float(
@@ -2954,7 +2957,7 @@ def run_confirmation(context):
                     "run_fingerprint": context.run_fingerprint,
                     "tokens_seen": result.tokens_seen,
                     "optimizer_updates": result.optimizer_updates,
-                    "replacement_state": _replacement_state(student, target_paths),
+                    "replacement_state": replacement_state(student, target_paths),
                 },
             )
             if int(trajectory["best_checkpoint_tokens"]) == start_tokens:
@@ -2972,7 +2975,7 @@ def run_confirmation(context):
         trajectory["checkpoint_seconds"] = float(
             trajectory.get("checkpoint_seconds", 0.0)
         ) + perf_counter() - checkpoint_started
-        final_evaluation = _find_full_evaluation(trajectory, target_tokens)
+        final_evaluation = find_full_evaluation(trajectory, target_tokens)
         final_evaluation["cumulative_checkpoint_seconds"] = float(
             trajectory["checkpoint_seconds"]
         )
@@ -3001,9 +3004,9 @@ def run_confirmation(context):
         target_key = str(float(context.settings["target"]))
         for requested in context.settings["comparison"]["swiglu_3_equal_token_milestones"]:
             source_m = source_milestone(context.source, target_key, int(requested))
-            current_m = _find_full_evaluation(trajectory, int(requested))
+            current_m = find_full_evaluation(trajectory, int(requested))
             comparisons.append(
-                _source_comparison_row(context, source_m, current_m, trajectory)
+                source_comparison_row(context, source_m, current_m, trajectory)
             )
         context.artifact["results"]["paired_swiglu_3_comparison"] = comparisons
         context.artifact["status"] = "completed"
