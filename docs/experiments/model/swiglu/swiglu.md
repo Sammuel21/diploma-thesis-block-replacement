@@ -179,8 +179,8 @@ Optimized results and comparisons are stored in
 ## Python workflow
 
 The headless compute path is
-[`workflows.runs.model.swiglu.initial`](../../../../workflows/runs/model/swiglu/initial.py),
-driven by [`initial.json`](../../../../workflows/configs/model/swiglu/initial.json).
+[`workflows.runs.model.swiglu.swiglu_initial`](../../../../workflows/runs/model/swiglu/swiglu_initial.py),
+driven by [`swiglu-initial.json`](../../../../workflows/configs/model/swiglu/swiglu-initial.json).
 It exposes historical, optimized, and combined stages while retaining the
 notebook as the explanatory and loading frontend. The optimized runner keeps
 the six-block, native-dtype CPU capture discipline described above. Each run

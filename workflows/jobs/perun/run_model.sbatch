@@ -31,10 +31,10 @@ case "$WORKFLOW_NAME" in
         WORKFLOW_MODULE="workflows.runs.model.baseline.compression"
         ;;
     swiglu)
-        WORKFLOW_MODULE="workflows.runs.model.swiglu.initial"
+        WORKFLOW_MODULE="workflows.runs.model.swiglu.swiglu_initial"
         ;;
     swiglu-2)
-        WORKFLOW_MODULE="workflows.runs.model.swiglu.allocation"
+        WORKFLOW_MODULE="workflows.runs.model.swiglu.swiglu_2_allocation"
         ;;
     *)
         echo "Unsupported model workflow: $WORKFLOW_NAME" >&2

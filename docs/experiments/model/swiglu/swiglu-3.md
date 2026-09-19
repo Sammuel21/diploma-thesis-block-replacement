@@ -151,8 +151,8 @@ fingerprint. Milestone checkpoints contain reconstructable replacement states.
 
 ## Artifacts and execution
 
-The runner is `workflows.runs.model.swiglu.calibration_recovery`, configured by
-`workflows/configs/model/swiglu/calibration-recovery.json`. It writes a unique incremental science
+The runner is `workflows.runs.model.swiglu.swiglu_3_calibration_recovery`, configured by
+`workflows/configs/model/swiglu/swiglu-3-calibration-recovery.json`. It writes a unique incremental science
 JSON, a sibling `.run.json`, an asset directory with local operator states, the
 packed-token cache, current/best recovery state, and retained 10M and 100M
 milestone states.
@@ -165,7 +165,7 @@ From the repository root on a prepared Linux GPU host:
 ```bash
 export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 mkdir -p data/results/workflows/model/swiglu-3
-nohup python -u -m workflows.runs.model.swiglu.calibration_recovery \
+nohup python -u -m workflows.runs.model.swiglu.swiglu_3_calibration_recovery \
   --output data/results/workflows/model/swiglu-3/run-001.json \
   > data/results/workflows/model/swiglu-3/run-001.log 2>&1 &
 ```
@@ -173,7 +173,7 @@ nohup python -u -m workflows.runs.model.swiglu.calibration_recovery \
 After an interruption, use the same output explicitly:
 
 ```bash
-python -u -m workflows.runs.model.swiglu.calibration_recovery \
+python -u -m workflows.runs.model.swiglu.swiglu_3_calibration_recovery \
   --output data/results/workflows/model/swiglu-3/run-001.json --resume
 ```
 

@@ -60,7 +60,7 @@ from mlp_replacement.runlog import environment_record
 WORKFLOW = "swiglu-4"
 ARTIFACT_SCHEMA = 1
 SOURCE_SCHEMA = 1
-DEFAULT_CONFIG = Path("workflows/configs/model/swiglu/recovery-analysis.json")
+DEFAULT_CONFIG = Path("workflows/configs/model/swiglu/swiglu-4-recovery-analysis.json")
 
 
 def utc_now():

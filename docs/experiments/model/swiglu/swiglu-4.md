@@ -219,8 +219,8 @@ LoRA scopes. The maximum planned training is about 76M token positions: up to
 
 ## Artifact and interruption behavior
 
-The runner is `workflows.runs.model.swiglu.recovery_analysis`, configured by
-`workflows/configs/model/swiglu/recovery-analysis.json`. Its persistent scientific products are
+The runner is `workflows.runs.model.swiglu.swiglu_4_recovery_analysis`, configured by
+`workflows/configs/model/swiglu/swiglu-4-recovery-analysis.json`. Its persistent scientific products are
 the main JSON and sibling `.run.json`; the shell log remains the external nohup
 log. The main JSON contains all histories, milestones, trainable parameter
 counts, target paths, memory measurements, runtime, source fingerprints,
@@ -238,7 +238,7 @@ From the repository root on darthmachinus:
 ```bash
 export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 mkdir -p data/results/workflows/model/swiglu-4
-nohup python -u -m workflows.runs.model.swiglu.recovery_analysis \
+nohup python -u -m workflows.runs.model.swiglu.swiglu_4_recovery_analysis \
   --source data/results/workflows/model/swiglu-3/run-001.json \
   --output data/results/workflows/model/swiglu-4/run-001.json \
   > data/results/workflows/model/swiglu-4/run-001.log 2>&1 &
@@ -247,7 +247,7 @@ nohup python -u -m workflows.runs.model.swiglu.recovery_analysis \
 Resume an interrupted run with the same source and output:
 
 ```bash
-python -u -m workflows.runs.model.swiglu.recovery_analysis \
+python -u -m workflows.runs.model.swiglu.swiglu_4_recovery_analysis \
   --source data/results/workflows/model/swiglu-3/run-001.json \
   --output data/results/workflows/model/swiglu-4/run-001.json \
   --resume

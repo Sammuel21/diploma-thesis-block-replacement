@@ -231,8 +231,8 @@ loss, compression, and local fit reported alongside it.
 ## Python workflow
 
 The headless compute path is
-[`workflows.runs.model.swiglu.allocation`](../../../../workflows/runs/model/swiglu/allocation.py),
-driven by [`allocation.json`](../../../../workflows/configs/model/swiglu/allocation.json).
+[`workflows.runs.model.swiglu.swiglu_2_allocation`](../../../../workflows/runs/model/swiglu/swiglu_2_allocation.py),
+driven by [`swiglu-2-allocation.json`](../../../../workflows/configs/model/swiglu/swiglu-2-allocation.json).
 It implements the six dependent stages above in one process because later
 promotion and finalist choices depend on earlier measurements. The notebook is
 retained as the explanatory and loading frontend. The runner writes the

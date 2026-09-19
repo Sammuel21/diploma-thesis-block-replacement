@@ -8,10 +8,10 @@ frontend.
 | Notebook | Python module | Configuration | Default stage |
 | --- | --- | --- | --- |
 | `baseline/compression-baseline.ipynb` | `workflows.runs.model.baseline.compression` | `workflows/configs/model/baseline/compression.json` | optimized |
-| `swiglu/swiglu.ipynb` | `workflows.runs.model.swiglu.initial` | `workflows/configs/model/swiglu/initial.json` | optimized |
-| `swiglu/swiglu-2.ipynb` | `workflows.runs.model.swiglu.allocation` | `workflows/configs/model/swiglu/allocation.json` | complete search |
-| `swiglu/swiglu-3.ipynb` | `workflows.runs.model.swiglu.calibration_recovery` | `workflows/configs/model/swiglu/calibration-recovery.json` | calibration, sparsity, and recovery |
-| `swiglu/swiglu-4.ipynb` | `workflows.runs.model.swiglu.recovery_analysis` | `workflows/configs/model/swiglu/recovery-analysis.json` | completed global-recovery analysis |
+| `swiglu/swiglu.ipynb` | `workflows.runs.model.swiglu.swiglu_initial` | `workflows/configs/model/swiglu/swiglu-initial.json` | optimized |
+| `swiglu/swiglu-2.ipynb` | `workflows.runs.model.swiglu.swiglu_2_allocation` | `workflows/configs/model/swiglu/swiglu-2-allocation.json` | complete search |
+| `swiglu/swiglu-3.ipynb` | `workflows.runs.model.swiglu.swiglu_3_calibration_recovery` | `workflows/configs/model/swiglu/swiglu-3-calibration-recovery.json` | calibration, sparsity, and recovery |
+| `swiglu/swiglu-4.ipynb` | `workflows.runs.model.swiglu.swiglu_4_recovery_analysis` | `workflows/configs/model/swiglu/swiglu-4-recovery-analysis.json` | completed global-recovery analysis |
 | `swiglu/swiglu-5.ipynb` | `workflows.runs.model.swiglu.swiglu_5_search` | `workflows/configs/model/swiglu/swiglu-5-search.json` | bounded search |
 | `swiglu/swiglu-5.ipynb` | `workflows.runs.model.swiglu.swiglu_5_confirmation` | `workflows/configs/model/swiglu/swiglu-5-confirmation.json` | gated 100M confirmation |
 
@@ -35,10 +35,10 @@ Run from the repository root with `src/` on `PYTHONPATH`:
 ```bash
 export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 python -m workflows.runs.model.baseline.compression --stage optimized
-python -m workflows.runs.model.swiglu.initial --stage optimized
-python -m workflows.runs.model.swiglu.allocation
-python -m workflows.runs.model.swiglu.calibration_recovery
-python -m workflows.runs.model.swiglu.recovery_analysis
+python -m workflows.runs.model.swiglu.swiglu_initial --stage optimized
+python -m workflows.runs.model.swiglu.swiglu_2_allocation
+python -m workflows.runs.model.swiglu.swiglu_3_calibration_recovery
+python -m workflows.runs.model.swiglu.swiglu_4_recovery_analysis
 python -m workflows.runs.model.swiglu.swiglu_5_search \
   --config workflows/configs/model/swiglu/swiglu-5-search.json \
   --source data/results/workflows/model/swiglu-3/run-001.json \

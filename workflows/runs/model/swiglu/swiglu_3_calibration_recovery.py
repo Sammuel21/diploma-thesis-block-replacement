@@ -58,7 +58,7 @@ ARTIFACT_SCHEMA = 1
 ALLOCATION_SCHEMA = 1
 RANKING_SCHEMA = 3
 WINNING_POLICY = "singleton_kl_w25_t1"
-DEFAULT_CONFIG = Path("workflows/configs/model/swiglu/calibration-recovery.json")
+DEFAULT_CONFIG = Path("workflows/configs/model/swiglu/swiglu-3-calibration-recovery.json")
 
 
 def utc_now():
