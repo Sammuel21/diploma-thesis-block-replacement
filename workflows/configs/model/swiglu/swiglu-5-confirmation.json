@@ -30,7 +30,6 @@
     "target_tokens": 100000000,
     "validation_interval_tokens": 5000000,
     "full_evaluation_tokens": [10000000, 25000000, 50000000, 100000000],
-    "durable_checkpoint_interval_tokens": 5000000,
     "effective_batch_tokens": 2048,
     "microbatch_candidates": [
       {"microbatch_sequences": 2, "gradient_accumulation_steps": 8},

@@ -125,6 +125,11 @@ class TeacherFinalHiddenCache:
             raise RuntimeError("Teacher-hidden cache has a gap in the requested range")
         return torch.cat(chunks, dim=0) if len(chunks) > 1 else chunks[0]
 
+    def release(self):
+        """Release process-local memory maps before deleting cache shards."""
+
+        _load_hidden_shard.cache_clear()
+
 
 @lru_cache(maxsize=2)
 def _load_hidden_shard(path, sha256):

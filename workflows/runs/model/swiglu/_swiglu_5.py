@@ -10,7 +10,6 @@ from __future__ import annotations
 import gc
 import json
 import math
-import os
 import shutil
 from contextlib import contextmanager
 from copy import deepcopy
@@ -98,36 +97,6 @@ def default_output(workflow, target=None):
 def _asset_directory(output):
     output = Path(output)
     return output.with_suffix("").with_name(output.stem + ".assets")
-
-
-def _link_or_copy_checkpoint(source, destination):
-    """Retain one immutable checkpoint without serializing it twice."""
-
-    source = Path(source)
-    destination = Path(destination)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.exists():
-        if sha256_file(destination) != sha256_file(source):
-            raise ValueError(f"Existing checkpoint differs: {destination}")
-        return
-    try:
-        os.link(source, destination)
-    except OSError:
-        shutil.copy2(source, destination)
-
-
-def _content_provenance(value):
-    """Remove relocatable path fields while retaining content identity."""
-
-    if isinstance(value, dict):
-        return {
-            key: _content_provenance(item)
-            for key, item in value.items()
-            if key not in {"path", "resolved_path"}
-        }
-    if isinstance(value, list):
-        return [_content_provenance(item) for item in value]
-    return value
 
 
 def _checkpoint_rng():
@@ -247,7 +216,7 @@ def _strict_source_assets(source, source_path, calibration_pairs, targets):
     return assets, token_path
 
 
-def prepare_search_context(settings, config_path, source_path, output, resume):
+def prepare_search_context(settings, config_path, source_path, output):
     source_path = resolve_path(Path(source_path or settings["references"]["swiglu_3_artifact"]))
     source = load_artifact(source_path, 1, "completed SwiGLU-3 source")
     effective = deep_merge(source["configuration"], settings)
@@ -277,46 +246,33 @@ def prepare_search_context(settings, config_path, source_path, output, resume):
     )
     output = resolve_path(Path(output or default_output(SEARCH_WORKFLOW)))
     asset_dir = _asset_directory(output)
-    if resume:
-        if not output.is_file():
-            raise FileNotFoundError(f"Resume artifact does not exist: {output}")
-        artifact = json.loads(output.read_text(encoding="utf-8"))
-        if artifact.get("run_fingerprint") != run_fingerprint:
-            raise ValueError("SwiGLU-5 resume fingerprint differs")
-        if _content_provenance(artifact.get("provenance")) != _content_provenance(
-            provenance
-        ):
-            raise ValueError("SwiGLU-5 source/configuration assets changed")
-        if artifact.get("status") == "completed":
-            raise ValueError("Completed SwiGLU-5 search cannot be resumed")
-    else:
-        if output.exists() or asset_dir.exists():
-            raise FileExistsError(f"SwiGLU-5 output already exists: {output}")
-        artifact = {
-            "schema_version": SCHEMA_VERSION,
-            "workflow": SEARCH_WORKFLOW,
-            "experiment_family": "swiglu-5",
-            "experiment_class": "homogeneous-swiglu-global-recovery",
-            "status": "running",
-            "created_at_utc": utc_now(),
-            "run_fingerprint": run_fingerprint,
-            "environment": environment_record(),
-            "configuration": effective,
-            "provenance": provenance,
-            "results": {
-                "published_swiglu_3": {},
-                "dense_baseline": None,
-                "data": {},
-                "teacher_hidden_cache": {},
-                "kernel_calibration": {},
-                "width_curves": {"legacy_subset": [], "output_aware": []},
-                "local_fitting": [],
-                "candidates": {},
-                "selection": {},
-                "runtime": [],
-            },
-            "error": None,
-        }
+    if output.exists() or asset_dir.exists():
+        raise FileExistsError(f"SwiGLU-5 output already exists: {output}")
+    artifact = {
+        "schema_version": SCHEMA_VERSION,
+        "workflow": SEARCH_WORKFLOW,
+        "experiment_family": "swiglu-5",
+        "experiment_class": "homogeneous-swiglu-global-recovery",
+        "status": "running",
+        "created_at_utc": utc_now(),
+        "run_fingerprint": run_fingerprint,
+        "environment": environment_record(),
+        "configuration": effective,
+        "provenance": provenance,
+        "results": {
+            "published_swiglu_3": {},
+            "dense_baseline": None,
+            "data": {},
+            "teacher_hidden_cache": {},
+            "kernel_calibration": {},
+            "width_curves": {"legacy_subset": [], "output_aware": []},
+            "local_fitting": [],
+            "candidates": {},
+            "selection": {},
+            "runtime": [],
+        },
+        "error": None,
+    }
     context = SwiGLU5Context(
         SEARCH_WORKFLOW,
         output,
@@ -420,22 +376,9 @@ def _import_swiglu3_evidence(context):
 
 
 def _storage_preflight(context):
-    """Estimate peak run storage before any expensive local fitting."""
+    """Conservatively bound the low-storage search before local fitting."""
 
     context.asset_dir.mkdir(parents=True, exist_ok=True)
-    probe = context.asset_dir / ".hardlink-probe"
-    linked_probe = context.asset_dir / ".hardlink-probe-link"
-    hardlinks_supported = False
-    try:
-        probe.write_bytes(b"swiglu-5")
-        os.link(probe, linked_probe)
-        hardlinks_supported = True
-    except OSError:
-        hardlinks_supported = False
-    finally:
-        linked_probe.unlink(missing_ok=True)
-        probe.unlink(missing_ok=True)
-
     hidden = int(context.settings["model"]["hidden_size"])
     dense_width = int(context.settings["model"]["intermediate_size"])
     layers = len(context.settings["compatibility"]["eligible_layers"])
@@ -479,29 +422,34 @@ def _storage_preflight(context):
         + composition_state_parameters
         + boundary_state_parameters
     )
-    checkpoint_multiplier = 1 if hardlinks_supported else 2
-    checkpoint_bytes = checkpoint_multiplier * 12 * sum(
-        5 * parameters
-        for parameters in per_target_recovery_parameters.values()
+    widest_target_parameters = max(per_target_recovery_parameters.values())
+    transient_checkpoint_bytes = 12 * 4 * widest_target_parameters
+    selected_initial_state_bytes = 4 * 4 * sum(
+        per_target_recovery_parameters.values()
     )
     hidden_cache_bytes = (
         int(context.settings["teacher_hidden_cache"]["target_tokens"])
         * hidden
         * 2
     )
-    estimated_peak_bytes = (
-        local_state_bytes + checkpoint_bytes + hidden_cache_bytes
+    recovery_peak_bytes = (
+        hidden_cache_bytes
+        + transient_checkpoint_bytes
+        + selected_initial_state_bytes
     )
+    estimated_peak_bytes = max(local_state_bytes, recovery_peak_bytes)
     reserve_fraction = float(
         context.settings["storage_preflight"]["reserve_fraction"]
     )
     required_bytes = math.ceil(estimated_peak_bytes * (1.0 + reserve_fraction))
     free_bytes = shutil.disk_usage(context.asset_dir.parent).free
     record = {
-        "hardlinks_supported": hardlinks_supported,
+        "policy": "minimal_exact_no_resume",
         "hidden_cache_bytes": hidden_cache_bytes,
         "local_fit_state_bytes_upper_bound": local_state_bytes,
-        "qualifier_checkpoint_bytes_upper_bound": checkpoint_bytes,
+        "selected_initial_state_bytes_upper_bound": selected_initial_state_bytes,
+        "transient_checkpoint_bytes_upper_bound": transient_checkpoint_bytes,
+        "recovery_peak_bytes_upper_bound": recovery_peak_bytes,
         "estimated_peak_bytes": estimated_peak_bytes,
         "reserve_fraction": reserve_fraction,
         "required_free_bytes": required_bytes,
@@ -1572,16 +1520,21 @@ def _recover_candidate(
         return
     if torch.device(context.device).type == "cuda":
         torch.cuda.reset_peak_memory_stats(context.device)
-    student, target_paths, train_modules = _load_candidate_student(
-        context, candidate, model_config
-    )
-    execution_model = student
-    if kernel["execution_mode"] == "compiled_reduce_overhead":
-        execution_model = torch.compile(student, mode="reduce-overhead")
     target_key = str(float(candidate["target"]))
     candidate_id = candidate["candidate_id"]
     recovery_dir = context.asset_dir / "recovery" / target_key / candidate_id
     current_path = recovery_dir / "current.pt"
+    if current_path.is_file():
+        student, target_paths, train_modules = _blank_candidate_student(
+            context, model_config, candidate
+        )
+    else:
+        student, target_paths, train_modules = _load_candidate_student(
+            context, candidate, model_config
+        )
+    execution_model = student
+    if kernel["execution_mode"] == "compiled_reduce_overhead":
+        execution_model = torch.compile(student, mode="reduce-overhead")
     optimizer_state = None
     start_tokens = int(recovery.get("tokens_seen", 0))
     start_updates = int(recovery.get("optimizer_updates", 0))
@@ -1604,32 +1557,10 @@ def _recover_candidate(
         start_updates = int(checkpoint["optimizer_updates"])
         elapsed = float(checkpoint["training_seconds"])
         _restore_rng(checkpoint)
-        retained_boundaries = {
-            int(row["actual_tokens"])
-            for row in recovery.get("durable_checkpoints", [])
-        }
-        for requested in context.settings["recovery"]["durable_checkpoint_tokens"]:
-            boundary = next_optimizer_boundary(
-                int(requested), effective, actual_target
-            )
-            durable_path = recovery_dir / f"endpoint-{boundary:012d}.pt"
-            if (
-                boundary <= start_tokens
-                and boundary not in retained_boundaries
-                and durable_path.is_file()
-            ):
-                recovery.setdefault("durable_checkpoints", []).append(
-                    {
-                        "requested_tokens": [int(requested)],
-                        "actual_tokens": boundary,
-                        "path": relative_to_root(durable_path),
-                        "sha256": sha256_file(durable_path),
-                        "retained": True,
-                        "recovered_after_interruption": True,
-                    }
-                )
     elif start_tokens:
-        raise FileNotFoundError(f"Candidate resume checkpoint is missing: {current_path}")
+        raise FileNotFoundError(
+            f"Candidate continuation checkpoint is missing: {current_path}"
+        )
     else:
         recovery["validation_history"].append(
             {
@@ -1666,22 +1597,16 @@ def _recover_candidate(
         for value in context.settings["recovery"]["full_evaluation_tokens"]
         if start_tokens < next_optimizer_boundary(int(value), effective, actual_target) <= actual_target
     ]
-    durable_requested = [
-        int(value)
-        for value in context.settings["recovery"]["durable_checkpoint_tokens"]
-        if start_tokens < next_optimizer_boundary(int(value), effective, actual_target) <= actual_target
-    ]
     requested_union = sorted(
         {
             value
-            for value in validation_requested + full_requested + durable_requested
+            for value in validation_requested + full_requested
             if start_tokens < next_optimizer_boundary(value, effective, actual_target) <= actual_target
         }
     )
     schedule_map = _requested_actual_map(requested_union, effective, actual_target)
     validation_map = _requested_actual_map(validation_requested, effective, actual_target)
     full_map = _requested_actual_map(full_requested, effective, actual_target)
-    durable_map = _requested_actual_map(durable_requested, effective, actual_target)
     geometry = kernel["selected_geometry"]
     microbatch_sequences = int(geometry["microbatch_sequences"])
     microbatch_tokens = microbatch_sequences * int(token_cache.sequence_length)
@@ -1746,45 +1671,29 @@ def _recover_candidate(
         recovery["training_seconds"] = event.elapsed_seconds
         recovery["evaluation_seconds"] = float(recovery.get("evaluation_seconds", 0.0)) + evaluation_seconds
         recovery["first_step"] = recovery.get("first_step") or first_step
-        checkpoint_started = perf_counter()
-        state = _replacement_state(student, target_paths)
-        checkpoint = {
-            "schema_version": 1,
-            "workflow": SEARCH_WORKFLOW,
-            "run_fingerprint": context.run_fingerprint,
-            "candidate_fingerprint": fingerprint(
-                {key: value for key, value in candidate.items() if key != "recovery"}
-            ),
-            "target": candidate["target"],
-            "candidate_id": candidate_id,
-            "tokens_seen": event.tokens_seen,
-            "optimizer_updates": event.optimizer_updates,
-            "training_seconds": event.elapsed_seconds,
-            "packed_token_fingerprint": token_cache.fingerprint,
-            "replacement_state": state,
-            "optimizer_state": optimizer.state_dict(),
-            "recovery": deepcopy(recovery),
-            **_checkpoint_rng(),
-        }
-        atomic_torch_save(current_path, checkpoint)
-        durable_path = None
-        durable_sha256 = None
-        if event.tokens_seen in durable_map:
-            durable_path = recovery_dir / f"endpoint-{event.tokens_seen:012d}.pt"
-            _link_or_copy_checkpoint(current_path, durable_path)
-            durable_sha256 = sha256_file(durable_path)
-        checkpoint_seconds += perf_counter() - checkpoint_started
+        if event.tokens_seen == actual_target:
+            checkpoint_started = perf_counter()
+            checkpoint = {
+                "schema_version": 1,
+                "workflow": SEARCH_WORKFLOW,
+                "run_fingerprint": context.run_fingerprint,
+                "candidate_fingerprint": fingerprint(
+                    {key: value for key, value in candidate.items() if key != "recovery"}
+                ),
+                "target": candidate["target"],
+                "candidate_id": candidate_id,
+                "tokens_seen": event.tokens_seen,
+                "optimizer_updates": event.optimizer_updates,
+                "training_seconds": event.elapsed_seconds,
+                "packed_token_fingerprint": token_cache.fingerprint,
+                "replacement_state": _replacement_state(student, target_paths),
+                "optimizer_state": optimizer.state_dict(),
+                "recovery": deepcopy(recovery),
+                **_checkpoint_rng(),
+            }
+            atomic_torch_save(current_path, checkpoint)
+            checkpoint_seconds += perf_counter() - checkpoint_started
         recovery["checkpoint_seconds"] = float(recovery.get("checkpoint_seconds", 0.0)) + checkpoint_seconds
-        if durable_path is not None:
-            recovery.setdefault("durable_checkpoints", []).append(
-                {
-                    "requested_tokens": list(durable_map[event.tokens_seen]),
-                    "actual_tokens": event.tokens_seen,
-                    "path": relative_to_root(durable_path),
-                    "sha256": durable_sha256,
-                    "retained": True,
-                }
-            )
         context.persist("recovery")
 
     try:
@@ -1851,31 +1760,16 @@ def _recover_candidate(
         release_cuda(torch)
 
 
-def _prune_search_candidate_checkpoints(
-    context,
-    candidate,
-    keep_requested=(),
-):
+def _prune_search_candidate_checkpoints(context, candidate):
     """Prune non-selected recovery state while preserving its manifest."""
 
-    keep_requested = {int(value) for value in keep_requested}
     recovery = candidate["recovery"]
     changed = False
     asset_root = context.asset_dir.resolve()
     for row in recovery.get("durable_checkpoints", []):
         if not bool(row.get("retained", True)):
             continue
-        requested = {int(value) for value in row["requested_tokens"]}
-        if requested & keep_requested:
-            row["retained"] = True
-            continue
-        path = (
-            context.asset_dir
-            / "recovery"
-            / str(float(candidate["target"]))
-            / candidate["candidate_id"]
-            / f"endpoint-{int(row['actual_tokens']):012d}.pt"
-        ).resolve()
+        path = resolve_path(Path(row["path"])).resolve()
         try:
             path.relative_to(asset_root)
         except ValueError as error:
@@ -1894,14 +1788,7 @@ def _prune_search_candidate_checkpoints(
         / candidate["candidate_id"]
         / "current.pt"
     )
-    if current_path.is_file() and (
-        not keep_requested
-        or int(recovery.get("tokens_seen", 0))
-        >= next_optimizer_boundary(
-            max(keep_requested),
-            int(context.settings["recovery"]["effective_batch_tokens"]),
-        )
-    ):
+    if current_path.is_file():
         current_path.resolve().relative_to(asset_root)
         current_path.unlink()
         changed = True
@@ -1909,14 +1796,65 @@ def _prune_search_candidate_checkpoints(
         context.persist("checkpoint_pruning")
 
 
-def _prune_search_local_fit_states(context):
-    """Retain fit evidence in JSON after winner checkpoints supersede states."""
+def _retain_search_winner_endpoint(context, candidate):
+    recovery = candidate["recovery"]
+    requested = int(context.settings["recovery"]["finalist_tokens"])
+    actual = int(recovery["tokens_seen"])
+    expected = next_optimizer_boundary(
+        requested,
+        int(context.settings["recovery"]["effective_batch_tokens"]),
+    )
+    if actual != expected:
+        raise ValueError("Search winner is not at the exact 5M endpoint")
+    recovery_dir = (
+        context.asset_dir
+        / "recovery"
+        / str(float(candidate["target"]))
+        / candidate["candidate_id"]
+    )
+    current_path = recovery_dir / "current.pt"
+    endpoint_path = recovery_dir / f"endpoint-{actual:012d}.pt"
+    if not current_path.is_file():
+        raise FileNotFoundError(f"Search winner checkpoint is missing: {current_path}")
+    if endpoint_path.exists():
+        raise FileExistsError(f"Search winner endpoint already exists: {endpoint_path}")
+    current_path.replace(endpoint_path)
+    record = {
+        "requested_tokens": [requested],
+        "actual_tokens": actual,
+        "path": relative_to_root(endpoint_path),
+        "sha256": sha256_file(endpoint_path),
+        "retained": True,
+    }
+    recovery["durable_checkpoints"] = [record]
+    return record
 
+
+def _pending_candidate_fit_keys(context):
+    needed = set()
+    for candidates in context.artifact["results"]["candidates"].values():
+        for candidate in candidates.values():
+            if int(candidate["recovery"].get("tokens_seen", 0)) > 0:
+                continue
+            needed.update(
+                row["fit_key"]
+                for row in candidate["allocation"]
+                if row.get("fit_key") is not None
+            )
+    return needed
+
+
+def _prune_search_local_fit_states(context, retain_fit_keys=(), stage="search_complete"):
+    """Delete fitted tensors once no untrained candidate can consume them."""
+
+    retain_fit_keys = set(retain_fit_keys)
     asset_root = context.asset_dir.resolve()
     removed = 0
     removed_bytes = 0
     for row in context.artifact["results"]["local_fitting"]:
         if not bool(row.get("state_retained", True)):
+            continue
+        if row["fit_key"] in retain_fit_keys:
             continue
         path = _operator_state_path(
             context,
@@ -1936,16 +1874,46 @@ def _prune_search_local_fit_states(context):
             path.unlink()
             removed += 1
         row["state_retained"] = False
-        row["pruned_after_search"] = True
+        row["pruned_at_stage"] = stage
     for rows in context.artifact["results"]["width_curves"].values():
         for row in rows:
-            if row.get("state_path") is not None:
+            if (
+                row.get("state_path") is not None
+                and row.get("fit_key") not in retain_fit_keys
+            ):
                 row["state_retained"] = False
     return {
+        "stage": stage,
         "state_files_removed": removed,
         "bytes_removed": removed_bytes,
-        "retained_evidence": "fit histories, metrics, hashes, and winner endpoints",
+        "retained_fit_states": len(retain_fit_keys),
+        "retained_evidence": "fit histories, metrics, hashes, and candidate recipes",
     }
+
+
+def _prune_teacher_hidden_cache(context, hidden_cache):
+    """Remove the search-only teacher cache after its last consumer."""
+
+    hidden_cache.release()
+    gc.collect()
+    record = context.artifact["results"].get("teacher_hidden_cache", {})
+    root_value = record.get("root")
+    if not root_value:
+        return {"removed": False, "bytes_removed": 0}
+    root = resolve_path(Path(root_value)).resolve()
+    asset_root = context.asset_dir.resolve()
+    try:
+        root.relative_to(asset_root)
+    except ValueError as error:
+        raise ValueError(f"Refusing to prune cache outside run assets: {root}") from error
+    removed_bytes = 0
+    if root.is_dir():
+        removed_bytes = sum(path.stat().st_size for path in root.rglob("*") if path.is_file())
+        shutil.rmtree(root)
+    record["retained"] = False
+    record["pruned_after_search"] = True
+    record["bytes_removed"] = removed_bytes
+    return {"removed": True, "bytes_removed": removed_bytes}
 
 
 def _runtime_guard(context, observed_tokens_per_second):
@@ -1973,11 +1941,11 @@ def _runtime_guard(context, observed_tokens_per_second):
     return record
 
 
-def _select_finalists(context, target_key):
+def _rank_qualifier_challengers(context, target_key, candidate_ids):
     candidates = context.artifact["results"]["candidates"][target_key]
     qualifier_requested = int(context.settings["recovery"]["qualifier_tokens"])
     challengers = []
-    for candidate_id in ("S5-C1", "S5-C2", "S5-C3", "S5-C4"):
+    for candidate_id in candidate_ids:
         trajectory = candidates[candidate_id]["recovery"]
         endpoint = next(
             row
@@ -1985,8 +1953,16 @@ def _select_finalists(context, target_key):
             if qualifier_requested in [int(value) for value in row["requested_tokens"]]
         )
         challengers.append((float(endpoint["recovery_validation_kl"]), candidate_id))
+    return [candidate_id for _, candidate_id in sorted(challengers)]
+
+
+def _select_finalists(context, target_key):
     count = int(context.settings["selection"]["challenger_finalists"])
-    selected = [candidate_id for _, candidate_id in sorted(challengers)[:count]]
+    selected = _rank_qualifier_challengers(
+        context,
+        target_key,
+        ("S5-C1", "S5-C2", "S5-C3", "S5-C4"),
+    )[:count]
     return ["S5-C0", *selected]
 
 
@@ -2022,11 +1998,6 @@ def _select_winner(context, target_key, finalists):
         ),
     )
     winner_candidate = candidates[winner["candidate_id"]]
-    endpoint = next(
-        row
-        for row in winner_candidate["recovery"].get("durable_checkpoints", [])
-        if requested in [int(value) for value in row["requested_tokens"]]
-    )
     source_history = context.artifact["results"]["published_swiglu_3"][target_key]["validation_history"]
     source_nearest = min(
         source_history,
@@ -2052,7 +2023,6 @@ def _select_winner(context, target_key, finalists):
             "KL differences <=1e-6 tie-break by PPL then candidate ID; "
             "fall back to S5-C0 when no challenger passes"
         ),
-        "winner_endpoint": endpoint,
         "gaps": {
             "to_dense": {
                 "recovery_validation_kl": float(winner_eval["recovery_validation_kl"]),
@@ -2147,6 +2117,14 @@ def run_search(context):
     _build_c1_c3_candidates(context, selection_cache, validation_cache)
     _build_composition_candidates(context, selection_cache, validation_cache)
     _record_stage_runtime(context, "candidate_assembly", started)
+    context.artifact["results"]["local_fit_state_pruning"] = [
+        _prune_search_local_fit_states(
+            context,
+            _pending_candidate_fit_keys(context),
+            stage="candidate_assembly",
+        )
+    ]
+    context.persist("candidate_state_pruning")
 
     started = perf_counter()
     token_cache = _packed_source_cache(context)
@@ -2194,6 +2172,15 @@ def run_search(context):
     _record_stage_runtime(context, "kernel_calibration", started)
     guard = _runtime_guard(context, kernel["observed_tokens_per_second"])
     if not guard["passed"]:
+        context.artifact["results"]["local_fit_state_pruning"].append(
+            _prune_search_local_fit_states(
+                context,
+                stage="budget_guard_rejected",
+            )
+        )
+        context.artifact["results"]["teacher_hidden_cache_cleanup"] = (
+            _prune_teacher_hidden_cache(context, hidden_cache)
+        )
         context.artifact["status"] = "budget_guard_rejected"
         context.artifact["completed_at_utc"] = utc_now()
         context.persist(None)
@@ -2201,11 +2188,36 @@ def run_search(context):
 
     started = perf_counter()
     qualifier = int(context.settings["recovery"]["qualifier_tokens"])
+    finalist_target = int(context.settings["recovery"]["finalist_tokens"])
+    qualifier_selection = context.artifact["results"]["selection"].setdefault(
+        "qualifier", {}
+    )
     for target_key in ("0.2", "0.5"):
-        for candidate_id in ("S5-C0", "S5-C1", "S5-C2", "S5-C3", "S5-C4"):
+        candidates = context.artifact["results"]["candidates"][target_key]
+        _recover_candidate(
+            context,
+            candidates["S5-C0"],
+            model_config,
+            token_cache,
+            hidden_cache,
+            teacher_head,
+            validation_cache,
+            selection_cache,
+            qualifier,
+            kernel,
+        )
+        context.artifact["results"]["local_fit_state_pruning"].append(
+            _prune_search_local_fit_states(
+                context,
+                _pending_candidate_fit_keys(context),
+                stage=f"{target_key}-S5-C0-qualified",
+            )
+        )
+        completed_challengers = []
+        for candidate_id in ("S5-C1", "S5-C2", "S5-C3", "S5-C4"):
             _recover_candidate(
                 context,
-                context.artifact["results"]["candidates"][target_key][candidate_id],
+                candidates[candidate_id],
                 model_config,
                 token_cache,
                 hidden_cache,
@@ -2215,28 +2227,37 @@ def run_search(context):
                 qualifier,
                 kernel,
             )
-    context.artifact["results"]["selection"]["qualifier"] = {}
-    finalists_by_target = {}
-    for target_key in ("0.2", "0.5"):
+            completed_challengers.append(candidate_id)
+            retained = set(
+                _rank_qualifier_challengers(
+                    context,
+                    target_key,
+                    completed_challengers,
+                )[: int(context.settings["selection"]["challenger_finalists"])]
+            )
+            for completed_id in completed_challengers:
+                if completed_id not in retained:
+                    _prune_search_candidate_checkpoints(
+                        context,
+                        candidates[completed_id],
+                    )
+            context.artifact["results"]["local_fit_state_pruning"].append(
+                _prune_search_local_fit_states(
+                    context,
+                    _pending_candidate_fit_keys(context),
+                    stage=f"{target_key}-{candidate_id}-qualified",
+                )
+            )
         finalists = _select_finalists(context, target_key)
-        finalists_by_target[target_key] = finalists
-        context.artifact["results"]["selection"]["qualifier"][target_key] = {
+        qualifier_selection[target_key] = {
             "requested_tokens": qualifier,
             "finalists": finalists,
         }
-    context.persist("qualifier_selection")
-    for target_key, candidates in context.artifact["results"]["candidates"].items():
-        finalists = set(finalists_by_target[target_key])
-        for candidate_id, candidate in candidates.items():
-            if candidate_id not in finalists:
-                _prune_search_candidate_checkpoints(context, candidate)
-
-    finalist_target = int(context.settings["recovery"]["finalist_tokens"])
-    for target_key, finalists in finalists_by_target.items():
+        context.persist("qualifier_selection")
         for candidate_id in finalists:
             _recover_candidate(
                 context,
-                context.artifact["results"]["candidates"][target_key][candidate_id],
+                candidates[candidate_id],
                 model_config,
                 token_cache,
                 hidden_cache,
@@ -2246,24 +2267,25 @@ def run_search(context):
                 finalist_target,
                 kernel,
             )
-            _prune_search_candidate_checkpoints(
-                context,
-                context.artifact["results"]["candidates"][target_key][candidate_id],
-                keep_requested=(finalist_target,),
+            context.artifact["results"]["local_fit_state_pruning"].append(
+                _prune_search_local_fit_states(
+                    context,
+                    _pending_candidate_fit_keys(context),
+                    stage=f"{target_key}-{candidate_id}-finalist",
+                )
             )
-    for target_key, finalists in finalists_by_target.items():
-        context.artifact["results"]["selection"][target_key] = _select_winner(
+        selection = _select_winner(
             context, target_key, finalists
         )
-        winner = context.artifact["results"]["selection"][target_key][
-            "winner_candidate_id"
-        ]
-        for candidate_id in finalists:
-            _prune_search_candidate_checkpoints(
-                context,
-                context.artifact["results"]["candidates"][target_key][candidate_id],
-                keep_requested=(finalist_target,) if candidate_id == winner else (),
-            )
+        winner = selection["winner_candidate_id"]
+        selection["winner_endpoint"] = _retain_search_winner_endpoint(
+            context, candidates[winner]
+        )
+        context.artifact["results"]["selection"][target_key] = selection
+        for candidate_id, candidate in candidates.items():
+            if candidate_id != winner:
+                _prune_search_candidate_checkpoints(context, candidate)
+        context.persist("winner_selection")
     _record_stage_runtime(context, "candidate_recovery_and_selection", started)
     context.artifact["results"]["recovery_work"] = {
         "qualifier_candidate_token_positions": 20_000_000,
@@ -2271,12 +2293,18 @@ def run_search(context):
         "total_candidate_token_positions": 38_000_000,
         "effective_batch_tokens": int(context.settings["recovery"]["effective_batch_tokens"]),
         "checkpoint_storage_policy": (
-            "hard-link identical current/milestone states when supported; "
-            "prune rejected states; retain one 5M winner endpoint per target"
+            "retain only exact qualifier states still eligible for continuation; "
+            "process targets sequentially; retain one 5M winner endpoint per target"
         ),
     }
-    context.artifact["results"]["local_fit_state_pruning"] = (
-        _prune_search_local_fit_states(context)
+    context.artifact["results"]["local_fit_state_pruning"].append(
+        _prune_search_local_fit_states(
+            context,
+            stage="search_complete",
+        )
+    )
+    context.artifact["results"]["teacher_hidden_cache_cleanup"] = (
+        _prune_teacher_hidden_cache(context, hidden_cache)
     )
     context.artifact["status"] = "completed"
     context.artifact["completed_at_utc"] = utc_now()
@@ -2289,7 +2317,6 @@ def prepare_confirmation_context(
     search_path,
     target,
     output,
-    resume,
 ):
     target = float(target)
     if target not in [float(value) for value in settings["compatibility"]["allowed_targets"]]:
@@ -2351,45 +2378,36 @@ def prepare_confirmation_context(
     )
     output = resolve_path(Path(output or default_output(CONFIRMATION_WORKFLOW, target_key)))
     asset_dir = _asset_directory(output)
-    if resume:
-        if not output.is_file():
-            raise FileNotFoundError(f"Resume artifact does not exist: {output}")
-        artifact = json.loads(output.read_text(encoding="utf-8"))
-        if artifact.get("run_fingerprint") != run_fingerprint:
-            raise ValueError("Confirmation resume fingerprint differs")
-        if artifact.get("status") == "completed":
-            raise ValueError("Completed confirmation cannot be resumed")
-    else:
-        if output.exists() or asset_dir.exists():
-            raise FileExistsError(f"Confirmation output already exists: {output}")
-        artifact = {
-            "schema_version": SCHEMA_VERSION,
-            "workflow": CONFIRMATION_WORKFLOW,
-            "experiment_family": "swiglu-5",
-            "experiment_class": "homogeneous-swiglu-global-recovery",
-            "status": "running",
-            "created_at_utc": utc_now(),
-            "run_fingerprint": run_fingerprint,
-            "environment": environment_record(),
-            "configuration": effective,
-            "provenance": provenance,
-            "results": {
-                "target": target,
-                "selected_candidate_id": selection["winner_candidate_id"],
-                "kernel_calibration": {},
-                "trajectory": {
-                    "status": "pending",
-                    "tokens_seen": 0,
-                    "optimizer_updates": 0,
-                    "validation_history": [],
-                    "full_evaluations": [],
-                    "scientific_checkpoints": [],
-                },
-                "paired_swiglu_3_comparison": [],
-                "runtime": [],
+    if output.exists() or asset_dir.exists():
+        raise FileExistsError(f"Confirmation output already exists: {output}")
+    artifact = {
+        "schema_version": SCHEMA_VERSION,
+        "workflow": CONFIRMATION_WORKFLOW,
+        "experiment_family": "swiglu-5",
+        "experiment_class": "homogeneous-swiglu-global-recovery",
+        "status": "running",
+        "created_at_utc": utc_now(),
+        "run_fingerprint": run_fingerprint,
+        "environment": environment_record(),
+        "configuration": effective,
+        "provenance": provenance,
+        "results": {
+            "target": target,
+            "selected_candidate_id": selection["winner_candidate_id"],
+            "kernel_calibration": {},
+            "trajectory": {
+                "status": "pending",
+                "tokens_seen": 0,
+                "optimizer_updates": 0,
+                "validation_history": [],
+                "full_evaluations": [],
+                "checkpoint_policy": "final_and_best_weights_only_no_resume",
             },
-            "error": None,
-        }
+            "paired_swiglu_3_comparison": [],
+            "runtime": [],
+        },
+        "error": None,
+    }
     context = SwiGLU5Context(
         CONFIRMATION_WORKFLOW,
         output,
@@ -2730,125 +2748,43 @@ def run_confirmation(context):
     )
     endpoint = _load_selected_search_checkpoint(context)
     trajectory = context.artifact["results"]["trajectory"]
-    current_path = context.asset_dir / "recovery" / "current.pt"
     best_path = context.asset_dir / "recovery" / "best.pt"
     final_path = context.asset_dir / "recovery" / "final.pt"
-    optimizer_state = None
-    if current_path.is_file():
-        current = torch.load(current_path, map_location="cpu", weights_only=False)
-        if current.get("run_fingerprint") != context.run_fingerprint:
-            raise ValueError("Confirmation current checkpoint fingerprint differs")
-        if current.get("packed_token_fingerprint") != token_cache.fingerprint:
-            raise ValueError("Confirmation current checkpoint token stream differs")
-        _load_replacement_state(student, current["replacement_state"])
-        optimizer_state = current["optimizer_state"]
-        trajectory.clear()
-        trajectory.update(current["trajectory"])
-        _restore_rng(current)
-        start_tokens = int(current["tokens_seen"])
-        start_updates = int(current["optimizer_updates"])
-        training_seconds = float(current["training_seconds"])
-        retained_boundaries = {
-            int(row["actual_tokens"])
-            for row in trajectory.get("scientific_checkpoints", [])
+    _load_replacement_state(student, endpoint["replacement_state"])
+    optimizer_state = endpoint["optimizer_state"]
+    _restore_rng(endpoint)
+    start_tokens = int(endpoint["tokens_seen"])
+    start_updates = int(endpoint["optimizer_updates"])
+    training_seconds = float(endpoint["training_seconds"])
+    search_full = _find_full_evaluation(candidate["recovery"], start_requested)
+    trajectory.update(
+        {
+            "status": "running",
+            "tokens_seen": start_tokens,
+            "optimizer_updates": start_updates,
+            "training_seconds": training_seconds,
+            "evaluation_seconds": float(
+                candidate["recovery"].get("evaluation_seconds", 0.0)
+            ),
+            "checkpoint_seconds": float(
+                candidate["recovery"].get("checkpoint_seconds", 0.0)
+            ),
+            "validation_history": [
+                {
+                    "requested_tokens": [start_requested],
+                    "actual_tokens": start_tokens,
+                    "optimizer_updates": start_updates,
+                    "recovery_validation_kl": search_full["recovery_validation_kl"],
+                    "source": "swiglu-5-search-endpoint",
+                }
+            ],
+            "full_evaluations": [deepcopy(search_full)],
+            "best_validation_kl": float(search_full["recovery_validation_kl"]),
+            "best_checkpoint_tokens": start_tokens,
+            "best_checkpoint_updates": start_updates,
         }
-        for requested in context.settings["recovery"]["full_evaluation_tokens"]:
-            boundary = next_optimizer_boundary(
-                int(requested),
-                int(context.settings["recovery"]["effective_batch_tokens"]),
-                int(context.settings["recovery"]["target_tokens"]),
-            )
-            scientific_path = (
-                context.asset_dir
-                / "recovery"
-                / f"milestone-{boundary:012d}.pt"
-            )
-            if (
-                boundary <= start_tokens
-                and boundary not in retained_boundaries
-                and scientific_path.is_file()
-            ):
-                trajectory.setdefault("scientific_checkpoints", []).append(
-                    {
-                        "requested_tokens": [int(requested)],
-                        "actual_tokens": boundary,
-                        "path": relative_to_root(scientific_path),
-                        "sha256": sha256_file(scientific_path),
-                        "recovered_after_interruption": True,
-                    }
-                )
-            if boundary <= start_tokens:
-                matching = [
-                    row
-                    for row in trajectory.get("full_evaluations", [])
-                    if int(requested)
-                    in [int(value) for value in row["requested_tokens"]]
-                ]
-                if matching and "cumulative_elapsed_seconds" not in matching[0]:
-                    matching[0]["cumulative_training_seconds"] = training_seconds
-                    matching[0]["cumulative_evaluation_seconds"] = float(
-                        trajectory.get("evaluation_seconds", 0.0)
-                    )
-                    matching[0]["cumulative_checkpoint_seconds"] = float(
-                        trajectory.get("checkpoint_seconds", 0.0)
-                    )
-                    matching[0]["cumulative_elapsed_seconds"] = (
-                        matching[0]["cumulative_training_seconds"]
-                        + matching[0]["cumulative_evaluation_seconds"]
-                        + matching[0]["cumulative_checkpoint_seconds"]
-                    )
-    elif int(trajectory.get("tokens_seen", 0)):
-        raise FileNotFoundError(f"Confirmation current checkpoint is missing: {current_path}")
-    else:
-        _load_replacement_state(student, endpoint["replacement_state"])
-        optimizer_state = endpoint["optimizer_state"]
-        _restore_rng(endpoint)
-        start_tokens = int(endpoint["tokens_seen"])
-        start_updates = int(endpoint["optimizer_updates"])
-        training_seconds = float(endpoint["training_seconds"])
-        search_full = _find_full_evaluation(
-            candidate["recovery"], start_requested
-        )
-        trajectory.update(
-            {
-                "status": "running",
-                "tokens_seen": start_tokens,
-                "optimizer_updates": start_updates,
-                "training_seconds": training_seconds,
-                "evaluation_seconds": float(
-                    candidate["recovery"].get("evaluation_seconds", 0.0)
-                ),
-                "checkpoint_seconds": float(
-                    candidate["recovery"].get("checkpoint_seconds", 0.0)
-                ),
-                "validation_history": [
-                    {
-                        "requested_tokens": [start_requested],
-                        "actual_tokens": start_tokens,
-                        "optimizer_updates": start_updates,
-                        "recovery_validation_kl": search_full["recovery_validation_kl"],
-                        "source": "swiglu-5-search-endpoint",
-                    }
-                ],
-                "full_evaluations": [deepcopy(search_full)],
-                "scientific_checkpoints": [],
-                "best_validation_kl": float(search_full["recovery_validation_kl"]),
-                "best_checkpoint_tokens": start_tokens,
-                "best_checkpoint_updates": start_updates,
-            }
-        )
-        atomic_torch_save(
-            best_path,
-            {
-                "schema_version": 1,
-                "workflow": CONFIRMATION_WORKFLOW,
-                "run_fingerprint": context.run_fingerprint,
-                "tokens_seen": start_tokens,
-                "optimizer_updates": start_updates,
-                "replacement_state": _replacement_state(student, target_paths),
-            },
-        )
-        context.persist("recovery")
+    )
+    context.persist("recovery")
 
     target_tokens = int(context.settings["recovery"]["target_tokens"])
     if target_tokens > token_cache.token_count:
@@ -2861,12 +2797,10 @@ def run_confirmation(context):
         for value in context.settings["recovery"]["full_evaluation_tokens"]
         if value > start_requested
     ]
-    durable_requested = validation_requested
     requested_union = sorted(set(validation_requested + full_requested))
     schedule_map = _requested_actual_map(requested_union, effective, target_tokens)
     validation_map = _requested_actual_map(validation_requested, effective, target_tokens)
     full_map = _requested_actual_map(full_requested, effective, target_tokens)
-    durable_map = _requested_actual_map(durable_requested, effective, target_tokens)
     geometry = kernel["selected_geometry"]
     microbatch_sequences = int(geometry["microbatch_sequences"])
     microbatch_tokens = microbatch_sequences * token_cache.sequence_length
@@ -2875,7 +2809,7 @@ def run_confirmation(context):
     if torch.device(context.device).type == "cuda":
         torch.cuda.reset_peak_memory_stats(context.device)
 
-    def on_checkpoint(event, optimizer, first_step):
+    def on_checkpoint(event, _optimizer, first_step):
         evaluation_started = perf_counter()
         validation_kl = evaluate_validation_kl_mixed(
             student,
@@ -2926,33 +2860,8 @@ def run_confirmation(context):
         trajectory["optimizer_updates"] = event.optimizer_updates
         trajectory["training_seconds"] = event.elapsed_seconds
         trajectory["first_step"] = trajectory.get("first_step") or first_step
-        checkpoint_started = perf_counter()
-        state = _replacement_state(student, target_paths)
-        payload = {
-            "schema_version": 1,
-            "workflow": CONFIRMATION_WORKFLOW,
-            "run_fingerprint": context.run_fingerprint,
-            "tokens_seen": event.tokens_seen,
-            "optimizer_updates": event.optimizer_updates,
-            "training_seconds": event.elapsed_seconds,
-            "packed_token_fingerprint": token_cache.fingerprint,
-            "replacement_state": state,
-            "optimizer_state": optimizer.state_dict(),
-            "trajectory": deepcopy(trajectory),
-            **_checkpoint_rng(),
-        }
-        atomic_torch_save(current_path, payload)
-        scientific_path = None
-        scientific_sha256 = None
-        if event.tokens_seen in full_map:
-            scientific_path = (
-                context.asset_dir
-                / "recovery"
-                / f"milestone-{event.tokens_seen:012d}.pt"
-            )
-            _link_or_copy_checkpoint(current_path, scientific_path)
-            scientific_sha256 = sha256_file(scientific_path)
         if improved:
+            checkpoint_started = perf_counter()
             atomic_torch_save(
                 best_path,
                 {
@@ -2961,12 +2870,12 @@ def run_confirmation(context):
                     "run_fingerprint": context.run_fingerprint,
                     "tokens_seen": event.tokens_seen,
                     "optimizer_updates": event.optimizer_updates,
-                    "replacement_state": state,
+                    "replacement_state": _replacement_state(student, target_paths),
                 },
             )
-        trajectory["checkpoint_seconds"] = float(
-            trajectory.get("checkpoint_seconds", 0.0)
-        ) + perf_counter() - checkpoint_started
+            trajectory["checkpoint_seconds"] = float(
+                trajectory.get("checkpoint_seconds", 0.0)
+            ) + perf_counter() - checkpoint_started
         if event.tokens_seen in full_map:
             full_row = trajectory["full_evaluations"][-1]
             full_row["cumulative_training_seconds"] = event.elapsed_seconds
@@ -2980,15 +2889,6 @@ def run_confirmation(context):
                 full_row["cumulative_training_seconds"]
                 + full_row["cumulative_evaluation_seconds"]
                 + full_row["cumulative_checkpoint_seconds"]
-            )
-        if scientific_path is not None:
-            trajectory["scientific_checkpoints"].append(
-                {
-                    "requested_tokens": list(full_map[event.tokens_seen]),
-                    "actual_tokens": event.tokens_seen,
-                    "path": relative_to_root(scientific_path),
-                    "sha256": scientific_sha256,
-                }
             )
         context.persist("recovery")
 
@@ -3037,17 +2937,62 @@ def run_confirmation(context):
         trajectory["training_seconds"] = result.elapsed_seconds
         trajectory["memory"] = recovery_memory_record(context.device)
         trajectory["status"] = "completed"
-        _link_or_copy_checkpoint(current_path, final_path)
+        checkpoint_started = perf_counter()
+        best_is_final = int(trajectory["best_checkpoint_tokens"]) == result.tokens_seen
+        if best_is_final:
+            if final_path.exists():
+                raise FileExistsError(f"Final checkpoint already exists: {final_path}")
+            best_path.replace(final_path)
+            retained_best_path = final_path
+            retained_best_contents = "replacement_weights_only"
+        else:
+            atomic_torch_save(
+                final_path,
+                {
+                    "schema_version": 1,
+                    "workflow": CONFIRMATION_WORKFLOW,
+                    "run_fingerprint": context.run_fingerprint,
+                    "tokens_seen": result.tokens_seen,
+                    "optimizer_updates": result.optimizer_updates,
+                    "replacement_state": _replacement_state(student, target_paths),
+                },
+            )
+            if int(trajectory["best_checkpoint_tokens"]) == start_tokens:
+                retained_best_path = resolve_path(
+                    Path(
+                        context.artifact["provenance"]["selected_endpoint"][
+                            "resolved_path"
+                        ]
+                    )
+                )
+                retained_best_contents = "search_endpoint_with_optimizer_state"
+            else:
+                retained_best_path = best_path
+                retained_best_contents = "replacement_weights_only"
+        trajectory["checkpoint_seconds"] = float(
+            trajectory.get("checkpoint_seconds", 0.0)
+        ) + perf_counter() - checkpoint_started
+        final_evaluation = _find_full_evaluation(trajectory, target_tokens)
+        final_evaluation["cumulative_checkpoint_seconds"] = float(
+            trajectory["checkpoint_seconds"]
+        )
+        final_evaluation["cumulative_elapsed_seconds"] = (
+            float(final_evaluation["cumulative_training_seconds"])
+            + float(final_evaluation["cumulative_evaluation_seconds"])
+            + float(final_evaluation["cumulative_checkpoint_seconds"])
+        )
         trajectory["final_checkpoint"] = {
             "path": relative_to_root(final_path),
             "sha256": sha256_file(final_path),
             "tokens_seen": result.tokens_seen,
+            "contents": "replacement_weights_only",
         }
         trajectory["best_checkpoint"] = {
-            "path": relative_to_root(best_path),
-            "sha256": sha256_file(best_path),
+            "path": relative_to_root(retained_best_path),
+            "sha256": sha256_file(retained_best_path),
             "tokens_seen": int(trajectory["best_checkpoint_tokens"]),
             "selection_rule": "lowest fixed validation KL at or below 100M",
+            "contents": retained_best_contents,
         }
         context.artifact["results"]["runtime"].append(
             {"stage": "confirmation_recovery", "seconds": perf_counter() - stage_started}
@@ -3064,7 +3009,6 @@ def run_confirmation(context):
         context.artifact["status"] = "completed"
         context.artifact["completed_at_utc"] = utc_now()
         context.persist(None)
-        current_path.unlink(missing_ok=True)
     finally:
         del endpoint, student, teacher, train_modules
         gc.collect()

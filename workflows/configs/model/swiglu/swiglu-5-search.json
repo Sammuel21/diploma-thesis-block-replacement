@@ -103,7 +103,6 @@
     "finalist_tokens": 5000000,
     "validation_interval_tokens": 1000000,
     "full_evaluation_tokens": [0, 2000000, 5000000],
-    "durable_checkpoint_tokens": [2000000, 4000000, 5000000],
     "effective_batch_tokens": 2048,
     "profile_optimizer_updates": 16,
     "microbatch_candidates": [

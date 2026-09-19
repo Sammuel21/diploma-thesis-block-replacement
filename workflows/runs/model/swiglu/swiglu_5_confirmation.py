@@ -25,7 +25,6 @@ def parse_args():
     parser.add_argument("--search-artifact", type=Path, required=True)
     parser.add_argument("--target", type=float, required=True, choices=(0.2, 0.5))
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--resume", action="store_true")
     return parser.parse_args()
 
 
@@ -38,7 +37,6 @@ def main():
         args.search_artifact,
         args.target,
         args.output,
-        args.resume,
     )
     try:
         run_confirmation(context)

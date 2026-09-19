@@ -24,7 +24,6 @@ def parse_args():
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--source", type=Path)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--resume", action="store_true")
     return parser.parse_args()
 
 
@@ -36,7 +35,6 @@ def main():
         args.config,
         args.source,
         args.output,
-        args.resume,
     )
     try:
         run_search(context)

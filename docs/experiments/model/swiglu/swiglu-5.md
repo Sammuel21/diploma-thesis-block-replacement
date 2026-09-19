@@ -97,11 +97,12 @@ The dense final normalized hidden states for the first requested 5M stream
 tokens are stored in atomic BF16 shards. A frozen copy of the tied output head
 reconstructs teacher logits after the dense Transformer is released. Fixed
 sample checks must keep cached-versus-online teacher KL at or below `1e-5`.
-Before local fitting begins, a storage preflight estimates the peak from those
-shards, all curve/candidate states, and five qualifier checkpoints per target,
-using the source allocations and the detected hard-link capability. It adds a
-15% reserve and fails early if free space is insufficient; the cache builder
-still independently enforces its 25 GiB minimum.
+Before local fitting begins, a storage preflight bounds two non-overlapping
+peaks: width-curve fitting and recovery with the teacher cache, selected
+candidate states, and at most four transient candidate checkpoints during an
+atomic write. It adds a 15% reserve and fails early if free space is
+insufficient; the cache builder still independently enforces its 25 GiB
+minimum.
 
 The runner profiles `4x4`, `8x2`, and `16x1` sequence/accumulation geometries,
 selects the largest below 22 GiB peak VRAM, and retains `torch.compile` only
@@ -110,13 +111,14 @@ Each throughput trial measures 16 optimizer updates (32,768 token positions)
 so one-time startup work does not dominate the six-hour projection. All trials
 use disposable states, and the pre-profile RNG state is restored before the
 tournament. Training, evaluation, and checkpoint time are recorded separately.
-Identical `current.pt` and milestone states are retained with filesystem hard
-links when supported, avoiding duplicate serialization. After each selection
-decision, rejected checkpoints are removed while their paths, hashes, and
-pruning status remain in the JSON; only one reconstructable 5M winner endpoint
-per target remains after a completed search. Once both winners are committed,
-the superseded local-fit tensors are also removed; their histories, metrics,
-content hashes, and allocation references remain recorded in the search JSON.
+The 20% and 50% targets run sequentially. During qualification, the runner
+keeps only `S5-C0`, the currently leading two challengers, and the candidate
+being atomically written. Displaced candidates are removed immediately.
+Width-fit tensors are deleted as soon as no untrained candidate references
+them, while their histories, metrics, hashes, and allocation recipes remain in
+the JSON. Only one reconstructable 5M winner endpoint per target survives. The
+approximately 19 GiB teacher-hidden cache is temporary and is deleted after
+its final consumer.
 
 Every candidate reaches the 2M requested boundary. The best two challengers
 per target and `S5-C0` continue to the exact optimizer boundary for 5M
@@ -137,11 +139,12 @@ search and original SwiGLU-3 artifacts, restores the exact selected 5M
 replacement, optimizer, RNG, update count, and token cursor, then continues the
 same finite stream to 100M with online dense-teacher inference. It re-profiles
 online-teacher batching, records fixed KL every 5M, and performs full
-evaluation at 10M, 25M, 50M, and 100M. Current state is durable every 5M;
-scientific checkpoints are retained at all four full milestones, together with
-final and best-under-budget weights. Full-milestone and final names similarly
-share the identical state where the filesystem supports hard links; the
-temporary `current.pt` name is removed only after successful completion.
+evaluation at 10M, 25M, 50M, and 100M. Milestones retain metrics rather than
+model or optimizer snapshots. A successful run keeps only FP32 replacement
+weights for the final state and the best fixed-validation-KL state; when the
+final state is also best, both records refer to the same file. If the original
+5M search endpoint remains best, confirmation references that retained search
+endpoint instead of copying it.
 
 The 10M and 100M tables pair exact boundaries with the matching SwiGLU-3
 target. The source artifact has no observed 10M runtime checkpoint, so that
@@ -168,8 +171,10 @@ python -m workflows.runs.model.swiglu.swiglu_5_confirmation \
   --output data/results/workflows/model/swiglu-5/confirmation/<unique>.json
 ```
 
-Both processes support `--resume`. Neither exposes a smoke mode. No SwiGLU-5
-Perun launcher is provided.
+Neither process supports resume or a smoke mode. A failed process must be
+restarted with a new output path. This deliberate low-storage policy does not
+change candidate training, selection, token order, or confirmation
+continuation. No SwiGLU-5 Perun launcher is provided.
 
 ## Reporting and interpretation boundary
 
