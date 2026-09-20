@@ -84,6 +84,61 @@ from .shared import (
 SEARCH_WORKFLOW = "swiglu-5-search"
 CONFIRMATION_WORKFLOW = "swiglu-5-confirmation"
 SCHEMA_VERSION = 1
+CANDIDATE_DEFINITIONS = {
+    "S5-C0": {
+        "name": "Legacy allocation control",
+        "short_label": "Legacy control",
+        "initialization": "Exact SwiGLU-3 fitted operators",
+        "allocation": "SwiGLU-3 ranked widths",
+        "question": (
+            "How much does the stronger recovery recipe improve the original "
+            "SwiGLU-3 construction?"
+        ),
+    },
+    "S5-C1": {
+        "name": "Output-reconstructed initialization",
+        "short_label": "Output reconstruction",
+        "initialization": "Output-aware reconstruction",
+        "allocation": "SwiGLU-3 ranked widths",
+        "question": "Does a better local initialization help without changing widths?",
+    },
+    "S5-C2": {
+        "name": "Discrete layer allocation",
+        "short_label": "Discrete allocation",
+        "initialization": "Legacy teacher-neuron subset",
+        "allocation": "Discrete per-layer width optimization",
+        "question": "Does concentrating compression in tolerant layers improve recovery?",
+    },
+    "S5-C3": {
+        "name": "Reconstruction plus discrete allocation",
+        "short_label": "Combined strategy",
+        "initialization": "Output-aware reconstruction",
+        "allocation": "Discrete per-layer width optimization",
+        "question": "Are reconstruction and discrete allocation complementary?",
+    },
+    "S5-C4": {
+        "name": "Composition-aware refinement",
+        "short_label": "Composition-aware",
+        "initialization": "Refit on compressed-model activation context",
+        "allocation": "Widths of the best pre-recovery parent",
+        "question": "Does fitting in the assembled student's context reduce composition error?",
+    },
+}
+RECOVERY_PROTOCOL_DEFINITION = {
+    "name": "Replacement-only teacher distillation",
+    "objective": "Teacher-to-student KL at temperature 1",
+    "learning_rate": "Constant 3e-5",
+    "trainable_scope": "Compressed SwiGLU replacements only",
+    "effective_tokens_per_update": 2048,
+}
+METRIC_DEFINITIONS = {
+    "recovery_validation_kl": (
+        "Fixed teacher-to-student KL at temperature 1; lower is better and dense is zero."
+    ),
+    "wikitext_validation_perplexity": (
+        "WikiText-2 validation perplexity on the fixed workflow split; lower is better."
+    ),
+}
 
 
 def utc_now():
@@ -353,6 +408,16 @@ def prepare_search_context(
         validation = validate_search_resume_artifact(context, provenance)
         context.artifact["status"] = "running"
         context.artifact["error"] = None
+        context.artifact["definitions"] = {
+            "candidates": deepcopy(CANDIDATE_DEFINITIONS),
+            "recovery_protocol": deepcopy(RECOVERY_PROTOCOL_DEFINITION),
+            "metrics": deepcopy(METRIC_DEFINITIONS),
+        }
+        for candidates in context.artifact["results"].get("candidates", {}).values():
+            for candidate_id, candidate in candidates.items():
+                candidate["candidate_name"] = CANDIDATE_DEFINITIONS[candidate_id][
+                    "name"
+                ]
         context.artifact["results"]["resume_validation"] = validation
         context.persist("resume_validation")
         return context
@@ -369,6 +434,11 @@ def prepare_search_context(
         "environment": environment_record(),
         "configuration": effective,
         "provenance": provenance,
+        "definitions": {
+            "candidates": deepcopy(CANDIDATE_DEFINITIONS),
+            "recovery_protocol": deepcopy(RECOVERY_PROTOCOL_DEFINITION),
+            "metrics": deepcopy(METRIC_DEFINITIONS),
+        },
         "results": {
             "published_swiglu_3": {},
             "dense_baseline": None,
@@ -1009,6 +1079,7 @@ def legacy_candidate(context, target):
         )
     return {
         "candidate_id": "S5-C0",
+        "candidate_name": CANDIDATE_DEFINITIONS["S5-C0"]["name"],
         "target": float(target),
         "initialization": "exact_swiglu_3",
         "allocation_method": "exact_swiglu_3_ranked_widths",
@@ -1120,6 +1191,7 @@ def build_c1_c3_candidates(context, selection_cache, validation_cache):
         ) in recipes.items():
             descriptor = {
                 "candidate_id": candidate_id,
+                "candidate_name": CANDIDATE_DEFINITIONS[candidate_id]["name"],
                 "target": target,
                 "initialization": initialization,
                 "allocation_method": allocation_method,
@@ -1359,6 +1431,7 @@ def build_composition_candidates(context, selection_cache, validation_cache):
             release_cuda(torch)
         candidate = {
             "candidate_id": "S5-C4",
+            "candidate_name": CANDIDATE_DEFINITIONS["S5-C4"]["name"],
             "target": float(key),
             "initialization": "composition_aware",
             "allocation_method": "best_pre_recovery_parent_widths",
@@ -1600,20 +1673,65 @@ def calibrate_recovery(context, model_config, cache, teacher_head):
     return record
 
 
-def requested_actual_map(requested_values, effective_batch, limit):
+def requested_actual_map(
+    requested_values,
+    effective_batch,
+    maximum_requested_tokens,
+    actual_token_limit,
+):
+    """Map in-phase requested milestones to their optimizer boundaries."""
+
+    if int(actual_token_limit) < int(maximum_requested_tokens):
+        raise ValueError(
+            "Actual token limit cannot precede the active requested-token phase"
+        )
     mapped = {}
     for requested in requested_values:
         requested = int(requested)
-        actual = next_optimizer_boundary(requested, effective_batch, limit)
+        if requested > int(maximum_requested_tokens):
+            raise ValueError(
+                f"Requested milestone {requested:,} exceeds the active "
+                f"{int(maximum_requested_tokens):,}-token phase"
+            )
+        actual = next_optimizer_boundary(
+            requested,
+            effective_batch,
+            int(actual_token_limit),
+        )
         mapped.setdefault(actual, []).append(requested)
     return {actual: tuple(values) for actual, values in sorted(mapped.items())}
 
 
 def find_full_evaluation(trajectory, requested_tokens):
-    for row in trajectory["full_evaluations"]:
-        if int(requested_tokens) in [int(value) for value in row["requested_tokens"]]:
-            return row
-    raise ValueError(f"Candidate has no full evaluation at {requested_tokens:,} tokens")
+    """Return the first valid evaluation at or after a requested milestone."""
+
+    matches = [
+        row
+        for row in trajectory["full_evaluations"]
+        if int(requested_tokens)
+        in [int(value) for value in row["requested_tokens"]]
+    ]
+    if not matches:
+        raise ValueError(
+            f"Candidate has no full evaluation at {requested_tokens:,} tokens"
+        )
+    valid_matches = [
+        row
+        for row in matches
+        if int(row["actual_tokens"]) >= int(requested_tokens)
+    ]
+    if not valid_matches:
+        raise ValueError(
+            f"Candidate has only premature evaluations labeled for "
+            f"{requested_tokens:,} tokens"
+        )
+    return min(
+        valid_matches,
+        key=lambda row: (
+            int(row["actual_tokens"]),
+            int(row["optimizer_updates"]),
+        ),
+    )
 
 
 def recover_candidate(
@@ -1712,18 +1830,39 @@ def recover_candidate(
     full_requested = [
         int(value)
         for value in context.settings["recovery"]["full_evaluation_tokens"]
-        if start_tokens < next_optimizer_boundary(int(value), effective, actual_target) <= actual_target
+        if int(value) <= int(requested_target)
+        and start_tokens
+        < next_optimizer_boundary(int(value), effective, actual_target)
+        <= actual_target
     ]
     requested_union = sorted(
         {
             value
             for value in validation_requested + full_requested
-            if start_tokens < next_optimizer_boundary(value, effective, actual_target) <= actual_target
+            if value <= int(requested_target)
+            and start_tokens
+            < next_optimizer_boundary(value, effective, actual_target)
+            <= actual_target
         }
     )
-    schedule_map = requested_actual_map(requested_union, effective, actual_target)
-    validation_map = requested_actual_map(validation_requested, effective, actual_target)
-    full_map = requested_actual_map(full_requested, effective, actual_target)
+    schedule_map = requested_actual_map(
+        requested_union,
+        effective,
+        int(requested_target),
+        actual_target,
+    )
+    validation_map = requested_actual_map(
+        validation_requested,
+        effective,
+        int(requested_target),
+        actual_target,
+    )
+    full_map = requested_actual_map(
+        full_requested,
+        effective,
+        int(requested_target),
+        actual_target,
+    )
     geometry = kernel["selected_geometry"]
     microbatch_sequences = int(geometry["microbatch_sequences"])
     microbatch_tokens = microbatch_sequences * int(token_cache.sequence_length)
@@ -2104,6 +2243,7 @@ def select_winner(context, target_key, finalists):
         passes = candidate_id == "S5-C0" or ppl <= control_ppl
         row = {
             "candidate_id": candidate_id,
+            "candidate_name": CANDIDATE_DEFINITIONS[candidate_id]["name"],
             "recovery_validation_kl": float(evaluation["recovery_validation_kl"]),
             "wikitext_validation_perplexity": ppl,
             "control_perplexity": control_ppl,
@@ -2143,6 +2283,7 @@ def select_winner(context, target_key, finalists):
         "finalists": finalists,
         "guardrail_decisions": decisions,
         "winner_candidate_id": winner["candidate_id"],
+        "winner_candidate_name": CANDIDATE_DEFINITIONS[winner["candidate_id"]]["name"],
         "selection_rule": (
             "challenger PPL no worse than S5-C0; lowest fixed T=1 KL; "
             "KL differences <=1e-6 tie-break by PPL then candidate ID; "
@@ -2587,9 +2728,17 @@ def prepare_confirmation_context(
         "environment": environment_record(),
         "configuration": effective,
         "provenance": provenance,
+        "definitions": {
+            "candidates": deepcopy(CANDIDATE_DEFINITIONS),
+            "recovery_protocol": deepcopy(RECOVERY_PROTOCOL_DEFINITION),
+            "metrics": deepcopy(METRIC_DEFINITIONS),
+        },
         "results": {
             "target": target,
             "selected_candidate_id": selection["winner_candidate_id"],
+            "selected_candidate_name": CANDIDATE_DEFINITIONS[
+                selection["winner_candidate_id"]
+            ]["name"],
             "kernel_calibration": {},
             "trajectory": {
                 "status": "pending",
@@ -2994,9 +3143,24 @@ def run_confirmation(context):
         if value > start_requested
     ]
     requested_union = sorted(set(validation_requested + full_requested))
-    schedule_map = requested_actual_map(requested_union, effective, target_tokens)
-    validation_map = requested_actual_map(validation_requested, effective, target_tokens)
-    full_map = requested_actual_map(full_requested, effective, target_tokens)
+    schedule_map = requested_actual_map(
+        requested_union,
+        effective,
+        target_tokens,
+        target_tokens,
+    )
+    validation_map = requested_actual_map(
+        validation_requested,
+        effective,
+        target_tokens,
+        target_tokens,
+    )
+    full_map = requested_actual_map(
+        full_requested,
+        effective,
+        target_tokens,
+        target_tokens,
+    )
     geometry = kernel["selected_geometry"]
     microbatch_sequences = int(geometry["microbatch_sequences"])
     microbatch_tokens = microbatch_sequences * token_cache.sequence_length

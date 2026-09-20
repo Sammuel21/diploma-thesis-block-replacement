@@ -15,15 +15,19 @@ curation:
 sources:
   notebooks:
     - notebooks/model/swiglu/swiglu-5.ipynb
+  artifacts:
+    - data/results/workflows/model/swiglu-5/search/run-001.json
+    - data/results/workflows/model/swiglu-5/confirmation/run-001-target-0.2.json
+    - data/results/workflows/model/swiglu-5/confirmation/run-001-target-0.5.json
   reference_artifacts:
     - data/results/workflows/model/swiglu-3/run-001.json
 ---
 
 # SwiGLU-5 Efficient Global-Recovery Search and Confirmation
 
-Status: both runners and the load-only report are implemented. The bounded
-search has not completed, and confirmation must not run until the search
-artifact has been reviewed.
+Status: completed on darthmachinus. The bounded search and both 100M-token
+confirmation runs are present. The load-only notebook reports the full search,
+the SwiGLU-3 comparisons, and the winner-selection caveat described below.
 
 ## Purpose
 
@@ -48,13 +52,15 @@ eligible/protected layers, 393,216-pair calibration selection, exact 20% and
 contract. Recorded asset paths may relocate, but content hashes and stream
 fingerprints may not change.
 
-The artifact keeps three roles separate:
+The artifact keeps three roles separate. Human-readable strategy names are
+primary in reporting; stable candidate IDs remain secondary artifact keys:
 
 1. imported published SwiGLU-3 evidence, retaining its original `1e-5`
    recovery configuration;
-2. `S5-C0`, which reconstructs the exact SwiGLU-3 operators but trains them
-   with the fixed SwiGLU-5 recovery configuration; and
-3. `S5-C1` through `S5-C4`, which change initialization, allocation, or local
+2. the **Legacy allocation control** (`S5-C0`), which reconstructs the exact
+   SwiGLU-3 operators but trains them with the fixed SwiGLU-5 recovery
+   configuration; and
+3. four named strategies that change initialization, allocation, or local
    capture context while holding recovery and token order fixed.
 
 Search-time 5M comparisons against SwiGLU-3 are limited to its retained
@@ -65,13 +71,13 @@ validation trajectory. Equal-budget WikiText comparisons become available at
 
 For each 20% and 50% eligible-MLP removal target:
 
-| ID | Initialization | Width allocation |
-| --- | --- | --- |
-| `S5-C0` | Exact SwiGLU-3 operator states | Exact SwiGLU-3 ranked widths |
-| `S5-C1` | Output-aware reconstruction | SwiGLU-3 ranked widths |
-| `S5-C2` | Legacy teacher subset | Discrete width curves |
-| `S5-C3` | Output-aware reconstruction | Discrete width curves |
-| `S5-C4` | Composition-aware refit | Widths of the best pre-recovery parent |
+| Strategy | Artifact key | Initialization | Width allocation | Question isolated |
+| --- | --- | --- | --- | --- |
+| Legacy allocation control | `S5-C0` | Exact SwiGLU-3 operator states | Exact SwiGLU-3 ranked widths | Effect of the stronger recovery recipe |
+| Output-reconstructed initialization | `S5-C1` | Output-aware reconstruction | SwiGLU-3 ranked widths | Initialization without allocation changes |
+| Discrete layer allocation | `S5-C2` | Legacy teacher subset | Discrete width curves | Concentrating compression in tolerant layers |
+| Reconstruction plus discrete allocation | `S5-C3` | Output-aware reconstruction | Discrete width curves | Whether initialization and allocation are complementary |
+| Composition-aware refinement | `S5-C4` | Refit on compressed-model inputs | Widths of the best pre-recovery parent | Whether assembled-model context improves local fitting |
 
 Output-aware initialization copies selected gate/up rows and down columns,
 initializes one down-projection bias from the mean output residual, fits down
@@ -86,7 +92,7 @@ project-proposed hypothesis; integrated model KL and WikiText perplexity remain
 authoritative. Bias parameters are included in requested-versus-realized
 budget reporting.
 
-`S5-C4` freezes the chosen parent as an input-capture context, derives dense
+**Composition-aware refinement** freezes the chosen parent as an input-capture context, derives dense
 local targets at those student-distribution inputs, fits every replacement
 without mutating the capture context, and installs the states only after the
 single recapture round is complete.
@@ -113,7 +119,7 @@ so one-time startup work does not dominate the runtime projection. All trials
 use disposable states, and the pre-profile RNG state is restored before the
 tournament. Training, evaluation, and checkpoint time are recorded separately.
 The 20% and 50% targets run sequentially. During qualification, the runner
-keeps only `S5-C0`, the currently leading two challengers, and the candidate
+keeps only the Legacy allocation control, the currently leading two challengers, and the candidate
 being atomically written. Displaced candidates are removed immediately.
 Width-fit tensors are deleted as soon as no untrained candidate references
 them, while their histories, metrics, hashes, and allocation recipes remain in
@@ -122,11 +128,11 @@ approximately 19 GiB teacher-hidden cache is temporary and is deleted after
 its final consumer.
 
 Every candidate reaches the 2M requested boundary. The best two challengers
-per target and `S5-C0` continue to the exact optimizer boundary for 5M
-requested tokens. Challengers must have 5M WikiText perplexity no worse than
-`S5-C0`; final selection uses fixed T=1 KL, a `1e-6` tie interval, then
-perplexity and candidate ID. `S5-C0` remains eligible throughout and is the
-fallback when no challenger passes.
+per target and the Legacy allocation control continue to the exact optimizer
+boundary for 5M requested tokens. Challengers must have 5M WikiText
+perplexity no worse than the control; final selection uses fixed T=1 KL, a
+`1e-6` tie interval, then perplexity and candidate ID. The control remains
+eligible throughout and is the fallback when no challenger passes.
 
 Before recovery, the workflow projects the complete 38M candidate-token
 tournament from measured preparation time and recovery throughput with a 15%
@@ -134,6 +140,31 @@ reserve. By default, a projection above six hours writes
 `budget_guard_rejected` and stops without silently shrinking the design.
 `--allow-over-budget` preserves the projection record but permits an explicitly
 authorized longer run.
+
+## Observed result
+
+Discrete layer allocation is the decisive SwiGLU-5 improvement. At the true
+5M endpoints it improves the Legacy allocation control from KL 0.096449 and
+PPL 17.2055 to KL 0.091872 and PPL 16.4044 at 20% removal. At 50% removal it
+improves the control from KL 0.284632 and PPL 24.4594 to KL 0.281350 and PPL
+23.3052. Output reconstruction alone is not consistently beneficial, the
+combined strategy is only marginally different from discrete allocation, and
+composition-aware refinement does not win the fixed-KL selection rule.
+
+At 100M recovery tokens, the executed discrete-allocation confirmations reach
+PPL 15.9491 / KL 0.074664 at 20% eligible-MLP removal and PPL 20.5286 / KL
+0.194910 at 50%. The matching SwiGLU-3 results are PPL 16.6543 / KL 0.075510
+and PPL 22.0908 / KL 0.220696 respectively.
+
+The original search artifact contains one milestone-labeling defect: during
+the 2M qualifier, the future 5M request was also attached to the 2M full
+evaluation. Selection therefore consumed the 2M row. The genuine 5M rows show
+that Reconstruction plus discrete allocation (`S5-C3`) was marginally better
+than Discrete layer allocation (`S5-C2`) at 20%, by 0.000128 KL and 0.029 PPL.
+The 20% confirmation consequently represents a valid near-runner-up trajectory
+rather than the exact 5M winner. The 50% winner remains Discrete layer
+allocation. The workflow scheduler and lookup logic are corrected for future
+runs; historical artifacts remain unchanged.
 
 ## Confirmation
 
@@ -194,8 +225,13 @@ Perun launcher is provided.
 ## Reporting and interpretation boundary
 
 [`swiglu-5.ipynb`](../../../../notebooks/model/swiglu/swiglu-5.ipynb) loads
-JSON artifacts only. It reports the imported SwiGLU-3 rows, dense reference,
-pre-recovery candidates, layer widths, recovery curves, selection decisions,
-runtime decomposition, and optional confirmation comparisons. Before a search
-artifact exists, this document describes an implemented experimental contract,
-not an empirical result. A null result in which `S5-C0` remains best is valid.
+JSON artifacts only. It presents named experimental strategies, equal-budget
+search comparisons, recovery trajectories, a layer-width heatmap, corrected
+5M selection semantics, 100M confirmation curves, direct SwiGLU-3 comparisons,
+resource use, and the progression from SwiGLU-4 recovery tuning to SwiGLU-5
+allocation. Stable IDs remain visible only as secondary provenance keys.
+
+New workflow artifacts include additive `definitions` metadata mapping IDs to
+human-readable names, scientific questions, recovery settings, and metric
+meaning. Historical source JSON is not rewritten; the notebook carries the
+same mapping as a compatibility fallback.
