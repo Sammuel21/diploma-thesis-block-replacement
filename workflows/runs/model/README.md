@@ -86,9 +86,13 @@ checkpoints during execution, and removes them after a successful run. See
 [`swiglu-4.md`](../../../docs/experiments/model/swiglu/swiglu-4.md) for its tournament,
 LoRA scopes, reporting contract, and nohup commands.
 
-`swiglu-5-search` accepts `--source` and `--output`; it has no resume or smoke
-mode. Its low-storage policy retains only live tournament continuation states
-and the two 5M winners. `swiglu-5-confirmation` additionally requires one
+`swiglu-5-search` accepts `--source`, `--output`, and a pre-recovery `--resume`
+against the original failed output. Resume validates retained operator hashes,
+reuses completed width curves and initial candidates, and restarts the first
+unfinished candidate stage. `--allow-over-budget` records but does not enforce
+the configured runtime projection. There is no smoke mode. Its low-storage
+policy retains only live tournament continuation states and the two 5M winners.
+`swiglu-5-confirmation` additionally requires one
 explicit `--target 0.2` or `--target 0.5` and a completed `--search-artifact`;
 it creates only final and best replacement-weight snapshots, and references
 the retained 5M search endpoint when that remains best. Implementing

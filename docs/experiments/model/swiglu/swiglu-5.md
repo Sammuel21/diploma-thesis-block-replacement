@@ -5,7 +5,7 @@ type: experiment-workflow
 category: experiments/model/swiglu
 status: draft
 created: 2026-09-19
-modified: 2026-09-19
+modified: 2026-09-20
 authorship:
   created_by: collaborative
 curation:
@@ -22,7 +22,7 @@ sources:
 # SwiGLU-5 Efficient Global-Recovery Search and Confirmation
 
 Status: both runners and the load-only report are implemented. The bounded
-search has not been executed, and confirmation must not run until the search
+search has not completed, and confirmation must not run until the search
 artifact has been reviewed.
 
 ## Purpose
@@ -108,7 +108,7 @@ The runner profiles `4x4`, `8x2`, and `16x1` sequence/accumulation geometries,
 selects the largest below 22 GiB peak VRAM, and retains `torch.compile` only
 when it is at least 10% faster with loss divergence no greater than `1e-4`.
 Each throughput trial measures 16 optimizer updates (32,768 token positions)
-so one-time startup work does not dominate the six-hour projection. All trials
+so one-time startup work does not dominate the runtime projection. All trials
 use disposable states, and the pre-profile RNG state is restored before the
 tournament. Training, evaluation, and checkpoint time are recorded separately.
 The 20% and 50% targets run sequentially. During qualification, the runner
@@ -129,8 +129,10 @@ fallback when no challenger passes.
 
 Before recovery, the workflow projects the complete 38M candidate-token
 tournament from measured preparation time and recovery throughput with a 15%
-reserve. A projection above six hours writes `budget_guard_rejected` and stops
-without silently shrinking the design.
+reserve. By default, a projection above six hours writes
+`budget_guard_rejected` and stops without silently shrinking the design.
+`--allow-over-budget` preserves the projection record but permits an explicitly
+authorized longer run.
 
 ## Confirmation
 
@@ -161,6 +163,17 @@ python -m workflows.runs.model.swiglu.swiglu_5_search \
   --output data/results/workflows/model/swiglu-5/search/<unique>.json
 ```
 
+A failed search before recovery training may continue from its original output:
+
+```bash
+python -m workflows.runs.model.swiglu.swiglu_5_search \
+  --config workflows/configs/model/swiglu/swiglu-5-search.json \
+  --source data/results/workflows/model/swiglu-3/run-001.json \
+  --output data/results/workflows/model/swiglu-5/search/run-001.json \
+  --resume \
+  --allow-over-budget
+```
+
 After analyzing that completed artifact, run one selected target:
 
 ```bash
@@ -171,10 +184,11 @@ python -m workflows.runs.model.swiglu.swiglu_5_confirmation \
   --output data/results/workflows/model/swiglu-5/confirmation/<unique>.json
 ```
 
-Neither process supports resume or a smoke mode. A failed process must be
-restarted with a new output path. This deliberate low-storage policy does not
-change candidate training, selection, token order, or confirmation
-continuation. No SwiGLU-5 Perun launcher is provided.
+Search resume is limited to failures before recovery training and does not add
+large recovery checkpoints. Confirmation does not support resume, and neither
+process has a smoke mode. This low-storage policy does not change candidate
+training, selection, token order, or confirmation continuation. No SwiGLU-5
+Perun launcher is provided.
 
 ## Reporting and interpretation boundary
 

@@ -26,7 +26,7 @@ this progression.
 | [SwiGLU-2](swiglu-2.md) | Singleton-KL allocation policy and width search | Notebook artifact present |
 | [SwiGLU-3](swiglu-3.md) | Calibration sweep, 20%-50% sparsity sweep, and 100M-token recovery | Completed artifact present |
 | [SwiGLU-4](swiglu-4.md) | Recovery objective, learning rate, RMSNorm, and LoRA comparison | Completed artifact present |
-| [SwiGLU-5](swiglu-5.md) | Efficient initialization/allocation search followed by gated confirmation | Implemented; search not yet executed |
+| [SwiGLU-5](swiglu-5.md) | Efficient initialization/allocation search followed by gated confirmation | Implemented; search not yet completed |
 
 The maintained runners and configurations use the matching class directories
 under `workflows/runs/model/swiglu/` and `workflows/configs/model/swiglu/`.

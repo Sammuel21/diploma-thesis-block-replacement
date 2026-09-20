@@ -24,6 +24,16 @@ def parse_args():
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--source", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Continue a failed pre-recovery search from its original output",
+    )
+    parser.add_argument(
+        "--allow-over-budget",
+        action="store_true",
+        help="Record but do not enforce the configured runtime limit",
+    )
     return parser.parse_args()
 
 
@@ -35,9 +45,10 @@ def main():
         args.config,
         args.source,
         args.output,
+        resume=args.resume,
     )
     try:
-        run_search(context)
+        run_search(context, allow_over_budget=args.allow_over_budget)
     except BaseException as error:
         context.artifact["status"] = "failed"
         context.artifact["error"] = {

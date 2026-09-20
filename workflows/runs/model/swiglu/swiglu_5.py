@@ -54,6 +54,7 @@ from mlp_replacement.operators import (
 from mlp_replacement.runlog import environment_record
 
 from .shared import (
+    autocast_context,
     atomic_json,
     atomic_torch_save,
     build_local_data,
@@ -159,6 +160,7 @@ class SwiGLU5Context:
     model_dtype: object | None = None
     blocks: dict | None = None
     data: dict | None = None
+    resumed: bool = False
 
     @property
     def sidecar(self):
@@ -216,7 +218,92 @@ def strict_source_assets(source, source_path, calibration_pairs, targets):
     return assets, token_path
 
 
-def prepare_search_context(settings, config_path, source_path, output):
+def validate_search_resume_artifact(context, expected_provenance):
+    artifact = context.artifact
+    if artifact.get("workflow") != SEARCH_WORKFLOW:
+        raise ValueError("Resume artifact is not a SwiGLU-5 search")
+    if artifact.get("status") != "failed":
+        raise ValueError("SwiGLU-5 search resume requires a failed artifact")
+    if artifact.get("run_fingerprint") != context.run_fingerprint:
+        raise ValueError("Resume configuration or SwiGLU-3 source changed")
+    if artifact.get("configuration") != context.settings:
+        raise ValueError("Resume artifact configuration differs")
+
+    provenance = artifact.get("provenance", {})
+    if provenance.get("configuration", {}).get("sha256") != expected_provenance[
+        "configuration"
+    ]["sha256"]:
+        raise ValueError("Resume configuration file changed")
+    source_record = provenance.get("swiglu_3", {})
+    expected_source = expected_provenance["swiglu_3"]
+    if source_record.get("sha256") != expected_source["sha256"]:
+        raise ValueError("Resume SwiGLU-3 source artifact changed")
+    if source_record.get("assets") != expected_source["assets"]:
+        raise ValueError("Resume SwiGLU-3 source assets changed")
+    if not context.asset_dir.is_dir():
+        raise FileNotFoundError(
+            f"SwiGLU-5 resume asset directory is missing: {context.asset_dir}"
+        )
+
+    results = artifact.get("results", {})
+    for candidates in results.get("candidates", {}).values():
+        for candidate in candidates.values():
+            recovery = candidate.get("recovery", {})
+            if int(recovery.get("tokens_seen", 0)) != 0:
+                raise ValueError(
+                    "This resume path only supports failures before recovery training"
+                )
+
+    validated_files = 0
+    validated_bytes = 0
+    asset_root = context.asset_dir.resolve()
+    for row in results.get("local_fitting", []):
+        if not bool(row.get("state_retained", True)):
+            continue
+        path = resolve_source_asset(row["state_path"], context.output).resolve()
+        try:
+            path.relative_to(asset_root)
+        except ValueError as error:
+            raise ValueError(
+                f"Resume operator state lies outside the run assets: {path}"
+            ) from error
+        if sha256_file(path) != row["state_sha256"]:
+            raise ValueError(f"Resume operator state changed: {path}")
+        validated_files += 1
+        validated_bytes += path.stat().st_size
+
+    prior_updated = artifact.get("updated_at_utc")
+    prior_elapsed = None
+    if artifact.get("created_at_utc") and prior_updated:
+        prior_elapsed = (
+            datetime.fromisoformat(prior_updated)
+            - datetime.fromisoformat(artifact["created_at_utc"])
+        ).total_seconds()
+    results.setdefault("continuations", []).append(
+        {
+            "resumed_at_utc": utc_now(),
+            "prior_status": artifact["status"],
+            "prior_error": deepcopy(artifact.get("error")),
+            "prior_elapsed_wall_seconds": prior_elapsed,
+            "validated_local_fit_states": validated_files,
+            "validated_local_fit_bytes": validated_bytes,
+        }
+    )
+    return {
+        "validated_local_fit_states": validated_files,
+        "validated_local_fit_bytes": validated_bytes,
+    }
+
+
+def prepare_search_context(
+    settings,
+    config_path,
+    source_path,
+    output,
+    resume=False,
+):
+    if resume and output is None:
+        raise ValueError("SwiGLU-5 search --resume requires the original --output")
     source_path = resolve_path(Path(source_path or settings["references"]["swiglu_3_artifact"]))
     source = load_artifact(source_path, 1, "completed SwiGLU-3 source")
     effective = deep_merge(source["configuration"], settings)
@@ -246,6 +333,25 @@ def prepare_search_context(settings, config_path, source_path, output):
     )
     output = resolve_path(Path(output or default_output(SEARCH_WORKFLOW)))
     asset_dir = asset_directory(output)
+    if resume:
+        artifact = load_artifact(output, SCHEMA_VERSION, "failed SwiGLU-5 search")
+        context = SwiGLU5Context(
+            SEARCH_WORKFLOW,
+            output,
+            asset_dir,
+            effective,
+            run_fingerprint,
+            artifact,
+            source_path=source_path,
+            source=source,
+            resumed=True,
+        )
+        validation = validate_search_resume_artifact(context, provenance)
+        context.artifact["status"] = "running"
+        context.artifact["error"] = None
+        context.artifact["results"]["resume_validation"] = validation
+        context.persist("resume_validation")
+        return context
     if output.exists() or asset_dir.exists():
         raise FileExistsError(f"SwiGLU-5 output already exists: {output}")
     artifact = {
@@ -444,7 +550,7 @@ def storage_preflight(context):
     required_bytes = math.ceil(estimated_peak_bytes * (1.0 + reserve_fraction))
     free_bytes = shutil.disk_usage(context.asset_dir.parent).free
     record = {
-        "policy": "minimal_exact_no_resume",
+        "policy": "minimal_exact_stage_resume",
         "hidden_cache_bytes": hidden_cache_bytes,
         "local_fit_state_bytes_upper_bound": local_state_bytes,
         "selected_initial_state_bytes_upper_bound": selected_initial_state_bytes,
@@ -498,12 +604,12 @@ def fit_operator(
     neuron_indices,
     context_kind="dense",
 ):
-    fit_key = fit_key(initialization, layer, width, context_kind)
+    fit_identifier = fit_key(initialization, layer, width, context_kind)
     existing = {
         row["fit_key"]: row for row in context.artifact["results"]["local_fitting"]
     }
-    if fit_key in existing:
-        row = existing[fit_key]
+    if fit_identifier in existing:
+        row = existing[fit_identifier]
         state_path = resolve_source_asset(row["state_path"], context.output)
         if not state_path.is_file() or sha256_file(state_path) != row["state_sha256"]:
             raise ValueError(f"Persisted local-fit state changed: {state_path}")
@@ -555,7 +661,7 @@ def fit_operator(
             ),
         }
         down_history = history_rows(
-            fit_key, "down_only", reconstruction.down_only_fit.history
+            fit_identifier, "down_only", reconstruction.down_only_fit.history
         )
     else:
         raise ValueError(f"Unsupported SwiGLU-5 initialization: {initialization}")
@@ -570,7 +676,7 @@ def fit_operator(
     }
     atomic_torch_save(state_path, state)
     row = {
-        "fit_key": fit_key,
+        "fit_key": fit_identifier,
         "initialization": initialization,
         "capture_context": context_kind,
         "layer": int(layer),
@@ -603,7 +709,8 @@ def fit_operator(
         "state_path": relative_to_root(state_path),
         "state_sha256": sha256_file(state_path),
         "parameter_count": sum(value.numel() for value in state.values()),
-        "history": down_history + history_rows(fit_key, "full", fit.history),
+        "history": down_history
+        + history_rows(fit_identifier, "full", fit.history),
     }
     context.artifact["results"]["local_fitting"].append(row)
     context.persist("local_fitting")
@@ -1158,24 +1265,30 @@ def build_composition_candidates(context, selection_cache, validation_cache):
                 for offset in range(0, len(layers), group_size):
                     group = layers[offset : offset + group_size]
                     paths = [context.blocks[layer].path for layer in group]
-                    captured_training = collect_modules_io(
-                        context.model,
-                        paths,
-                        training_loader,
-                        pair_batches,
-                        context.device,
-                        storage_device="cpu",
-                        storage_dtype=context.model_dtype,
-                    )
-                    captured_validation = collect_modules_io(
-                        context.model,
-                        paths,
-                        context.data["operator_validation"],
-                        int(context.data["partition_batches"]["operator_validation"]),
-                        context.device,
-                        storage_device="cpu",
-                        storage_dtype=context.model_dtype,
-                    )
+                    with autocast_context(context.device):
+                        captured_training = collect_modules_io(
+                            context.model,
+                            paths,
+                            training_loader,
+                            pair_batches,
+                            context.device,
+                            storage_device="cpu",
+                            storage_dtype=context.model_dtype,
+                        )
+                    with autocast_context(context.device):
+                        captured_validation = collect_modules_io(
+                            context.model,
+                            paths,
+                            context.data["operator_validation"],
+                            int(
+                                context.data["partition_batches"][
+                                    "operator_validation"
+                                ]
+                            ),
+                            context.device,
+                            storage_device="cpu",
+                            storage_dtype=context.model_dtype,
+                        )
                     for layer in group:
                         parent_row = next(row for row in parent["allocation"] if int(row["layer"]) == layer)
                         if parent_row.get("retains_dense_module"):
@@ -1916,7 +2029,7 @@ def prune_teacher_hidden_cache(context, hidden_cache):
     return {"removed": True, "bytes_removed": removed_bytes}
 
 
-def runtime_guard(context, observed_tokens_per_second):
+def runtime_guard(context, observed_tokens_per_second, allow_over_budget=False):
     completed_seconds = sum(
         float(row["seconds"]) for row in context.artifact["results"]["runtime"]
     )
@@ -1924,6 +2037,9 @@ def runtime_guard(context, observed_tokens_per_second):
     raw_projection = completed_seconds + candidate_tokens / float(observed_tokens_per_second)
     projected = raw_projection * (
         1.0 + float(context.settings["runtime_guard"]["reserve_fraction"])
+    )
+    within_limit = projected <= int(
+        context.settings["runtime_guard"]["maximum_projected_seconds"]
     )
     record = {
         "completed_preparation_seconds": completed_seconds,
@@ -1933,8 +2049,10 @@ def runtime_guard(context, observed_tokens_per_second):
         "reserve_fraction": float(context.settings["runtime_guard"]["reserve_fraction"]),
         "projected_seconds": projected,
         "maximum_projected_seconds": int(context.settings["runtime_guard"]["maximum_projected_seconds"]),
-        "passed": projected
-        <= int(context.settings["runtime_guard"]["maximum_projected_seconds"]),
+        "within_configured_limit": within_limit,
+        "over_budget_allowed": bool(allow_over_budget),
+        "override_used": bool(allow_over_budget and not within_limit),
+        "passed": bool(within_limit or allow_over_budget),
     }
     context.artifact["results"]["runtime_guard"] = record
     context.persist("runtime_guard")
@@ -2055,7 +2173,49 @@ def record_stage_runtime(context, stage, started):
     context.persist(stage)
 
 
-def run_search(context):
+def width_curves_complete(context):
+    layers = tuple(
+        int(value) for value in context.settings["compatibility"]["eligible_layers"]
+    )
+    original_width = int(context.settings["model"]["intermediate_size"])
+    widths = {
+        min(original_width, max(1, round(original_width * float(ratio))))
+        for ratio in context.settings["allocation"]["width_ratios"]
+    }
+    expected = {(layer, width) for layer in layers for width in widths}
+    for initialization in ("legacy_subset", "output_aware"):
+        rows = context.artifact["results"]["width_curves"].get(
+            initialization, []
+        )
+        observed = {
+            (int(row["layer"]), int(row["replacement_width"])) for row in rows
+        }
+        if observed != expected or any(
+            "monotone_teacher_kl" not in row for row in rows
+        ):
+            return False
+    return True
+
+
+def initial_candidates_complete(context):
+    expected_layers = {
+        int(value) for value in context.settings["compatibility"]["eligible_layers"]
+    }
+    required_ids = {"S5-C0", "S5-C1", "S5-C2", "S5-C3"}
+    candidates_by_target = context.artifact["results"]["candidates"]
+    for target in context.settings["compatibility"]["target_mlp_removals"]:
+        candidates = candidates_by_target.get(str(float(target)), {})
+        if not required_ids <= set(candidates):
+            return False
+        for candidate_id in required_ids:
+            candidate = candidates[candidate_id]
+            layers = {int(row["layer"]) for row in candidate.get("allocation", [])}
+            if layers != expected_layers or not candidate.get("pre_recovery"):
+                return False
+    return True
+
+
+def run_search(context, allow_over_budget=False):
     """Execute the complete compute-bounded SwiGLU-5 tournament."""
 
     started = perf_counter()
@@ -2070,7 +2230,11 @@ def run_search(context):
         ),
         "sequence_length": int(context.data["sequence_length"]),
     }
-    record_stage_runtime(context, "load_model_and_data", started)
+    record_stage_runtime(
+        context,
+        "resume_load_model_and_data" if context.resumed else "load_model_and_data",
+        started,
+    )
 
     started = perf_counter()
     cache_dtype = context.source["configuration"]["recovery"].get(
@@ -2090,43 +2254,60 @@ def run_search(context):
         context.device,
         cache_dtype,
     )
-    context.artifact["results"]["dense_baseline"] = {
-        "recovery_validation_kl": evaluate_validation_kl_mixed(
-            context.model,
-            validation_cache,
-            float(context.settings["recovery"]["temperature"]),
-            context.device,
+    if context.artifact["results"].get("dense_baseline") is None:
+        context.artifact["results"]["dense_baseline"] = {
+            "recovery_validation_kl": evaluate_validation_kl_mixed(
+                context.model,
+                validation_cache,
+                float(context.settings["recovery"]["temperature"]),
+                context.device,
+            ),
+            "allocation_selection": evaluate_teacher_cache_mixed(
+                context.model,
+                selection_cache,
+                float(context.settings["recovery"]["temperature"]),
+                context.device,
+            ),
+            "wikitext_validation": evaluate_lm_mixed(
+                context.model,
+                context.data["model_validation"],
+                context.device,
+                int(context.settings["data"]["model_validation_batches"]),
+            ),
+        }
+    record_stage_runtime(
+        context,
+        (
+            "resume_fixed_evaluation_caches"
+            if context.resumed
+            else "dense_and_fixed_evaluation_caches"
         ),
-        "allocation_selection": evaluate_teacher_cache_mixed(
-            context.model,
-            selection_cache,
-            float(context.settings["recovery"]["temperature"]),
-            context.device,
-        ),
-        "wikitext_validation": evaluate_lm_mixed(
-            context.model,
-            context.data["model_validation"],
-            context.device,
-            int(context.settings["data"]["model_validation_batches"]),
-        ),
-    }
-    record_stage_runtime(context, "dense_and_fixed_evaluation_caches", started)
+        started,
+    )
+
+    if not width_curves_complete(context):
+        started = perf_counter()
+        build_width_curves(context, selection_cache)
+        record_stage_runtime(context, "width_curves", started)
+    else:
+        context.persist("width_curves_reused")
 
     started = perf_counter()
-    build_width_curves(context, selection_cache)
-    record_stage_runtime(context, "width_curves", started)
-
-    started = perf_counter()
-    build_c1_c3_candidates(context, selection_cache, validation_cache)
+    if not initial_candidates_complete(context):
+        build_c1_c3_candidates(context, selection_cache, validation_cache)
     build_composition_candidates(context, selection_cache, validation_cache)
-    record_stage_runtime(context, "candidate_assembly", started)
-    context.artifact["results"]["local_fit_state_pruning"] = [
+    record_stage_runtime(
+        context,
+        "resume_candidate_assembly" if context.resumed else "candidate_assembly",
+        started,
+    )
+    context.artifact["results"].setdefault("local_fit_state_pruning", []).append(
         prune_search_local_fit_states(
             context,
             pending_candidate_fit_keys(context),
             stage="candidate_assembly",
         )
-    ]
+    )
     context.persist("candidate_state_pruning")
 
     started = perf_counter()
@@ -2173,7 +2354,11 @@ def run_search(context):
     started = perf_counter()
     kernel = calibrate_recovery(context, model_config, hidden_cache, teacher_head)
     record_stage_runtime(context, "kernel_calibration", started)
-    guard = runtime_guard(context, kernel["observed_tokens_per_second"])
+    guard = runtime_guard(
+        context,
+        kernel["observed_tokens_per_second"],
+        allow_over_budget=allow_over_budget,
+    )
     if not guard["passed"]:
         context.artifact["results"]["local_fit_state_pruning"].append(
             prune_search_local_fit_states(
