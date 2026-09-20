@@ -43,7 +43,11 @@ from mlp_replacement.compression.surgery import replace_submodule
 from mlp_replacement.config import OperatorConfig
 from mlp_replacement.data import PackedTokenCache, make_token_loader
 from mlp_replacement.evaluation.operator import evaluate_operator
-from mlp_replacement.model import discover_mlp_blocks, load_model_and_tokenizer
+from mlp_replacement.model import (
+    discover_mlp_blocks,
+    load_model_and_tokenizer,
+    resolve_dtype,
+)
 from mlp_replacement.operators import (
     GatedMLPReplacement,
     fit_operator_fp32_detailed,
@@ -2313,6 +2317,9 @@ def run_search(context, allow_over_budget=False):
     started = perf_counter()
     token_cache = packed_source_cache(context)
     hidden_settings = context.settings["teacher_hidden_cache"]
+    hidden_cache_dtype = resolve_dtype(
+        hidden_settings["dtype"], torch.device(context.device)
+    )
     hidden_cache = build_teacher_final_hidden_cache(
         context.model,
         token_cache,
@@ -2324,7 +2331,7 @@ def run_search(context, allow_over_budget=False):
             "model_id": context.settings["model"]["model_id"],
             "revision": context.settings["model"]["revision"],
         },
-        cache_dtype=torch.bfloat16,
+        cache_dtype=hidden_cache_dtype,
         shard_tokens=int(hidden_settings["shard_tokens"]),
         minimum_free_gib=float(hidden_settings["minimum_free_gib"]),
     )
@@ -2334,6 +2341,7 @@ def run_search(context, allow_over_budget=False):
         token_cache,
         context.device,
         hidden_settings["validation_sample_offsets"],
+        capture_batch_sequences=int(hidden_settings["capture_batch_sequences"]),
         temperature=float(context.settings["recovery"]["temperature"]),
         maximum_mean_kl=float(hidden_settings["maximum_mean_kl"]),
     )

@@ -96,7 +96,8 @@ single recapture round is complete.
 The dense final normalized hidden states for the first requested 5M stream
 tokens are stored in atomic BF16 shards. A frozen copy of the tied output head
 reconstructs teacher logits after the dense Transformer is released. Fixed
-sample checks must keep cached-versus-online teacher KL at or below `1e-5`.
+sample checks replay the cache-capture batch geometry and must keep
+cached-versus-online teacher KL at or below `1e-5`.
 Before local fitting begins, a storage preflight bounds two non-overlapping
 peaks: width-curve fitting and recovery with the teacher cache, selected
 candidate states, and at most four transient candidate checkpoints during an

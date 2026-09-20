@@ -242,12 +242,14 @@ def build_teacher_final_hidden_cache(
     batch_sequences = int(batch_sequences)
     shard_tokens = int(shard_tokens)
     sequence_length = int(packed_tokens.sequence_length)
+    capture_batch_tokens = batch_sequences * sequence_length
     if (
         token_count < 1
         or token_count > packed_tokens.token_count
         or token_count % sequence_length
         or shard_tokens % sequence_length
         or batch_sequences < 1
+        or shard_tokens % capture_batch_tokens
     ):
         raise ValueError("Teacher-hidden cache geometry is inconsistent")
     output_head = model.get_output_embeddings()
@@ -390,7 +392,7 @@ def build_teacher_final_hidden_cache(
                 cursor = shard_start
                 while cursor < shard_end:
                     count = min(
-                        batch_sequences * sequence_length,
+                        capture_batch_tokens,
                         shard_end - cursor,
                     )
                     batch = packed_tokens.batch(cursor, count, batch_sequences)
@@ -507,66 +509,141 @@ def validate_teacher_final_hidden_cache(
     packed_tokens,
     device,
     sample_offsets,
-    batch_sequences=2,
+    capture_batch_sequences,
+    sample_sequences=2,
     temperature=1.0,
     maximum_mean_kl=1e-5,
 ):
-    """Compare cached and online dense distributions at fixed offsets."""
+    """Compare cached and online dense distributions at fixed offsets.
+
+    Replay the batch geometry used to capture the hidden states.  BF16 model
+    output can vary with CUDA kernel geometry, so changing the batch size here
+    would measure that numerical difference instead of cache fidelity.
+    """
 
     head = model.get_output_embeddings()
     if head is None or getattr(model, "model", None) is None:
         raise TypeError("Teacher cache validation requires model and output head")
+    if cache.token_fingerprint != packed_tokens.fingerprint:
+        raise ValueError("Teacher cache and packed-token fingerprints differ")
+    if int(cache.sequence_length) != int(packed_tokens.sequence_length):
+        raise ValueError("Teacher cache and packed-token sequence lengths differ")
+    if cache.head_fingerprint != tensor_sha256(head.weight):
+        raise ValueError("Teacher cache and output-head fingerprints differ")
+    capture_batch_sequences = int(capture_batch_sequences)
+    sample_sequences = int(sample_sequences)
+    if capture_batch_sequences < 1 or sample_sequences < 1:
+        raise ValueError("Teacher cache validation batch sizes must be positive")
+    sample_offsets = tuple(int(value) for value in sample_offsets)
+    if not sample_offsets:
+        raise ValueError("Teacher cache validation requires at least one sample")
+    sequence_length = int(cache.sequence_length)
+    capture_batch_tokens = capture_batch_sequences * sequence_length
+    sample_tokens = sample_sequences * sequence_length
+    if int(cache.manifest["shard_tokens"]) % capture_batch_tokens:
+        raise ValueError(
+            "Teacher cache shards do not preserve the capture-batch boundaries"
+        )
+    cache_dtype = resolve_dtype(cache.dtype, torch.device(device))
     losses = []
-    sample_tokens = int(batch_sequences) * int(cache.sequence_length)
+    evaluated_offsets = []
+    was_training = model.training
     model.eval()
-    with torch.no_grad():
-        for offset in sample_offsets:
-            offset = int(offset)
-            batch = packed_tokens.batch(offset, sample_tokens, batch_sequences)
-            input_ids = batch["input_ids"].to(device)
-            attention_mask = batch["attention_mask"].to(device)
-            with autocast_context(device, torch.bfloat16):
-                online_logits = model(
-                    input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    use_cache=False,
-                ).logits
-                hidden = cache.batch(offset, sample_tokens).reshape(
-                    *input_ids.shape,
-                    cache.hidden_size,
-                ).to(device)
-                cached_logits = head(hidden)
-            mask = attention_mask.bool()
-            online_probabilities = torch.softmax(
-                online_logits[mask].float() / float(temperature), dim=-1
-            )
-            cached_log_probabilities = torch.log_softmax(
-                cached_logits[mask].float() / float(temperature), dim=-1
-            )
-            losses.append(
-                float(
-                    (
-                        F.kl_div(
-                            cached_log_probabilities,
-                            online_probabilities,
-                            reduction="batchmean",
+    try:
+        with torch.no_grad():
+            for offset in sample_offsets:
+                sample_end = offset + sample_tokens
+                if offset % sequence_length:
+                    raise ValueError(
+                        "Teacher cache validation offsets must begin on a sequence boundary"
+                    )
+                if offset < 0 or sample_end > cache.token_count:
+                    raise ValueError(
+                        "Teacher cache validation sample lies outside the cache"
+                    )
+                evaluated_offsets.append(offset)
+                kl_sum = 0.0
+                compared_tokens = 0
+                capture_offset = (
+                    offset // capture_batch_tokens
+                ) * capture_batch_tokens
+                while capture_offset < sample_end:
+                    capture_tokens = min(
+                        capture_batch_tokens,
+                        cache.token_count - capture_offset,
+                    )
+                    batch = packed_tokens.batch(
+                        capture_offset,
+                        capture_tokens,
+                        capture_batch_sequences,
+                    )
+                    input_ids = batch["input_ids"].to(device)
+                    attention_mask = batch["attention_mask"].to(device)
+                    with autocast_context(device, cache_dtype):
+                        online_logits = model(
+                            input_ids=input_ids,
+                            attention_mask=attention_mask,
+                            use_cache=False,
+                        ).logits.reshape(-1, head.weight.shape[0])
+                        hidden = cache.batch(
+                            capture_offset,
+                            capture_tokens,
+                        ).reshape(
+                            *input_ids.shape,
+                            cache.hidden_size,
+                        ).to(device)
+                        cached_logits = head(hidden).reshape(
+                            -1, head.weight.shape[0]
                         )
-                        * (float(temperature) ** 2)
-                    ).item()
-                )
-            )
+                    overlap_start = max(offset, capture_offset)
+                    overlap_end = min(sample_end, capture_offset + capture_tokens)
+                    local_start = overlap_start - capture_offset
+                    local_end = overlap_end - capture_offset
+                    online_probabilities = torch.softmax(
+                        online_logits[local_start:local_end].float()
+                        / float(temperature),
+                        dim=-1,
+                    )
+                    cached_log_probabilities = torch.log_softmax(
+                        cached_logits[local_start:local_end].float()
+                        / float(temperature),
+                        dim=-1,
+                    )
+                    kl_sum += float(
+                        (
+                            F.kl_div(
+                                cached_log_probabilities,
+                                online_probabilities,
+                                reduction="sum",
+                            )
+                            * (float(temperature) ** 2)
+                        ).item()
+                    )
+                    compared_tokens += local_end - local_start
+                    capture_offset += capture_tokens
+                if compared_tokens != sample_tokens:
+                    raise RuntimeError(
+                        "Teacher cache validation did not cover the requested sample"
+                    )
+                losses.append(kl_sum / compared_tokens)
+    finally:
+        model.train(was_training)
     mean_kl = sum(losses) / len(losses)
     record = {
-        "sample_offsets": [int(value) for value in sample_offsets],
+        "sample_offsets": evaluated_offsets,
+        "sample_sequences": sample_sequences,
+        "capture_batch_sequences": capture_batch_sequences,
         "sample_kls": losses,
         "mean_kl": mean_kl,
         "maximum_mean_kl": float(maximum_mean_kl),
         "passed": mean_kl <= float(maximum_mean_kl),
     }
     if not record["passed"]:
+        sample_summary = ", ".join(f"{value:.8g}" for value in losses)
         raise ValueError(
             f"Cached teacher mean KL {mean_kl:.8g} exceeds "
-            f"{float(maximum_mean_kl):.8g}"
+            f"{float(maximum_mean_kl):.8g} with capture batch "
+            f"{capture_batch_sequences}; sample KLs: [{sample_summary}]"
         )
     return record
 
