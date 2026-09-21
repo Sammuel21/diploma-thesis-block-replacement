@@ -28,6 +28,8 @@ sources:
 Status: completed on darthmachinus. The bounded search and both 100M-token
 confirmation runs are present. The load-only notebook reports the full search,
 the SwiGLU-3 comparisons, and the winner-selection caveat described below.
+For the family-level outcome, see the [results overview](swiglu-results.md);
+for chronological rationale, see the [experimental progression](swiglu-progression.md).
 
 ## Purpose
 

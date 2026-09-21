@@ -1,11 +1,11 @@
 ---
 metadata_version: 1
-title: Homogeneous SwiGLU Experimental Progression and Results
+title: Homogeneous SwiGLU Experimental Progression
 type: experiment-synthesis
 category: experiments/model/swiglu
 status: active
 created: 2026-09-20
-modified: 2026-09-20
+modified: 2026-09-21
 authorship:
   created_by: collaborative
 curation:
@@ -30,15 +30,15 @@ sources:
     - data/results/workflows/model/swiglu-5/confirmation/run-001-target-0.5.json
 ---
 
-# Homogeneous SwiGLU Experimental Progression and Results
+# Homogeneous SwiGLU Experimental Progression
 
 ## Purpose and evidence boundary
 
 This page is the chronological synthesis of the homogeneous SwiGLU experiment
-family. It explains what each experiment changed, what was observed, why the
-next experiment was designed, and which conclusions survive the complete
-SwiGLU-5 confirmation. The individual workflow pages remain the authoritative
-method descriptions:
+family. It explains what each experiment changed, what was observed, and why
+the next experiment was designed. For the outcomes grouped by finding rather
+than timeline, see the [results overview](swiglu-results.md). The individual
+workflow pages remain the authoritative method descriptions:
 
 - [SwiGLU](swiglu.md), referred to here as **SwiGLU-1**;
 - [SwiGLU-2](swiglu-2.md);

@@ -1,11 +1,11 @@
 ---
 metadata_version: 1
-title: Homogeneous SwiGLU Experiment Progression
+title: Homogeneous SwiGLU Experiments
 type: index
 category: experiments/model/swiglu
 status: active
 created: 2026-09-19
-modified: 2026-09-20
+modified: 2026-09-21
 authorship:
   created_by: collaborative
 curation:
@@ -14,14 +14,16 @@ curation:
   reviewed_on: null
 ---
 
-# Homogeneous SwiGLU Experiment Progression
+# Homogeneous SwiGLU Experiments
 
 This class holds model-wide experiments in which every replaced MLP remains a
 reduced-width SwiGLU. Heterogeneous operator selection is deliberately outside
 this progression.
 
-The chronological findings and rationale connecting all five experiments are
-summarized in [SwiGLU experimental progression and results](swiglu-progression.md).
+Start with the [results overview](swiglu-results.md) for the achieved quality,
+matched comparisons, compute cost, and limitations. The
+[experimental progression](swiglu-progression.md) explains the chronological
+decisions and rationale connecting all five experiments.
 
 | Experiment | Main contribution | Execution status |
 | --- | --- | --- |
