@@ -753,3 +753,15 @@ This file is append-only. Entries use the format:
   stable wiki page IDs.
 - Updated maintained repository links and agent routing to the new canonical
   paths. No scientific wiki claim or verification status was changed.
+
+## [2026-09-21] register | SwiGLU-6 evaluation references
+
+- Registered the canonical WikiText, PIQA, ARC, WinoGrande and HellaSwag
+  publications and pinned LM Evaluation Harness v0.4.13, as required by the
+  evaluation framework before benchmark activation.
+- Added a remote evaluation-reference collection and index navigation.
+- Checked publication metadata and the harness APIs used by the adapter.
+  All six entries remain `registered`; no full paper was ingested and no
+  source-summary or scientific finding was added.
+- Dataset revisions and installed harness source hashes will be recorded by
+  the SwiGLU-6 protocol-freezing stage. Scientific execution remains pending.

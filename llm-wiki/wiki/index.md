@@ -38,6 +38,11 @@ The researcher-found Phase Transitions Perspective remains `in-review` because
 its main article was checked but its central supplementary material was not
 accessible during ingestion.
 
+Canonical WikiText, PIQA, ARC, WinoGrande, HellaSwag and LM Evaluation Harness
+v0.4.13 references are now individually registered in
+[`raw/sources.yml`](../raw/sources.yml) for SwiGLU-6 evaluation. They remain
+`registered`; no paper ingestion or source-summary pages were added.
+
 ## Concepts
 
 - [[concept-replacement-error-propagation|Replacement error propagation]]:

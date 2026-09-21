@@ -1,5 +1,5 @@
 schema_version: 1
-updated: 2026-08-11
+updated: 2026-09-21
 
 # Individual sources are added here only when deliberately registered for
 # ingestion. Collection membership alone does not mean a source was reviewed.
@@ -124,3 +124,87 @@ sources:
       synthesis, comparative experiments, and strong universal or speculative
       claims. Its supplementary PDF was not independently reviewed during this
       ingestion because the publisher download returned a client challenge.
+
+  - id: src-wikitext-2016
+    title: Pointer Sentinel Mixture Models
+    collection_id: evaluation-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Stephen Merity, Caiming Xiong, James Bradbury, Richard Socher]
+    year: 2016
+    canonical_url: https://arxiv.org/abs/1609.07843v1
+    sha256: null
+    added: 2026-09-21
+    ingestion_status: registered
+    notes: Canonical WikiText publication; metadata checked, full paper not ingested. Runtime dataset revisions are frozen separately.
+
+  - id: src-piqa-2019
+    title: "PIQA: Reasoning about Physical Commonsense in Natural Language"
+    collection_id: evaluation-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Yonatan Bisk, Rowan Zellers, Ronan Le Bras, Jianfeng Gao, Yejin Choi]
+    year: 2019
+    canonical_url: https://arxiv.org/abs/1911.11641v1
+    sha256: null
+    added: 2026-09-21
+    ingestion_status: registered
+    notes: Canonical PIQA publication, AAAI 2020 with 2019 preprint; metadata checked, full paper not ingested.
+
+  - id: src-arc-2018
+    title: "Think you have Solved Question Answering? Try ARC, the AI2 Reasoning Challenge"
+    collection_id: evaluation-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Peter Clark, Isaac Cowhey, Oren Etzioni, Tushar Khot, Ashish Sabharwal, Carissa Schoenick, Oyvind Tafjord]
+    year: 2018
+    canonical_url: https://arxiv.org/abs/1803.05457v1
+    sha256: null
+    added: 2026-09-21
+    ingestion_status: registered
+    notes: Canonical source for ARC-Easy and ARC-Challenge; metadata checked, full paper not ingested.
+
+  - id: src-winogrande-2019
+    title: "WinoGrande: An Adversarial Winograd Schema Challenge at Scale"
+    collection_id: evaluation-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Keisuke Sakaguchi, Ronan Le Bras, Chandra Bhagavatula, Yejin Choi]
+    year: 2019
+    canonical_url: https://arxiv.org/abs/1907.10641v1
+    sha256: null
+    added: 2026-09-21
+    ingestion_status: registered
+    notes: Canonical WinoGrande preprint; metadata checked, full paper not ingested.
+
+  - id: src-hellaswag-2019
+    title: "HellaSwag: Can a Machine Really Finish Your Sentence?"
+    collection_id: evaluation-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Rowan Zellers, Ari Holtzman, Yonatan Bisk, Ali Farhadi, Yejin Choi]
+    year: 2019
+    canonical_url: https://arxiv.org/abs/1905.07830v1
+    sha256: null
+    added: 2026-09-21
+    ingestion_status: registered
+    notes: Canonical HellaSwag publication; metadata checked, full paper not ingested.
+
+  - id: src-lm-eval-harness-0-4-13
+    title: LM Evaluation Harness v0.4.13
+    collection_id: evaluation-references
+    origin: external-other
+    evidence_kind: software
+    priority: supporting
+    authors: [EleutherAI]
+    year: 2026
+    canonical_url: https://github.com/EleutherAI/lm-evaluation-harness/releases/tag/v0.4.13
+    sha256: null
+    added: 2026-09-21
+    ingestion_status: registered
+    notes: SwiGLU-6 pinned software release; selected adapter APIs checked, no full source ingestion. Runtime protocol records installed Python and task YAML SHA-256 hashes.

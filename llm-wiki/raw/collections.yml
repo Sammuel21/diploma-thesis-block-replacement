@@ -1,5 +1,5 @@
 schema_version: 1
-updated: 2026-07-17
+updated: 2026-09-21
 path_base: repository-root
 
 collections:
@@ -47,3 +47,18 @@ collections:
     mutability: mutable
     ingestion_policy: one-at-a-time-reviewed
     notes: Original ideas and informal notes; never treat them as prior work.
+
+  - id: evaluation-references
+    title: Canonical evaluation benchmarks and pinned software
+    locations:
+      - https://arxiv.org
+      - https://github.com/EleutherAI/lm-evaluation-harness
+    storage: remote
+    origin: external-other
+    evidence_kinds:
+      - scholarly-primary
+      - software
+    priority: supporting
+    mutability: immutable-snapshot
+    ingestion_policy: selective-with-source-verification
+    notes: Bibliographic registration for implemented evaluation; no source ingestion is implied.

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "workflow": "swiglu-6",
+  "seed": 21,
+  "targets": [0.2, 0.5],
+  "candidate_id": "S5-C2",
+  "model": {
+    "model_id": "HuggingFaceTB/SmolLM2-1.7B",
+    "revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "tokenizer_revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "device": "cuda", "dtype": "bfloat16", "trust_remote_code": false,
+    "hidden_size": 2048, "intermediate_size": 8192, "num_layers": 24
+  },
+  "sources": {
+    "search": "data/results/workflows/model/swiglu-5/search/run-001.json",
+    "swiglu_3": "data/results/workflows/model/swiglu-3/run-001.json",
+    "confirmations": {
+      "0.2": "data/results/workflows/model/swiglu-5/confirmation/run-001-target-0.2.json",
+      "0.5": "data/results/workflows/model/swiglu-5/confirmation/run-001-target-0.5.json"
+    }
+  },
+  "data": {
+    "recovery_dataset": "allenai/c4", "recovery_revision": null,
+    "first_shard": 1, "shard_count": 1024,
+    "sequence_length": 128, "target_tokens": 2000000000,
+    "historical_prefix_tokens": 100000000
+  },
+  "recovery": {
+    "start_tokens": 5001216,
+    "segment_endpoints": [100000000, 1000000000, 2000000000],
+    "checkpoint_interval_tokens": 25000000,
+    "legacy_validation_interval_tokens": 5000000,
+    "legacy_ppl_tokens": [10000000, 25000000, 50000000, 100000000, 250000000, 500000000, 1000000000, 1500000000, 2000000000],
+    "learning_rate": 0.00003, "weight_decay": 0.0,
+    "temperature": 1.0, "ce_weight": 0.0, "scheduler": "constant",
+    "optimizer_backend": "fused", "microbatch_sequences": 8,
+    "gradient_accumulation_steps": 2, "effective_batch_tokens": 2048,
+    "replay_kl_tolerance": 0.0001, "replay_ppl_tolerance": 0.01,
+    "pause_after_replay": true, "disk_reserve_fraction": 0.15
+  },
+  "evaluation": {
+    "harness_version": "0.4.13", "seed": 21,
+    "contexts": [128, 2048], "strides": [64, 1024],
+    "benchmark_context_length": 2048,
+    "wikitext_dataset": "Salesforce/wikitext", "wikitext_name": "wikitext-2-raw-v1",
+    "tasks": ["piqa", "arc_easy", "arc_challenge", "winogrande", "hellaswag"],
+    "primary_metrics": {"piqa": "acc_norm", "arc_easy": "acc_norm", "arc_challenge": "acc_norm", "winogrande": "acc", "hellaswag": "acc_norm"},
+    "bootstrap_resamples": 10000
+  }
+}
