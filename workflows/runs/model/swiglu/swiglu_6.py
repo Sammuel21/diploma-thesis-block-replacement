@@ -38,7 +38,7 @@ def load_settings(path):
     if any(recovery.get(key) != value for key, value in fixed.items()):
         raise ValueError("This SwiGLU-6 protocol fixes the original recipe and 100M/1B boundaries")
     if settings["targets"] != [0.2, 0.5] or settings["candidate_id"] != "S5-C2":
-        raise ValueError("SwiGLU-6 currently confirms the two existing S5-C2 models")
+        raise ValueError("SwiGLU-6 continues the two existing S5-C2 models")
     if settings["data"]["sequence_length"] != 128 or settings["data"]["target_tokens"] != 1_000_000_000:
         raise ValueError("SwiGLU-6 requires a 1B-token stream of length-128 sequences")
     if settings["seed"] != 21 or settings["data"]["first_shard"] != 1 or settings["data"]["historical_prefix_tokens"] != 100_000_000:

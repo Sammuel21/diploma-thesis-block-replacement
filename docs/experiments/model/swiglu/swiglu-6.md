@@ -46,7 +46,8 @@ This preserves the historical selected allocations. SwiGLU-5's selection artifac
 contains an endpoint-label issue: its displayed selection metric was associated
 with an earlier budget, although the retained starting tensors are actual 5M
 checkpoints. At 20% removal S5-C2 was a near runner-up to S5-C3 at the actual 5M
-evaluation. SwiGLU-6 is confirmation of S5-C2, not a corrected architecture search.
+evaluation. SwiGLU-6 extends the selected S5-C2 allocations to a longer recovery
+budget; it is not a corrected architecture search.
 
 ## Files and environments
 
@@ -84,11 +85,10 @@ the referenced content and use that same configuration for all stages.
 
 ### Running as background jobs on darthmachinus
 
-The SwiGLU-5 confirmations ran on the shared RTX 4090 Linux host. SwiGLU-6's
-historical replay is specified for that host and its recovery environment. This
-is a series of separate `nohup` processes, not one unattended chain: preparation,
-protocol freeze, both 100M replay gates, both resumptions to 1B, and final
-evaluation. Start each next process only after the previous artifact reaches
+The SwiGLU-5 confirmations ran on the shared RTX 4090 Linux host. SwiGLU-6 uses
+that host and its recovery environment. Run preparation, protocol freeze, one
+uninterrupted recovery per target, and final evaluation as separate `nohup`
+processes. Start each next process only after the previous artifact reaches
 the expected status. The existing Perun `run_model.sbatch` launcher does not
 dispatch SwiGLU-6.
 
@@ -142,35 +142,33 @@ echo "Protocol PID: $!"
 ```
 
 Once `protocol-001.json` is completed, return to the **original recovery
-environment**. Start the 20% replay phase:
+environment**. Start the 20% recovery through 1B tokens:
 
 ```bash
 nohup python -u -m workflows.runs.model.swiglu.swiglu_6_recovery \
   --prepared "$S6_RESULTS/prepare-001.json" --target 0.2 \
   --output "$S6_RESULTS/recovery-001-target-0.2.json" \
-  > "$S6_RESULTS/recovery-001-target-0.2-replay.log" 2>&1 < /dev/null &
-echo "20% replay PID: $!"
+  > "$S6_RESULTS/recovery-001-target-0.2.log" 2>&1 < /dev/null &
+echo "20% recovery PID: $!"
 ```
 
-Check `recovery-001-target-0.2.json`: its status should be
-`paused_after_replay` and `results.replay_check.passed` should be `true`.
-Then resume the same output in a new process:
+At 100M, the runner records a checkpoint and a descriptive comparison with
+SwiGLU-5. It continues to 1B without a manual pause. Once the 20% artifact has
+`"status": "completed"`, start the 50% recovery:
 
 ```bash
 nohup python -u -m workflows.runs.model.swiglu.swiglu_6_recovery \
-  --prepared "$S6_RESULTS/prepare-001.json" --target 0.2 \
-  --output "$S6_RESULTS/recovery-001-target-0.2.json" --resume \
-  > "$S6_RESULTS/recovery-001-target-0.2-to-1b.log" 2>&1 < /dev/null &
-echo "20% continuation PID: $!"
+  --prepared "$S6_RESULTS/prepare-001.json" --target 0.5 \
+  --output "$S6_RESULTS/recovery-001-target-0.5.json" \
+  > "$S6_RESULTS/recovery-001-target-0.5.log" 2>&1 < /dev/null &
+echo "50% recovery PID: $!"
 ```
 
-Wait for `"status": "completed"`, then repeat these two recovery commands
-with target `0.5` and output `recovery-001-target-0.5.json`. Give its replay and
-continuation separate log filenames. This keeps the two expensive trajectories
-sequential on the single GPU. A later interruption resumes the **same** output
-with `--resume` and a new log filename; the runner restores the last verified
-checkpoint. Do not launch a second process against an output while the first is
-still active.
+Wait for the 50% artifact to reach `"status": "completed"`. This keeps the two
+expensive trajectories sequential on the single GPU. An unexpected interruption
+resumes the **same** output with `--resume` and a new log filename; the runner
+restores the last verified checkpoint. Do not launch a second process against
+an output while the first is still active.
 
 Finally activate the evaluation environment and run the five-model report:
 
@@ -202,7 +200,10 @@ Preparation resolves immutable C4 and WikiText dataset revisions, materializes
 the historical validation batches, and writes a shared 1B-token int32 stream.
 It starts at C4 shard 00001 and proceeds in order, excluding calibration shard
 00000. Documents receive EOS; the finite stream never wraps. The regenerated
-first 100M tokens must be byte-identical to the historical packed cache.
+first 100M tokens must be byte-identical to the historical packed cache. This
+checks the training-data prefix; it does not require the recovered metrics to
+match SwiGLU-5.
+
 Failure stops preparation. Its partial output is not a valid prepared artifact;
 inspect/remove only that new failed artifact or choose a new output name to retry.
 
@@ -233,22 +234,18 @@ Back in the recovery environment, run 20% first:
 python -m workflows.runs.model.swiglu.swiglu_6_recovery --prepared data/results/workflows/model/swiglu-6/prepare-001.json --target 0.2 --output data/results/workflows/model/swiglu-6/recovery-001-target-0.2.json
 ```
 
-At exactly 100M, the process compares historical C4 KL and the historical
-WikiText validation prefix. It requires absolute differences no larger than
-1e-4 KL and 0.01 perplexity, saves the endpoint, and exits with
-`paused_after_replay`. Inspect that artifact's `results.replay_check`, then
-continue the same output explicitly:
+At exactly 100M, the process records the differences from historical C4 KL and
+WikiText validation-prefix perplexity in `results.historical_100m_comparison`.
+It saves the endpoint and continues toward 1B in the same process. These
+differences are descriptive; they do not determine whether recovery continues.
+After the 20% trajectory completes, run the 50% trajectory:
 
 ```bash
-python -m workflows.runs.model.swiglu.swiglu_6_recovery --prepared data/results/workflows/model/swiglu-6/prepare-001.json --target 0.2 --output data/results/workflows/model/swiglu-6/recovery-001-target-0.2.json --resume
+python -m workflows.runs.model.swiglu.swiglu_6_recovery --prepared data/results/workflows/model/swiglu-6/prepare-001.json --target 0.5 --output data/results/workflows/model/swiglu-6/recovery-001-target-0.5.json
 ```
 
-After the 20% trajectory completes, repeat these two commands with `--target 0.5`
-and `recovery-001-target-0.5.json`. This is sequential execution on one GPU.
-A failed replay is a diagnostic stop; the runner refuses continuation. Resolve
-its cause before starting a separately identified experiment. Passing the
-metric tolerances supports this replay comparison, not a general claim of
-bitwise GPU determinism.
+This is sequential execution on one GPU. On an unexpected interruption, rerun
+the interrupted target's command with `--resume` against its existing output.
 
 Recovery stores an initial checkpoint and then full resumable states every 25M
 requested tokens, rounded to the next optimizer boundary within the segment.
@@ -317,7 +314,7 @@ source checkout, JSON files, task samples, and asset trees alongside results.
 
 Local checks cover Python/config/notebook parsing, continuation boundary
 arithmetic, complete rolling-target coverage, and checkpoint descriptor integrity.
-No GPU training, model export/reload, harness inference, or scientific replay has
+No GPU training, model export/reload, harness inference, or long-budget recovery has
 been executed in the implementation environment. Those integration checks remain
 part of the intended run above; no reduced-budget workflow has been added.
 

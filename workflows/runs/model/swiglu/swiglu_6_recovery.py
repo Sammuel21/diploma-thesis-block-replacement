@@ -1,4 +1,4 @@
-"""Recover one SwiGLU-6 model, with an explicit process boundary at 100M."""
+"""Recover one SwiGLU-6 model through 100M to the fixed 1B endpoint."""
 
 import argparse
 import gc
@@ -36,13 +36,11 @@ def desired_requests(settings):
     ))
 
 
-def verify_replay(current, historical, settings):
+def compare_historical_100m(current, historical):
     original = next(row for row in historical["results"]["trajectory"]["full_evaluations"]
                     if row["actual_tokens"] == 100_000_000)
-    deltas = {"kl": current["recovery_validation_kl"] - original["recovery_validation_kl"],
-              "ppl": current["wikitext_validation"]["perplexity"] - original["wikitext_validation"]["perplexity"]}
-    return {**deltas, "passed": abs(deltas["kl"]) <= settings["replay_kl_tolerance"]
-            and abs(deltas["ppl"]) <= settings["replay_ppl_tolerance"]}
+    return {"kl_delta": current["recovery_validation_kl"] - original["recovery_validation_kl"],
+            "ppl_delta": current["wikitext_validation"]["perplexity"] - original["wikitext_validation"]["perplexity"]}
 
 
 def run_recovery(args, output, artifact, settings):
@@ -110,8 +108,6 @@ def run_recovery(args, output, artifact, settings):
                                "inherited_search_training_seconds": state["training_seconds"],
                                "evaluation_seconds": 0.0, "checkpoint_seconds": 0.0,
                                "tokens_seen": state["tokens_seen"], "optimizer_updates": state["optimizer_updates"]}
-    if artifact["results"].get("replay_check", {}).get("passed") is False:
-        raise ValueError("100M replay failed; inspect the discrepancy before a new experiment")
     final_tokens = settings["recovery"]["segment_endpoints"][-1]
     if int(state["tokens_seen"]) == final_tokens:
         artifact["status"] = "completed"
@@ -123,7 +119,7 @@ def run_recovery(args, output, artifact, settings):
     historical = read_json(provenance["targets"][target]["confirmation"]["path"])
     for key in ("torch", "transformers", "datasets"):
         if observed_environment["packages"][key] != historical["environment"]["packages"][key]:
-            raise ValueError(f"Replay requires the historical {key} version")
+            raise ValueError(f"Continuation requires the historical {key} version")
     artifact["environment"] = observed_environment
     persist(output, artifact, "loading_models")
     model_config = make_model_config(settings["model"])
@@ -179,7 +175,7 @@ def run_recovery(args, output, artifact, settings):
                             "training_seconds": event.elapsed_seconds, "memory": recovery_memory_record(device)})
             results["evaluation_seconds"] += perf_counter() - started
             if event.tokens_seen == 100_000_000:
-                results["replay_check"] = verify_replay(row, historical, recovery)
+                results["historical_100m_comparison"] = compare_historical_100m(row, historical)
             restore_rng(rng)
             is_milestone = event.tokens_seen in recovery["segment_endpoints"]
             is_checkpoint = is_milestone or any(point % recovery["checkpoint_interval_tokens"] == 0
@@ -203,8 +199,6 @@ def run_recovery(args, output, artifact, settings):
                 del payload, weights
             persist(output, artifact, "recovery")
             print(f"target={target} tokens={event.tokens_seen:,} KL={row['recovery_validation_kl']:.6f}", flush=True)
-            if results.get("replay_check", {}).get("passed") is False:
-                raise ValueError("100M replay exceeds tolerance; inspect before continuing")
 
         result = recover_exact_segment(
             origin=origin, end=end, cursor=cursor, schedule=schedule,
@@ -220,11 +214,6 @@ def run_recovery(args, output, artifact, settings):
             optimizer_state=optimizer_state, on_checkpoint=on_checkpoint, optimizer_backend="fused",
         )
         cursor, updates = result.tokens_seen, result.optimizer_updates
-        if cursor == 100_000_000 and recovery["pause_after_replay"]:
-            artifact["status"] = "paused_after_replay"
-            persist(output, artifact, "resume_required")
-            print("100M replay passed and was checkpointed. Resume this output to continue to 1B.", flush=True)
-            return
         if cursor < final_tokens:
             state, unused_record = restore_checkpoint(assets / "checkpoints", run_fingerprint)
             optimizer_state = state["optimizer_state"]

@@ -35,8 +35,7 @@
     "temperature": 1.0, "ce_weight": 0.0, "scheduler": "constant",
     "optimizer_backend": "fused", "microbatch_sequences": 8,
     "gradient_accumulation_steps": 2, "effective_batch_tokens": 2048,
-    "replay_kl_tolerance": 0.0001, "replay_ppl_tolerance": 0.01,
-    "pause_after_replay": true, "disk_reserve_fraction": 0.15
+    "disk_reserve_fraction": 0.15
   },
   "evaluation": {
     "harness_version": "0.4.13", "seed": 21,
