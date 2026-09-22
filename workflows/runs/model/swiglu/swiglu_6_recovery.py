@@ -28,9 +28,10 @@ from .swiglu_6 import DEFAULT_CONFIG, asset_directory, code_hashes, load_prepare
 
 def desired_requests(settings):
     recovery = settings["recovery"]
+    final_tokens = recovery["segment_endpoints"][-1]
     return sorted(set(
         list(range(5_000_000, 100_000_001, recovery["legacy_validation_interval_tokens"]))
-        + list(range(100_000_000, 2_000_000_001, recovery["checkpoint_interval_tokens"]))
+        + list(range(100_000_000, final_tokens + 1, recovery["checkpoint_interval_tokens"]))
         + recovery["legacy_ppl_tokens"] + recovery["segment_endpoints"]
     ))
 
@@ -80,9 +81,12 @@ def run_recovery(args, output, artifact, settings):
     trainable_count = sum(3 * settings["model"]["hidden_size"] * row["replacement_width"]
                           + (settings["model"]["hidden_size"] if row.get("has_output_bias") else 0)
                           for row in candidate["allocation"] if not row.get("retains_dense_module"))
-    # Three full generations cover previous/current/atomic temporary; three
-    # milestone weight files plus seven complete BF16 bundles are reserved.
-    required_bytes = int((trainable_count * (12 * 3 + 4 * 3) + 7 * 1_800_000_000 * 2)
+    # Three full generations cover previous/current/atomic temporary; milestone
+    # weight files and complete BF16 bundles are also reserved.
+    milestone_count = len(settings["recovery"]["segment_endpoints"])
+    bundle_count = 1 + len(settings["targets"]) * milestone_count
+    required_bytes = int((trainable_count * (12 * 3 + 4 * milestone_count)
+                          + bundle_count * 1_800_000_000 * 2)
                          * (1 + settings["recovery"]["disk_reserve_fraction"]))
     artifact["storage_preflight"] = {"additional_free_bytes_required": required_bytes,
                                       "free_bytes": shutil.disk_usage(assets).free}
@@ -108,7 +112,8 @@ def run_recovery(args, output, artifact, settings):
                                "tokens_seen": state["tokens_seen"], "optimizer_updates": state["optimizer_updates"]}
     if artifact["results"].get("replay_check", {}).get("passed") is False:
         raise ValueError("100M replay failed; inspect the discrepancy before a new experiment")
-    if int(state["tokens_seen"]) == 2_000_000_000:
+    final_tokens = settings["recovery"]["segment_endpoints"][-1]
+    if int(state["tokens_seen"]) == final_tokens:
         artifact["status"] = "completed"
         persist(output, artifact, "completed")
         return
@@ -152,7 +157,7 @@ def run_recovery(args, output, artifact, settings):
             "optimizer_updates": updates, "results": deepcopy(artifact["results"]), **rng,
         })
         persist(output, artifact, "recovery")
-    while cursor < 2_000_000_000:
+    while cursor < final_tokens:
         origin = segment_origin(cursor, recovery["segment_endpoints"])
         end = next(value for value in recovery["segment_endpoints"] if value > cursor)
         schedule = segment_schedule(origin, end, desired_requests(settings))
@@ -218,9 +223,9 @@ def run_recovery(args, output, artifact, settings):
         if cursor == 100_000_000 and recovery["pause_after_replay"]:
             artifact["status"] = "paused_after_replay"
             persist(output, artifact, "resume_required")
-            print("100M replay passed and was checkpointed. Resume this output to continue to 2B.", flush=True)
+            print("100M replay passed and was checkpointed. Resume this output to continue to 1B.", flush=True)
             return
-        if cursor < 2_000_000_000:
+        if cursor < final_tokens:
             state, unused_record = restore_checkpoint(assets / "checkpoints", run_fingerprint)
             optimizer_state = state["optimizer_state"]
             restore_rng(state)

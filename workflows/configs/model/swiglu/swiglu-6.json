@@ -22,15 +22,15 @@
   "data": {
     "recovery_dataset": "allenai/c4", "recovery_revision": null,
     "first_shard": 1, "shard_count": 1024,
-    "sequence_length": 128, "target_tokens": 2000000000,
+    "sequence_length": 128, "target_tokens": 1000000000,
     "historical_prefix_tokens": 100000000
   },
   "recovery": {
     "start_tokens": 5001216,
-    "segment_endpoints": [100000000, 1000000000, 2000000000],
+    "segment_endpoints": [100000000, 1000000000],
     "checkpoint_interval_tokens": 25000000,
     "legacy_validation_interval_tokens": 5000000,
-    "legacy_ppl_tokens": [10000000, 25000000, 50000000, 100000000, 250000000, 500000000, 1000000000, 1500000000, 2000000000],
+    "legacy_ppl_tokens": [10000000, 25000000, 50000000, 100000000, 250000000, 500000000, 1000000000],
     "learning_rate": 0.00003, "weight_decay": 0.0,
     "temperature": 1.0, "ce_weight": 0.0, "scheduler": "constant",
     "optimizer_backend": "fused", "microbatch_sequences": 8,

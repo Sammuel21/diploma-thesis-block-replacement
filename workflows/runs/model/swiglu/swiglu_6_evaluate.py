@@ -1,4 +1,4 @@
-"""Freeze and execute the seven-model SwiGLU-6 final evaluation."""
+"""Freeze and execute the five-model SwiGLU-6 final evaluation."""
 
 import argparse
 import gc
@@ -89,9 +89,11 @@ def frozen_cohort(args, settings):
         path = resolve_path(input_path)
         artifact = read_json(path)
         if artifact.get("workflow") != "swiglu-6" or artifact.get("stage") != "recovery" or artifact.get("status") != "completed":
-            raise ValueError("Final evaluation requires completed 2B recovery artifacts")
+            raise ValueError("Final evaluation requires completed 1B recovery artifacts")
         if artifact["configuration"] != settings or not artifact["results"]["replay_check"]["passed"]:
             raise ValueError("Recovery protocol or historical replay is invalid")
+        if artifact["results"]["tokens_seen"] != settings["recovery"]["segment_endpoints"][-1]:
+            raise ValueError("Recovery did not reach the fixed final endpoint")
         target = artifact["target"]
         if target in targets:
             raise ValueError("Duplicate recovery target")

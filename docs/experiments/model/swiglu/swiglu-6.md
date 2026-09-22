@@ -5,7 +5,7 @@ type: experiment
 category: experiments/model/swiglu
 status: active
 created: 2026-09-21
-modified: 2026-09-21
+modified: 2026-09-22
 authorship:
   created_by: collaborative
 curation:
@@ -28,19 +28,19 @@ from the repository root and write to a new `swiglu-6/` directory.
 | --- | --- |
 | Models | Existing S5-C2 allocations at 20% and 50% eligible-MLP parameter removal |
 | Initial state | Retained SwiGLU-5 search checkpoints at 5,001,216 tokens, including optimizer and RNG |
-| Endpoints | Exactly 100M, 1B and 2B cumulative recovery tokens |
+| Endpoints | Exactly 100M and 1B cumulative recovery tokens |
 | Recovery | Replacement parameters only; online dense-teacher KL, temperature 1, no CE |
 | Optimizer | Fused AdamW, constant LR 3e-5, weight decay 0 |
 | Geometry | Sequence length 128; 8 sequences × 2 accumulated microbatches = 2,048 tokens per full update |
 | Precision | BF16 forward; FP32 replacement parameters and Adam state |
-| Final models | Dense plus both allocations at each of the three endpoints: seven models |
+| Final models | Dense plus both allocations at each of the two endpoints: five models |
 | Model choice | Fixed endpoints; no best-checkpoint or final-test selection |
 
 Token budgets include the inherited 5M search recovery. The new training-time
 counter excludes that inherited work, which is recorded separately. The 100M
 endpoint ends with a partial 256-token optimizer update. Subsequent segments
 restart their update grid from that exact endpoint, without padding, replaying,
-or skipping tokens. Each of the three segments ends at its exact token budget.
+or skipping tokens. Both SwiGLU-6 segments end at their exact token budgets.
 
 This preserves the historical selected allocations. SwiGLU-5's selection artifact
 contains an endpoint-label issue: its displayed selection metric was associated
@@ -87,7 +87,7 @@ the referenced content and use that same configuration for all stages.
 The SwiGLU-5 confirmations ran on the shared RTX 4090 Linux host. SwiGLU-6's
 historical replay is specified for that host and its recovery environment. This
 is a series of separate `nohup` processes, not one unattended chain: preparation,
-protocol freeze, both 100M replay gates, both resumptions to 2B, and final
+protocol freeze, both 100M replay gates, both resumptions to 1B, and final
 evaluation. Start each next process only after the previous artifact reaches
 the expected status. The existing Perun `run_model.sbatch` launcher does not
 dispatch SwiGLU-6.
@@ -160,7 +160,7 @@ Then resume the same output in a new process:
 nohup python -u -m workflows.runs.model.swiglu.swiglu_6_recovery \
   --prepared "$S6_RESULTS/prepare-001.json" --target 0.2 \
   --output "$S6_RESULTS/recovery-001-target-0.2.json" --resume \
-  > "$S6_RESULTS/recovery-001-target-0.2-to-2b.log" 2>&1 < /dev/null &
+  > "$S6_RESULTS/recovery-001-target-0.2-to-1b.log" 2>&1 < /dev/null &
 echo "20% continuation PID: $!"
 ```
 
@@ -172,7 +172,7 @@ with `--resume` and a new log filename; the runner restores the last verified
 checkpoint. Do not launch a second process against an output while the first is
 still active.
 
-Finally activate the evaluation environment and run the seven-model report:
+Finally activate the evaluation environment and run the five-model report:
 
 ```bash
 nohup python -u -m workflows.runs.model.swiglu.swiglu_6_evaluate \
@@ -199,17 +199,23 @@ python -m workflows.runs.model.swiglu.swiglu_6_prepare --output data/results/wor
 ```
 
 Preparation resolves immutable C4 and WikiText dataset revisions, materializes
-the historical validation batches, and writes a shared 2B-token int32 stream.
+the historical validation batches, and writes a shared 1B-token int32 stream.
 It starts at C4 shard 00001 and proceeds in order, excluding calibration shard
 00000. Documents receive EOS; the finite stream never wraps. The regenerated
 first 100M tokens must be byte-identical to the historical packed cache.
 Failure stops preparation. Its partial output is not a valid prepared artifact;
 inspect/remove only that new failed artifact or choose a new output name to retry.
 
-The stream alone occupies 8,000,000,000 bytes (about 7.45 GiB), excluding dataset
+The stream alone occupies 4,000,000,000 bytes (about 3.73 GiB), excluding dataset
 caches. Recovery checks free space conservatively for optimizer generations,
 milestone weights and BF16 exports. Dataset cache growth must be budgeted
 separately. Use a local disk with sufficient room and reliable atomic renames.
+
+The completed SwiGLU-5 confirmations measured about 9,574 and 9,291 recovery
+tokens/s on darthmachinus. If that rate holds, continuing each retained 5M state
+to 1B takes about 29-30 hours, or about 59 hours for both targets sequentially.
+Preparation, checkpoint writes and five-model final evaluation add unmeasured
+time. This is a planning estimate, not a measured SwiGLU-6 runtime.
 
 Before recovery, freeze the evaluation protocol in the evaluation environment:
 
@@ -248,8 +254,8 @@ Recovery stores an initial checkpoint and then full resumable states every 25M
 requested tokens, rounded to the next optimizer boundary within the segment.
 It retains the current and previous verified generations. Each full state has
 replacement weights, optimizer, RNG, cursor, updates, and committed result
-history. Milestone weights at 100M/1B/2B remain separately available; the final
-2B optimizer checkpoint also remains. Hash-invalid or incomplete generations
+history. Milestone weights at 100M/1B remain separately available; the final
+1B optimizer checkpoint also remains. Hash-invalid or incomplete generations
 are skipped in favor of the previous verified generation. Foreign fingerprints
 are rejected. Resume after an interruption uses the same command and `--resume`.
 

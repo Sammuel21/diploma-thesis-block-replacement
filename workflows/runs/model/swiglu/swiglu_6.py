@@ -34,13 +34,13 @@ def load_settings(path):
              "temperature": 1.0, "ce_weight": 0.0, "scheduler": "constant",
              "optimizer_backend": "fused", "microbatch_sequences": 8,
              "gradient_accumulation_steps": 2, "effective_batch_tokens": 2048,
-             "segment_endpoints": [100000000, 1000000000, 2000000000]}
+             "segment_endpoints": [100000000, 1000000000]}
     if any(recovery.get(key) != value for key, value in fixed.items()):
-        raise ValueError("This SwiGLU-6 protocol fixes the original recipe and 100M/1B/2B boundaries")
+        raise ValueError("This SwiGLU-6 protocol fixes the original recipe and 100M/1B boundaries")
     if settings["targets"] != [0.2, 0.5] or settings["candidate_id"] != "S5-C2":
         raise ValueError("SwiGLU-6 currently confirms the two existing S5-C2 models")
-    if settings["data"]["sequence_length"] != 128 or settings["data"]["target_tokens"] != 2_000_000_000:
-        raise ValueError("SwiGLU-6 requires a 2B-token stream of length-128 sequences")
+    if settings["data"]["sequence_length"] != 128 or settings["data"]["target_tokens"] != 1_000_000_000:
+        raise ValueError("SwiGLU-6 requires a 1B-token stream of length-128 sequences")
     if settings["seed"] != 21 or settings["data"]["first_shard"] != 1 or settings["data"]["historical_prefix_tokens"] != 100_000_000:
         raise ValueError("Preserve the original seed, excluded calibration shard, and 100M prefix")
     evaluation = settings["evaluation"]

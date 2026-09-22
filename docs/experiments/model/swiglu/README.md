@@ -32,7 +32,7 @@ decisions and rationale connecting all five experiments.
 | [SwiGLU-3](swiglu-3.md) | Calibration sweep, 20%-50% sparsity sweep, and 100M-token recovery | Completed artifact present |
 | [SwiGLU-4](swiglu-4.md) | Recovery objective, learning rate, RMSNorm, and LoRA comparison | Completed artifact present |
 | [SwiGLU-5](swiglu-5.md) | Efficient initialization/allocation search followed by gated confirmation | Search and both 100M confirmations completed |
-| [SwiGLU-6](swiglu-6.md) | 2B continuation, frozen final evaluation, and BF16 deployment accounting | Implemented; scientific execution pending |
+| [SwiGLU-6](swiglu-6.md) | 1B continuation, frozen final evaluation, and BF16 deployment accounting | Implemented; scientific execution pending |
 
 The maintained runners and configurations use the matching class directories
 under `workflows/runs/model/swiglu/` and `workflows/configs/model/swiglu/`.
