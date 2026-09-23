@@ -16,7 +16,7 @@
 | 0 Baseline | Recorded | Clean tree and immutable reference hashes below |
 | 1 Teacher cache | Implemented; runtime checks pending | 12 cache symbols and autocast moved verbatim; 16 retained recovery definitions unchanged |
 | 2 Shared operations | Implemented; runtime checks pending | Matching helpers extracted; S6 imports package reconstruction; distinct legacy evaluators/writers retained |
-| 3 SwiGLU-5 modules | Pending | |
+| 3 SwiGLU-5 modules | Implemented; runtime checks pending | 61 relocated definitions match stage 2 verbatim; explicit facade preserves 64 original definitions and six constants |
 | 4 Documentation and verification | Pending | |
 
 ## Reference artifacts
@@ -54,3 +54,10 @@ All five records are schema 1 and marked completed. These hashes describe the or
 - The legacy atomic Torch writer only adds a function-local Torch import. `json_value` is re-exported from runlog; ExperimentLog methods are unchanged.
 - Student reconstruction substitutes explicit hidden-size/allocation inputs for context/candidate lookup. Module loading, initialization order, insertion, dtype and return order remain the original operations. Compatibility wrapper and S6 call-site adaptations are explicit.
 - Added eight focused artifact/reconstruction checks. Python execution remains pending in the configured research environment.
+
+### Stage 3 checks
+
+- All 61 definitions moved into the six internal modules match their stage-2 source bodies exactly, including nested callbacks, timers and cleanup. The already documented reconstruction wrapper is the sole S5 body adaptation from the original baseline.
+- Static project import-name resolution found no missing exports. The internal module graph follows the approved dependency directions; internal cache/evaluation/reconstruction helpers import their actual owners.
+- The 89-line compatibility module explicitly exposes all 64 originally defined functions/classes and six protocol constants. Both S5 CLI files and S6 preparation remain unchanged.
+- Added six standard-library structural checks and three runtime import checks. These are authored and reviewed, not executed: Python remains unavailable.
