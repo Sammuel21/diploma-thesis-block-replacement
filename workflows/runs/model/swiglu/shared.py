@@ -2,94 +2,26 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
-import math
-from contextlib import nullcontext
 from copy import deepcopy
 from pathlib import Path, PurePosixPath
 
 import torch
-import torch.nn.functional as F
 
-from workflows.runs.model.common import resolve_path
+from workflows.runs.model.common import relative_to_root, resolve_path
 
-from mlp_replacement.config import DatasetSpec, ModelConfig
+from mlp_replacement.artifacts import atomic_json, atomic_torch_save, fingerprint, sha256_file
+from mlp_replacement.compression.reconstruction import load_operator
+from mlp_replacement.config import DatasetSpec, deep_merge, make_model_config
 from mlp_replacement.data import (
     contiguous_token_windows,
     load_text_dataset,
     make_token_loader,
     sample_partitioned_windows,
 )
-from mlp_replacement.operators import GatedMLPReplacement
-from mlp_replacement.runlog import json_value
-
-
-def sha256_file(path):
-    """Return the SHA-256 digest of one workflow input or asset."""
-
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def deep_merge(base, override):
-    """Recursively merge explicit workflow overrides into a copied mapping."""
-
-    result = deepcopy(base)
-    for key, value in override.items():
-        if isinstance(value, dict) and isinstance(result.get(key), dict):
-            result[key] = deep_merge(result[key], value)
-        else:
-            result[key] = deepcopy(value)
-    return result
-
-
-def atomic_json(path, value):
-    """Atomically replace a JSON artifact."""
-
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(
-        json.dumps(json_value(value), indent=2, ensure_ascii=False, allow_nan=False),
-        encoding="utf-8",
-    )
-    temporary.replace(path)
-
-
-def atomic_torch_save(path, value):
-    """Atomically replace a torch checkpoint."""
-
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    torch.save(value, temporary)
-    temporary.replace(path)
-
-
-def relative_to_root(path):
-    """Represent repository assets portably when possible."""
-
-    path = Path(path).resolve()
-    try:
-        return str(path.relative_to(resolve_path(Path("."))))
-    except ValueError:
-        return str(path)
-
-
-def fingerprint(value):
-    """Fingerprint a JSON-compatible scientific contract."""
-
-    encoded = json.dumps(
-        json_value(value),
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+from mlp_replacement.evaluation.mixed_precision import (
+    autocast_context, evaluate_lm_mixed, evaluate_teacher_cache_mixed,
+    evaluate_validation_kl_mixed,
+)
 
 
 def resolve_source_asset(recorded_path, source_artifact_path):
@@ -330,19 +262,6 @@ def validate_swiglu3_contract(settings, source):
     }
 
 
-def make_model_config(values):
-    """Construct the pinned maintained model configuration."""
-
-    return ModelConfig(
-        model_id=values["model_id"],
-        revision=values["revision"],
-        tokenizer_revision=values["tokenizer_revision"],
-        device=values["device"],
-        dtype=values["dtype"],
-        trust_remote_code=bool(values["trust_remote_code"]),
-    )
-
-
 def build_local_data(context):
     """Recreate the frozen SwiGLU-3 local-data partition contract."""
 
@@ -419,187 +338,6 @@ def build_local_data(context):
         "batch_size": batch_size,
         "sequence_length": sequence_length,
     }
-
-
-def autocast_context(device):
-    """Use the established mixed-precision evaluation context."""
-
-    device = torch.device(device)
-    if device.type != "cuda":
-        return nullcontext()
-    dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-    return torch.autocast(device_type="cuda", dtype=dtype)
-
-
-def evaluate_lm_mixed(model, loader, device, max_batches):
-    """Evaluate causal-LM loss with FP32 reductions."""
-
-    was_training = model.training
-    model.eval()
-    total_nll = 0.0
-    predicted_tokens = 0
-    batches = 0
-    try:
-        with torch.no_grad():
-            for batch_index, batch in enumerate(loader):
-                if batch_index >= max_batches:
-                    break
-                input_ids = batch["input_ids"].to(device)
-                attention_mask = batch["attention_mask"].to(device)
-                with autocast_context(device):
-                    logits = model(
-                        input_ids=input_ids,
-                        attention_mask=attention_mask,
-                        use_cache=False,
-                    ).logits
-                labels = input_ids[:, 1:].contiguous()
-                mask = attention_mask[:, 1:].bool()
-                labels = labels.masked_fill(~mask, -100)
-                nll = F.cross_entropy(
-                    logits[:, :-1, :].float().contiguous().view(
-                        -1, logits.shape[-1]
-                    ),
-                    labels.view(-1),
-                    ignore_index=-100,
-                    reduction="sum",
-                )
-                total_nll += float(nll.item())
-                predicted_tokens += int(mask.sum().item())
-                batches += 1
-    finally:
-        model.train(was_training)
-    if predicted_tokens == 0:
-        raise ValueError("Language-model evaluation contained no predicted tokens")
-    loss = total_nll / predicted_tokens
-    return {
-        "loss": loss,
-        "perplexity": math.exp(loss) if loss < 709 else float("inf"),
-        "predicted_tokens": predicted_tokens,
-        "batches": batches,
-    }
-
-
-def evaluate_teacher_cache_mixed(model, teacher_cache, temperature, device):
-    """Evaluate teacher KL and causal-LM loss on a fixed cache."""
-
-    losses = []
-    total_nll = 0.0
-    predicted_tokens = 0
-    model.eval()
-    with torch.no_grad():
-        for batch in teacher_cache.batches:
-            input_ids = batch.input_ids.to(device)
-            attention_mask = batch.attention_mask.to(device)
-            with autocast_context(device):
-                logits = model(
-                    input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    use_cache=False,
-                ).logits
-            mask = attention_mask.bool()
-            teacher_probabilities = torch.softmax(
-                batch.logits.to(device=device, dtype=torch.float32)[mask]
-                / temperature,
-                dim=-1,
-            )
-            student_log_probabilities = torch.log_softmax(
-                logits.float()[mask] / temperature, dim=-1
-            )
-            kl = F.kl_div(
-                student_log_probabilities,
-                teacher_probabilities,
-                reduction="batchmean",
-            ) * (temperature**2)
-            losses.append(float(kl.item()))
-            labels = input_ids[:, 1:].contiguous()
-            valid = attention_mask[:, 1:].bool()
-            labels = labels.masked_fill(~valid, -100)
-            nll = F.cross_entropy(
-                logits[:, :-1, :].float().contiguous().view(
-                    -1, logits.shape[-1]
-                ),
-                labels.view(-1),
-                ignore_index=-100,
-                reduction="sum",
-            )
-            total_nll += float(nll.item())
-            predicted_tokens += int(valid.sum().item())
-    if not losses or predicted_tokens == 0:
-        raise ValueError("Teacher-cache evaluation contained no valid tokens")
-    loss = total_nll / predicted_tokens
-    return {
-        "teacher_kl": sum(losses) / len(losses),
-        "loss": loss,
-        "perplexity": math.exp(loss) if loss < 709 else float("inf"),
-        "predicted_tokens": predicted_tokens,
-        "batches": len(losses),
-    }
-
-
-def evaluate_validation_kl_mixed(model, teacher_cache, temperature, device):
-    """Measure fixed-cache teacher KL for a mixed-dtype recovery model."""
-
-    losses = []
-    model.eval()
-    with torch.no_grad():
-        for batch in teacher_cache.batches:
-            input_ids = batch.input_ids.to(device)
-            attention_mask = batch.attention_mask.to(device)
-            with autocast_context(device):
-                logits = model(
-                    input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    use_cache=False,
-                ).logits
-            mask = attention_mask.bool()
-            probabilities = torch.softmax(
-                batch.logits.to(device=device, dtype=torch.float32)[mask]
-                / temperature,
-                dim=-1,
-            )
-            log_probabilities = torch.log_softmax(
-                logits.float()[mask] / temperature, dim=-1
-            )
-            losses.append(
-                float(
-                    (
-                        F.kl_div(
-                            log_probabilities,
-                            probabilities,
-                            reduction="batchmean",
-                        )
-                        * (temperature**2)
-                    ).item()
-                )
-            )
-    if not losses:
-        raise ValueError("Recovery-validation cache contained no batches")
-    return sum(losses) / len(losses)
-
-
-def load_operator(
-    path,
-    hidden_size,
-    width,
-    device="cpu",
-    bias=False,
-    down_bias=False,
-):
-    """Reconstruct one saved FP32 SwiGLU replacement."""
-
-    module = GatedMLPReplacement(
-        hidden_size,
-        width,
-        bias=bias,
-        down_bias=down_bias,
-    ).to(
-        dtype=torch.float32
-    )
-    state = torch.load(path, map_location="cpu")
-    module.load_state_dict(state)
-    module.to(device=device, dtype=torch.float32)
-    module.eval()
-    return module
 
 
 def recovery_memory_record(device):

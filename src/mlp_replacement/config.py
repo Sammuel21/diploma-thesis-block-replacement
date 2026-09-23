@@ -1,3 +1,4 @@
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
@@ -265,4 +266,29 @@ def experiment_config_from_dict(data):
         operator=OperatorConfig(**data.get("operator", {})),
         recovery=RecoveryConfig(**data.get("recovery", {})),
         workflow=WorkflowConfig(**data.get("workflow", {})),
+    )
+
+
+def deep_merge(base, override):
+    """Recursively merge explicit workflow overrides into a copied mapping."""
+
+    result = deepcopy(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = deep_merge(result[key], value)
+        else:
+            result[key] = deepcopy(value)
+    return result
+
+
+def make_model_config(values):
+    """Construct the pinned maintained model configuration."""
+
+    return ModelConfig(
+        model_id=values["model_id"],
+        revision=values["revision"],
+        tokenizer_revision=values["tokenizer_revision"],
+        device=values["device"],
+        dtype=values["dtype"],
+        trust_remote_code=bool(values["trust_remote_code"]),
     )

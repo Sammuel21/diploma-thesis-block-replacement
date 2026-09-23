@@ -15,7 +15,7 @@
 | --- | --- | --- |
 | 0 Baseline | Recorded | Clean tree and immutable reference hashes below |
 | 1 Teacher cache | Implemented; runtime checks pending | 12 cache symbols and autocast moved verbatim; 16 retained recovery definitions unchanged |
-| 2 Shared operations | Pending | |
+| 2 Shared operations | Implemented; runtime checks pending | Matching helpers extracted; S6 imports package reconstruction; distinct legacy evaluators/writers retained |
 | 3 SwiGLU-5 modules | Pending | |
 | 4 Documentation and verification | Pending | |
 
@@ -45,3 +45,12 @@ All five records are schema 1 and marked completed. These hashes describe the or
 - Added five CPU tensor/file contract tests in `tests/test_teacher_cache_contracts.py`.
 - `git diff --check` passed. Python execution unavailable: `py -0p` reports no installed Pythons; WSL enumeration is inaccessible. No dependency installation attempted.
 - The explicitly requested ledger is force-tracked as a single exception to the existing ignored `plans/` directory.
+
+### Stage 2 checks and bounded adaptations
+
+- Shared evaluation, state snapshots, operator loading, and FP32 surgery retain their original bodies.
+- SwiGLU-3 fingerprint differences were only formatting/docstring/trailing argument comma; restoration differed only in a local variable name. Both were consolidated.
+- SwiGLU-3 teacher-cache evaluation and its `blocks_by_layer` temporary-surgery signature remain unchanged. Raw S4 fingerprints, raw teacher-cache JSON, and both recovery loops remain distinct.
+- The legacy atomic Torch writer only adds a function-local Torch import. `json_value` is re-exported from runlog; ExperimentLog methods are unchanged.
+- Student reconstruction substitutes explicit hidden-size/allocation inputs for context/candidate lookup. Module loading, initialization order, insertion, dtype and return order remain the original operations. Compatibility wrapper and S6 call-site adaptations are explicit.
+- Added eight focused artifact/reconstruction checks. Python execution remains pending in the configured research environment.

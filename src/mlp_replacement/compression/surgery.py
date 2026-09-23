@@ -116,3 +116,15 @@ def temporary_replacement(model, layer_index, replacement):
 
     with temporary_replacements(model, {layer_index: replacement}) as manifest:
         yield manifest.records[0]
+
+
+@contextmanager
+def temporary_fp32_replacements(model, blocks, replacements):
+    originals = {layer: blocks[layer].module for layer in replacements}
+    try:
+        for layer, replacement in replacements.items():
+            replace_submodule(model, blocks[layer].path, replacement)
+        yield
+    finally:
+        for layer, original in originals.items():
+            replace_submodule(model, blocks[layer].path, original)

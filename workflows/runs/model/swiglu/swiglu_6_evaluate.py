@@ -6,7 +6,6 @@ import subprocess
 import sys
 from importlib.metadata import version
 from pathlib import Path
-from types import SimpleNamespace
 
 from workflows.runs.model.common import PROJECT_ROOT, resolve_path
 from mlp_replacement.artifacts import contained_path, content_digest, file_digest, read_json, write_json_atomic
@@ -125,7 +124,7 @@ def export_cohort_model(row, settings, bundle_path, legacy):
     import torch
     from mlp_replacement.model import load_model_and_tokenizer
     from .shared import evaluate_lm_mixed, make_model_config
-    from .swiglu_5 import blank_candidate_student, load_replacement_state
+    from mlp_replacement.compression.reconstruction import build_swiglu_student, load_replacement_state
 
     model_config = make_model_config(settings["model"])
     if row["id"] == "dense":
@@ -134,8 +133,9 @@ def export_cohort_model(row, settings, bundle_path, legacy):
     else:
         from transformers import AutoTokenizer
 
-        model, paths, modules = blank_candidate_student(SimpleNamespace(settings=settings), model_config,
-                                                        {"allocation": row["allocation"]})
+        model, paths, modules = build_swiglu_student(
+            model_config, settings["model"]["hidden_size"], row["allocation"]
+        )
         state = torch.load(row["weights_path"], map_location="cpu", weights_only=False)
         if state["run_fingerprint"] != row["run_fingerprint"] or state["tokens_seen"] != row["tokens"]:
             raise ValueError("Milestone payload differs from frozen cohort")

@@ -11,6 +11,7 @@ from time import perf_counter
 import torch
 import torch.nn.functional as F
 
+from ..artifacts import sha256_file
 from ..model import autocast_context, resolve_dtype
 
 
@@ -103,14 +104,6 @@ def load_hidden_shard(path, sha256):
         )
     except TypeError:
         return torch.load(path, map_location="cpu")
-
-
-def sha256_file(path):
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def tensor_sha256(tensor):

@@ -39,7 +39,10 @@ from mlp_replacement.compression.recovery import (
     recover_trainable_by_tokens,
     validate_teacher_final_hidden_cache,
 )
-from mlp_replacement.compression.surgery import replace_submodule
+from mlp_replacement.compression.reconstruction import (
+    build_swiglu_student, load_replacement_state, replacement_state,
+)
+from mlp_replacement.compression.surgery import replace_submodule, temporary_fp32_replacements
 from mlp_replacement.config import OperatorConfig
 from mlp_replacement.data import PackedTokenCache, make_token_loader
 from mlp_replacement.evaluation.operator import evaluate_operator
@@ -172,33 +175,6 @@ def restore_rng(checkpoint):
     torch.set_rng_state(checkpoint["torch_rng_state"])
     if torch.cuda.is_available() and checkpoint.get("cuda_rng_states") is not None:
         torch.cuda.set_rng_state_all(checkpoint["cuda_rng_states"])
-
-
-def replacement_state(model, paths):
-    return {
-        path: {
-            name: tensor.detach().cpu().clone()
-            for name, tensor in model.get_submodule(path).state_dict().items()
-        }
-        for path in paths
-    }
-
-
-def load_replacement_state(model, state):
-    for path, values in state.items():
-        model.get_submodule(path).load_state_dict(values)
-
-
-@contextmanager
-def temporary_fp32_replacements(model, blocks, replacements):
-    originals = {layer: blocks[layer].module for layer in replacements}
-    try:
-        for layer, replacement in replacements.items():
-            replace_submodule(model, blocks[layer].path, replacement)
-        yield
-    finally:
-        for layer, original in originals.items():
-            replace_submodule(model, blocks[layer].path, original)
 
 
 @dataclass
@@ -2776,25 +2752,11 @@ def confirmation_candidate(context):
 
 
 def blank_candidate_student(context, model_config, candidate):
-    student, tokenizer = load_model_and_tokenizer(model_config)
-    blocks = {block.index: block for block in discover_mlp_blocks(student)}
-    hidden = int(context.settings["model"]["hidden_size"])
-    target_paths = []
-    train_modules = []
-    for row in candidate["allocation"]:
-        if row.get("retains_dense_module"):
-            continue
-        layer = int(row["layer"])
-        module = GatedMLPReplacement(
-            hidden,
-            int(row["replacement_width"]),
-            down_bias=bool(row.get("has_output_bias", False)),
-        ).to(next(student.parameters()).device, dtype=torch.float32)
-        replace_submodule(student, blocks[layer].path, module)
-        target_paths.append(blocks[layer].path)
-        train_modules.append(module)
-    del tokenizer
-    return student, target_paths, train_modules
+    """Adapt the historical candidate record to reusable reconstruction."""
+
+    return build_swiglu_student(
+        model_config, context.settings["model"]["hidden_size"], candidate["allocation"]
+    )
 
 
 def load_selected_search_checkpoint(context):

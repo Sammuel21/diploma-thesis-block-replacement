@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import math
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -22,7 +21,14 @@ from workflows.runs.model.common import (
     load_workflow_config,
     release_cuda,
     report_memory,
+    relative_to_root,
     resolve_path,
+)
+
+from mlp_replacement.artifacts import atomic_json, atomic_torch_save, fingerprint, sha256_file
+from mlp_replacement.compression.reconstruction import replacement_state, load_replacement_state
+from mlp_replacement.evaluation.mixed_precision import (
+    autocast_context, evaluate_lm_mixed, evaluate_validation_kl_mixed,
 )
 
 from mlp_replacement.capture import ActivationPairs, collect_modules_io
@@ -34,7 +40,7 @@ from mlp_replacement.compression.recovery import (
     token_checkpoint_schedule,
 )
 from mlp_replacement.compression.surgery import replace_submodule
-from mlp_replacement.config import DatasetSpec, ModelConfig, OperatorConfig
+from mlp_replacement.config import DatasetSpec, ModelConfig, OperatorConfig, deep_merge
 from mlp_replacement.data import (
     build_or_open_packed_token_cache,
     contiguous_token_windows,
@@ -82,58 +88,6 @@ def parse_args():
         help="Apply the checked-in reduced budgets without changing scientific defaults",
     )
     return parser.parse_args()
-
-
-def sha256_file(path):
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def fingerprint(value):
-    encoded = json.dumps(
-        json_value(value), sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
-
-
-def deep_merge(base, override):
-    result = deepcopy(base)
-    for key, value in override.items():
-        if isinstance(value, dict) and isinstance(result.get(key), dict):
-            result[key] = deep_merge(result[key], value)
-        else:
-            result[key] = deepcopy(value)
-    return result
-
-
-def atomic_json(path, value):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(
-        json.dumps(json_value(value), indent=2, ensure_ascii=False, allow_nan=False),
-        encoding="utf-8",
-    )
-    temporary.replace(path)
-
-
-def atomic_torch_save(path, value):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    torch.save(value, temporary)
-    temporary.replace(path)
-
-
-def relative_to_root(path):
-    path = Path(path).resolve()
-    try:
-        return str(path.relative_to(resolve_path(Path("."))))
-    except ValueError:
-        return str(path)
 
 
 class WorkflowContext:
@@ -409,58 +363,6 @@ def load_live_resources(context):
     return operator_config
 
 
-def autocast_context(device):
-    device = torch.device(device)
-    if device.type != "cuda":
-        return nullcontext()
-    dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-    return torch.autocast(device_type="cuda", dtype=dtype)
-
-
-def evaluate_lm_mixed(model, loader, device, max_batches):
-    was_training = model.training
-    model.eval()
-    total_nll = 0.0
-    predicted_tokens = 0
-    batches = 0
-    try:
-        with torch.no_grad():
-            for batch_index, batch in enumerate(loader):
-                if batch_index >= max_batches:
-                    break
-                input_ids = batch["input_ids"].to(device)
-                attention_mask = batch["attention_mask"].to(device)
-                with autocast_context(device):
-                    logits = model(
-                        input_ids=input_ids,
-                        attention_mask=attention_mask,
-                        use_cache=False,
-                    ).logits
-                labels = input_ids[:, 1:].contiguous()
-                mask = attention_mask[:, 1:].bool()
-                labels = labels.masked_fill(~mask, -100)
-                nll = F.cross_entropy(
-                    logits[:, :-1, :].float().contiguous().view(-1, logits.shape[-1]),
-                    labels.view(-1),
-                    ignore_index=-100,
-                    reduction="sum",
-                )
-                total_nll += float(nll.item())
-                predicted_tokens += int(mask.sum().item())
-                batches += 1
-    finally:
-        model.train(was_training)
-    if predicted_tokens == 0:
-        raise ValueError("Language-model evaluation contained no predicted tokens")
-    loss = total_nll / predicted_tokens
-    return {
-        "loss": loss,
-        "perplexity": math.exp(loss) if loss < 709 else float("inf"),
-        "predicted_tokens": predicted_tokens,
-        "batches": batches,
-    }
-
-
 def evaluate_teacher_cache_mixed(model, teacher_cache, temperature, device):
     losses = []
     total_nll = 0.0
@@ -509,46 +411,6 @@ def evaluate_teacher_cache_mixed(model, teacher_cache, temperature, device):
         "predicted_tokens": predicted_tokens,
         "batches": len(losses),
     }
-
-
-def evaluate_validation_kl_mixed(model, teacher_cache, temperature, device):
-    """Measure fixed-cache teacher KL for a mixed-dtype recovery model."""
-
-    losses = []
-    model.eval()
-    with torch.no_grad():
-        for batch in teacher_cache.batches:
-            input_ids = batch.input_ids.to(device)
-            attention_mask = batch.attention_mask.to(device)
-            with autocast_context(device):
-                logits = model(
-                    input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    use_cache=False,
-                ).logits
-            mask = attention_mask.bool()
-            probabilities = torch.softmax(
-                batch.logits.to(device=device, dtype=torch.float32)[mask] / temperature,
-                dim=-1,
-            )
-            log_probabilities = torch.log_softmax(
-                logits.float()[mask] / temperature, dim=-1
-            )
-            losses.append(
-                float(
-                    (
-                        F.kl_div(
-                            log_probabilities,
-                            probabilities,
-                            reduction="batchmean",
-                        )
-                        * (temperature**2)
-                    ).item()
-                )
-            )
-    if not losses:
-        raise ValueError("Recovery-validation cache contained no batches")
-    return sum(losses) / len(losses)
 
 
 def operator_path(context, stage, label, layer):
@@ -1033,21 +895,6 @@ def run_sparsity_stage(context, operator_config, selected_pairs):
     context.persist("sparsity")
     del selection_cache
     release_cuda(torch)
-
-
-def replacement_state(model, paths):
-    return {
-        path: {
-            name: tensor.detach().cpu().clone()
-            for name, tensor in model.get_submodule(path).state_dict().items()
-        }
-        for path in paths
-    }
-
-
-def load_replacement_state(model, state):
-    for path, module_state in state.items():
-        model.get_submodule(path).load_state_dict(module_state)
 
 
 def recovery_memory_record(device):

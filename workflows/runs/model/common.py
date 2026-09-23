@@ -163,3 +163,13 @@ def release_cuda(torch_module) -> None:
 
     if torch_module.cuda.is_available():
         torch_module.cuda.empty_cache()
+
+
+def relative_to_root(path):
+    """Represent repository assets portably when possible."""
+
+    path = Path(path).resolve()
+    try:
+        return str(path.relative_to(resolve_path(Path("."))))
+    except ValueError:
+        return str(path)
