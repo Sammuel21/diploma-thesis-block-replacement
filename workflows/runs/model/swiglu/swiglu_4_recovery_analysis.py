@@ -47,7 +47,7 @@ from mlp_replacement.compression.recovery import (
     recover_trainable_by_tokens,
 )
 from mlp_replacement.compression.surgery import replace_submodule
-from mlp_replacement.config import ModelConfig
+from mlp_replacement.config import make_model_config
 from mlp_replacement.data import PackedTokenCache
 from mlp_replacement.model import (
     discover_mlp_blocks,
@@ -381,17 +381,6 @@ def prepare_context(settings, output, source_override, resume, smoke):
     )
     context.persist("initialization")
     return context
-
-
-def make_model_config(values):
-    return ModelConfig(
-        model_id=values["model_id"],
-        revision=values["revision"],
-        tokenizer_revision=values["tokenizer_revision"],
-        device=values["device"],
-        dtype=values["dtype"],
-        trust_remote_code=bool(values["trust_remote_code"]),
-    )
 
 
 def load_live_resources(context):

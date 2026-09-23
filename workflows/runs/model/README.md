@@ -5,6 +5,47 @@ notebooks under `notebooks/model/`. They run the scientific computation and
 write notebook-compatible JSON; notebooks remain the explanatory and analysis
 frontend.
 
+## Implementation ownership
+
+The `swiglu/swiglu5/` package separates experiment context and source validation
+(`context.py`), local fitting/allocation adaptation (`fitting.py`), candidate
+assembly (`candidates.py`), recovery profiling/adaptation (`recovery.py`), and
+the two execution paths (`search.py`, `confirmation.py`). Both context-preparation
+functions live in `context.py`; `run_search` and `run_confirmation` live in their
+respective execution modules. Lower-level modules never import the execution
+modules or the compatibility facade.
+
+`swiglu/swiglu_5.py` explicitly re-exports the original project-defined API.
+The two existing CLI modules retain their arguments, defaults, and failure
+handling. `swiglu/shared.py` retains historical source adaptation and old helper
+imports; shared evaluation, configuration, artifact writing, and reconstruction
+are owned by the maintained package. SwiGLU-6 uses package reconstruction without
+depending on the SwiGLU-5 implementation. Older runners retain their own loops
+and distinct helper variants.
+
+Existing runs must use their original source snapshot, which may predate the
+refactor baseline. SwiGLU-6's source hashes remain part of its fingerprint;
+changed imports and new source files intentionally invalidate reuse under the
+old fingerprint. Refactored runs require new outputs. Checkpoint migration and
+changes to resume eligibility are outside this refactor.
+
+The [implementation ledger](../../../plans/PLAN-behavior-preserving-refactor.md)
+records baseline hashes, reversible stage commits, comparisons, and pending
+checks. In the configured research Python environment, run the focused contracts
+from the repository root:
+
+```bash
+python -m unittest discover -s tests -p 'test_*contracts.py' -v
+python -m unittest discover -s tests -p 'test_refactor*.py' -v
+```
+
+These checks cover source structure, imports, small tensor/file invariants, and
+read-only artifact interpretation. They do not launch scientific jobs. Numerical
+equivalence remains pending the next intended scientific run, with existing
+tolerances unchanged.
+
+## Entry points
+
 | Notebook | Python module | Configuration | Default stage |
 | --- | --- | --- | --- |
 | `baseline/compression-baseline.ipynb` | `workflows.runs.model.baseline.compression` | `workflows/configs/model/baseline/compression.json` | optimized |

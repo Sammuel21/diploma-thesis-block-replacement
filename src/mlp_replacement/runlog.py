@@ -1,36 +1,20 @@
 import json
-import math
 import platform
 import sys
 import traceback
-from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
 
 import torch
 
+from .artifacts import json_value
+
 
 def utc_time():
     """Return a stable UTC timestamp for run records."""
 
     return datetime.now(timezone.utc).isoformat()
-
-
-def json_value(value):
-    """Convert metric dataclasses and common scalar containers to JSON values."""
-
-    if is_dataclass(value):
-        return json_value(asdict(value))
-    if isinstance(value, dict):
-        return {str(key): json_value(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [json_value(item) for item in value]
-    if isinstance(value, Path):
-        return str(value)
-    if isinstance(value, float) and not math.isfinite(value):
-        return str(value)
-    return value
 
 
 def installed_version(package):

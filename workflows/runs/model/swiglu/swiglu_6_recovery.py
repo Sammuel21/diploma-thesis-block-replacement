@@ -7,7 +7,6 @@ import shutil
 from copy import deepcopy
 from pathlib import Path
 from time import perf_counter
-from types import SimpleNamespace
 
 import torch
 
@@ -18,11 +17,13 @@ from mlp_replacement.compression.continuation import (
     restore_rng, save_tensor_atomic, segment_origin, segment_schedule,
 )
 from mlp_replacement.compression.recovery import cache_teacher_logits
+from mlp_replacement.compression.reconstruction import (
+    build_swiglu_student, load_replacement_state, replacement_state,
+)
 from mlp_replacement.data import PackedTokenCache
 from mlp_replacement.model import load_model_and_tokenizer
 from mlp_replacement.runlog import environment_record
 from .shared import evaluate_lm_mixed, evaluate_validation_kl_mixed, make_model_config, recovery_memory_record
-from .swiglu_5 import blank_candidate_student, load_replacement_state, replacement_state
 from .swiglu_6 import DEFAULT_CONFIG, asset_directory, code_hashes, load_prepared, load_settings, new_artifact, persist, sources
 
 
@@ -124,8 +125,9 @@ def run_recovery(args, output, artifact, settings):
     persist(output, artifact, "loading_models")
     model_config = make_model_config(settings["model"])
     teacher, tokenizer = load_model_and_tokenizer(model_config)
-    context = SimpleNamespace(settings=settings)
-    student, target_paths, train_modules = blank_candidate_student(context, model_config, candidate)
+    student, target_paths, train_modules = build_swiglu_student(
+        model_config, settings["model"]["hidden_size"], candidate["allocation"]
+    )
     load_replacement_state(student, state["replacement_state"])
     device = next(student.parameters()).device
     legacy = torch.load(legacy_path, map_location="cpu", weights_only=False)

@@ -5,7 +5,7 @@ type: architecture
 category: agents/code-and-workflows
 status: active
 created: 2026-09-18
-modified: 2026-09-20
+modified: 2026-09-23
 authorship:
   created_by: collaborative
 curation:
@@ -52,6 +52,22 @@ interaction studies belong under `model/baseline/` and `model/interaction/`;
 block studies use `block/baseline/`, `block/operator/`, and `block/analysis/`.
 Reusable allocation and recovery behavior remains package code even when only
 SwiGLU-5 currently consumes it.
+
+Teacher caches belong in `compression/teacher_cache.py`, independently of
+recovery optimization. Replacement-state serialization and ordered student
+construction belong in `compression/reconstruction.py`; interpretation of
+experiment-specific source artifacts remains in workflows. The shared mixed-
+precision evaluators live in `evaluation/mixed_precision.py`, separately from
+the general evaluator and the two-argument recovery autocast helper in `model.py`.
+Keep normalized legacy writers/fingerprints distinct from strict, durable
+artifact operations and cache-specific raw JSON writing.
+
+SwiGLU-5's internal ownership and compatibility modules are described in the
+[model workflow README](../../workflows/runs/model/README.md). Import actual
+owners inside the implementation; retain explicit compatibility exports for
+existing callers. Resume existing experiments from their original source
+snapshot. In particular, do not weaken SwiGLU-6 source hashing to accommodate a
+refactor or move old checkpoints into new outputs.
 
 Reuse an existing abstraction when it expresses the required domain operation.
 Add a shared helper when multiple callers need it or when the operation deserves

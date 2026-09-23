@@ -1,4 +1,5 @@
 import re
+from contextlib import nullcontext
 from dataclasses import dataclass
 
 import torch
@@ -147,3 +148,10 @@ def get_mlp_block(model, layer_index):
         return refs[layer_index]
     except KeyError as exc:
         raise ValueError(f"No MLP block found for layer index {layer_index}") from exc
+
+
+def autocast_context(device, dtype):
+    device = torch.device(device)
+    if device.type != "cuda":
+        return nullcontext()
+    return torch.autocast(device_type="cuda", dtype=dtype)
