@@ -14,7 +14,7 @@
 | Stage | Status | Evidence |
 | --- | --- | --- |
 | 0 Baseline | Recorded | Clean tree and immutable reference hashes below |
-| 1 Teacher cache | Pending | |
+| 1 Teacher cache | Implemented; runtime checks pending | 12 cache symbols and autocast moved verbatim; 16 retained recovery definitions unchanged |
 | 2 Shared operations | Pending | |
 | 3 SwiGLU-5 modules | Pending | |
 | 4 Documentation and verification | Pending | |
@@ -37,3 +37,11 @@ All five records are schema 1 and marked completed. These hashes describe the or
 - Numerical equivalence is pending the next intended scientific run.
 - No smoke or reduced-budget experiments are authorized.
 - Wiki log reconstruction is skipped: latest wiki/log operation is 2026-09-21 in cfa2318.
+
+### Stage 1 checks
+
+- Exact normalized-newline source comparison: all moved cache definitions and all retained recovery definitions unchanged.
+- Cache module depends on model utilities, never on recovery optimization; old recovery exports retained.
+- Added five CPU tensor/file contract tests in `tests/test_teacher_cache_contracts.py`.
+- `git diff --check` passed. Python execution unavailable: `py -0p` reports no installed Pythons; WSL enumeration is inaccessible. No dependency installation attempted.
+- The explicitly requested ledger is force-tracked as a single exception to the existing ignored `plans/` directory.
