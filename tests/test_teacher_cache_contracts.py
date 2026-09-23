@@ -1,6 +1,9 @@
 """CPU tensor/file invariants; no model fitting or recovery is executed."""
 
 import copy
+import hashlib
+import os
+import struct
 import sys
 import tempfile
 import unittest
@@ -86,8 +89,23 @@ class TeacherCacheContracts(unittest.TestCase):
             "TeacherBatch", "TeacherCache", "TeacherHiddenShard", "TeacherFinalHiddenCache",
             "load_hidden_shard", "load_teacher_hidden_cache", "cache_teacher_logits",
             "build_teacher_final_hidden_cache", "validate_teacher_final_hidden_cache",
+            "sha256_file", "tensor_sha256", "atomic_json",
         ):
             self.assertIs(getattr(recovery, name), getattr(teacher_cache, name))
+
+    def test_tensor_fingerprint_and_raw_json_remain_distinct(self):
+        expected = hashlib.sha256(struct.pack("=16f", *range(16))).hexdigest()
+        self.assertEqual(teacher_cache.tensor_sha256(self.values), expected)
+        self.assertEqual(teacher_cache.tensor_sha256(self.values.t().contiguous().t()), expected)
+        path = self.root / "raw.json"
+        teacher_cache.atomic_json(path, {"value": 2.5})
+        self.assertEqual(path.read_bytes(), '{\n  "value": 2.5\n}'.replace("\n", os.linesep).encode())
+        original = path.read_bytes()
+        with self.assertRaises(TypeError):
+            teacher_cache.atomic_json(path, {"path": Path("asset.pt")})
+        with self.assertRaises(ValueError):
+            teacher_cache.atomic_json(path, {"value": float("nan")})
+        self.assertEqual(path.read_bytes(), original)
 
 
 if __name__ == "__main__":

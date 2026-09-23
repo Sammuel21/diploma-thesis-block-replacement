@@ -17,7 +17,7 @@
 | 1 Teacher cache | Implemented; runtime checks pending | 12 cache symbols and autocast moved verbatim; 16 retained recovery definitions unchanged |
 | 2 Shared operations | Implemented; runtime checks pending | Matching helpers extracted; S6 imports package reconstruction; distinct legacy evaluators/writers retained |
 | 3 SwiGLU-5 modules | Implemented; runtime checks pending | 61 relocated definitions match stage 2 verbatim; explicit facade preserves 64 original definitions and six constants |
-| 4 Documentation and verification | Pending | |
+| 4 Documentation and verification | Documentation and available inspection complete; execution incomplete | Ownership references updated; source/import inspection and five artifact hashes checked; Python unavailable |
 
 ## Reference artifacts
 
@@ -61,3 +61,85 @@ All five records are schema 1 and marked completed. These hashes describe the or
 - Static project import-name resolution found no missing exports. The internal module graph follows the approved dependency directions; internal cache/evaluation/reconstruction helpers import their actual owners.
 - The 89-line compatibility module explicitly exposes all 64 originally defined functions/classes and six protocol constants. Both S5 CLI files and S6 preparation remain unchanged.
 - Added six standard-library structural checks and three runtime import checks. These are authored and reviewed, not executed: Python remains unavailable.
+
+## Baseline surfaces and relocation map
+
+All locations in the baseline column refer to `dc11a031a07b217e1661adf0cb1f29b1ccb28393`; exact original definitions remain recoverable with `git show`. The structural checks enumerate every original maintained definition, rather than storing a second source copy.
+
+| Baseline location | Current owner / compatibility boundary |
+| --- | --- |
+| `compression/recovery.py:17` cache dataclasses; `:134` shard loader and cache functions | `compression/teacher_cache.py`; explicit recovery re-exports |
+| `compression/recovery.py:829` two-argument autocast | `model.py`; recovery re-export |
+| `swiglu/shared.py:28` matching artifact/configuration helpers | `artifacts.py`, `config.py`, workflow `common.py`; shared re-exports |
+| `swiglu/shared.py:424` one-argument autocast and mixed evaluators | `evaluation/mixed_precision.py`; shared re-exports |
+| `swiglu/shared.py:580` saved-operator loading | `compression/reconstruction.py`; shared re-export |
+| `swiglu_5.py:177` replacement state; `:192` FP32 insertion | `compression/reconstruction.py` and `compression/surgery.py`; facade exports |
+| `swiglu_5.py:204` context and remaining scientific/orchestration helpers | Six `swiglu5/` modules; explicit facade exports |
+| `swiglu_5.py:2363` search; `:3030` confirmation | `swiglu5/search.py`, `swiglu5/confirmation.py` |
+| `swiglu_5.py:2778` blank student | Explicit-input package constructor plus compatibility wrapper |
+
+Existing CLI surfaces are `workflows.runs.model.swiglu.swiglu_5_search`, `swiglu_5_confirmation`, `swiglu_6_prepare`, `swiglu_6_recovery`, and `swiglu_6_evaluate`. S5 CLI files and S6 preparation are byte-for-byte equal after newline normalization; the S6 `main` definitions are unchanged. Argument definitions, defaults, configuration paths, and exception boundaries therefore remain the baseline implementation. Help execution is pending. The compression package exports are unchanged; recovery, shared, runlog, and the S5 facade preserve the documented compatibility imports.
+
+## Final verification evidence (2026-09-23)
+
+| Check | Result and limit |
+| --- | --- |
+| Original definition source comparison | 87 of 89 relocated definitions are verbatim. Exceptions: local Torch import and explicit-input reconstruction/wrapper, documented above. All retained definitions are unchanged except the two bounded S6 reconstruction call adaptations. |
+| SwiGLU-5 split | All 61 stage-3 moves are verbatim relative to stage 2; all six constants match the baseline. |
+| Duplicate inspection | 13 matching definitions consolidated (152 original lines); only docstrings, formatting, a trailing argument comma, and the documented restoration local-variable name differed. |
+| Import inspection | All project `from` bindings resolve statically; inspected module graph has no cycles, no package dependency on workflows, and no S6 import of either S5 implementation path. Runtime resolution remains pending. |
+| Historical JSON | All five original SHA-256 hashes still match; schema 1/completed statuses, S4 source milestone, S5 candidate IDs, allocation fields, winner endpoints and confirmation retained-state records inspected read-only. No model weights loaded. |
+| Protected scope | No configuration, notebook, scheduler, checkpoint directory, historical artifact, dependency, or wiki changes. Original loops, selection rules, source hashing and continuation policy retained. |
+| Whitespace | `git diff --check` passed for each implementation stage and the final patch. |
+| Python execution | `py -3 -m unittest discover -s tests -v` exits 1: `No installed Python found!`. No AST parse, runtime import, help execution, or tensor-check pass is claimed. |
+| Numerical equivalence | Pending the next intended scientific run; no scientific job, profiling, recovery, or reduced-budget workflow launched. |
+
+The source comparisons preserve data order, RNG operations, parameter/optimizer ordering, precision/reductions, callback timing, model modes, tie rules, guards, token boundaries, commit/prune ordering and resource lifetimes as written. They do not establish numerical equivalence.
+
+### Focused checks ready for the research environment
+
+Twenty-five unittest methods in six files cover artifact bytes/fingerprints and writer distinctions (4), replacement state and surgery (4), teacher-cache indexing/manifests/release and raw serialization (6), structural preservation (6), runtime imports (3), and historical schemas/adapters (2). Historical checks explicitly skip if ignored local JSON references are unavailable. The structural suite requires the preserved baseline commit in local Git history.
+
+Run from the repository root in the configured research Python environment:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The standard-library structural checks can be run alone with `python -m unittest discover -s tests -p test_refactor_structure.py -v`. The tensor/import checks require the existing research dependencies. No dependency changes or substitute environment were introduced.
+
+### Deferred findings
+
+- S3 teacher-cache evaluation keeps its distinct empty-input behavior. Its narrower saved-operator loader and `blocks_by_layer` temporary-replacement helper also remain distinct. The planned matching consolidations were completed; these unmatched variants were not adapted.
+- Legacy normalized JSON/fingerprints/Torch writes, strict durable writes, cache raw JSON, older distinct fingerprints, and `ExperimentLog.write` remain separate.
+- Both existing confirmation artifacts begin `full_evaluations` with `actual_tokens=2000896`, whereas their initial validation history records the retained search endpoint at `5001216`. This inconsistency predates the refactor; metadata and lookup behavior are preserved. Investigate separately before interpreting that row as a token-aligned scientific observation.
+- Runtime verification is incomplete because the configured research Python environment is unavailable locally. Do not treat the authored tests as passed or this branch as numerically validated.
+
+## Line accounting
+
+Counts are physical source lines with normalized newlines. Definition spans include signatures/decorators, docstrings and internal blank lines, but exclude surrounding separators/imports. Relocation is not deletion.
+
+| Category | Lines |
+| --- | ---: |
+| Original definition spans relocated/adapted (89 definitions, including the constructor extraction) | 3,899 |
+| Original protocol constants relocated | 58 |
+| Duplicate definition spans removed (11 S3, one S4, one recovery hash helper) | 152 |
+| Compatibility facade, wrapper and re-export statements | 119 |
+| Added focused check files | 655 |
+
+The compatibility count consists of the 89-line S5 facade, six-line reconstruction wrapper, and 24 lines of re-export statements in recovery/shared/runlog (whole mixed import statements counted). Other import wiring, module docstrings and separators are reflected in the whole-file totals. Maintained production Python totals **18,709 -> 18,810 lines (+101)** across `src/` and `workflows/`, excluding tests and Markdown. The result improves ownership and removes demonstrated duplication; it does not claim a net source-line reduction.
+
+## Stage commits and rollback
+
+| Boundary | Local commit |
+| --- | --- |
+| Original baseline / original branch `llm-wiki` | `dc11a031a07b217e1661adf0cb1f29b1ccb28393` |
+| Stage 0 ledger | `24ab2f9` |
+| Stage 1 cache extraction | `1c52911` |
+| Stage 2 shared operations | `77531f8` |
+| Stage 3 S5 decomposition | `d916250` |
+| Stage 4 documentation / verification closure | Commit titled `Document refactor ownership and verification limits` |
+
+These are local, separately reviewable commits on `refactor/maintained-workflows`; nothing has been published. Before publication, return to the preserved original branch/checkout if abandoning the refactor. After publication, revert affected stages in reverse dependency order while preserving unrelated later work. Never use destructive reset/clean, rewrite historical artifacts, or delete checkpoint directories for rollback. Existing runs retain their actual original source snapshot, even when it differs from this baseline. New S6 source hashes require new outputs; checkpoint migration remains out of scope.
+
+The append-only wiki log is untouched. Its maintained 2026-09-21 registration entry confirms recent wiki operations, not a complete development timeline or currency of every scientific wiki page.

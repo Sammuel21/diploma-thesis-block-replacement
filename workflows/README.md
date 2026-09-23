@@ -59,6 +59,13 @@ layout under [`configs/model/`](configs/model/). See the
 [`runs/model` README](runs/model/README.md) for stage, dependency, artifact,
 and validation details.
 
+SwiGLU-5's context, fitting, candidate construction, recovery adaptation,
+search, and confirmation are separated under `runs/model/swiglu/swiglu5/`.
+The original CLI modules and `swiglu_5.py` compatibility imports remain available.
+Shared evaluation and model reconstruction belong to `src/mlp_replacement/`;
+historical artifact adaptation stays in the workflow layer. See the model-runner
+README for the source-snapshot and continuation boundary of this refactor.
+
 The older `runs/run_experiment.py` remains the generic configuration-driven
 entry point for one standard replacement experiment. It is not an alias for
 the multi-policy model-study runners.

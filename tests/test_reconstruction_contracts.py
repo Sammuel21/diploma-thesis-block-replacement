@@ -27,11 +27,12 @@ def small_model():
 class ReconstructionContracts(unittest.TestCase):
     def test_snapshot_is_independent_and_restore_is_scoped(self):
         model = small_model()
+        model.layers[0].mlp = nn.Linear(4, 4, bias=True).to(dtype=torch.float16)
         original = model.layers[0].mlp.weight.detach().clone()
         untouched = model.layers[1].mlp.weight.detach().clone()
-        state = reconstruction.replacement_state(model, ["layers.0.mlp"])
-        self.assertEqual(list(state), ["layers.0.mlp"])
-        self.assertEqual(list(state["layers.0.mlp"]), ["weight"])
+        state = reconstruction.replacement_state(model, ["layers.2.mlp", "layers.0.mlp"])
+        self.assertEqual(list(state), ["layers.2.mlp", "layers.0.mlp"])
+        self.assertEqual(list(state["layers.0.mlp"]), ["weight", "bias"])
         saved = state["layers.0.mlp"]["weight"]
         self.assertEqual(saved.dtype, torch.float16)
         self.assertEqual(saved.device.type, "cpu")
@@ -77,6 +78,8 @@ class ReconstructionContracts(unittest.TestCase):
         self.assertIs(student, model)
         self.assertIs(model.layers[1].mlp, dense)
         self.assertEqual(paths, ["layers.2.mlp", "layers.0.mlp"])
+        self.assertIs(modules[0], model.layers[2].mlp)
+        self.assertIs(modules[1], model.layers[0].mlp)
         self.assertEqual([module.bottleneck_size for module in modules], [3, 2])
         self.assertIsNotNone(modules[0].down_projection.bias)
         self.assertIsNone(modules[1].down_projection.bias)
