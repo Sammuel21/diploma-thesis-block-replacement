@@ -5,7 +5,7 @@ type: evaluation-framework
 category: methodology
 status: draft
 created: 2026-07-18
-modified: 2026-09-11
+modified: 2026-09-23
 authorship:
   created_by: unknown
 curation:
@@ -185,6 +185,29 @@ Every reportable run should identify:
 The final analysis should use Pareto plots or tables rather than one arbitrary
 combined score. A method is stronger when it preserves more quality at the same
 footprint or achieves a smaller footprint at a comparable quality level.
+
+## Practical Implications
+
+The final analysis should translate the reported compression measurements into
+their practical meaning. Keep measured outcomes separate from potential
+consequences that were not benchmarked directly.
+
+| Measurement | Practical meaning |
+| --- | --- |
+| Smaller serialized checkpoint | Requires less disk space and is cheaper to store, copy, and distribute. |
+| Lower resident model memory | Leaves more RAM or VRAM for larger batches, longer contexts, KV cache, or concurrent requests. |
+| Fewer FLOPs or operations | Gives the hardware less arithmetic to perform and therefore creates an opportunity for faster and less energy-intensive inference. It is a proxy, not a timing result. |
+| Lower measured latency | One fixed request finishes sooner on the declared hardware and runtime. |
+| Higher measured throughput | The fixed system processes more tokens or requests per unit of time. |
+| Smaller dense matrix dimensions | Standard dense CUDA kernels can execute the compressed model without requiring specialized sparse-kernel support. |
+
+Structured parameter removal can therefore provide value beyond checkpoint
+size: lower deployment memory, room for larger workloads, and potentially
+faster inference. The speedup is not expected to equal the parameter-removal
+percentage because attention, embeddings, memory transfers, kernel shapes, and
+runtime overhead remain. Claim lower latency or higher throughput only when
+they are measured under the controlled protocol; otherwise describe them as
+expected benefits of the reduced operation count and dense tensor dimensions.
 
 ## Reproducibility Decisions Still Needed
 

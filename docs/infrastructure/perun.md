@@ -5,7 +5,7 @@ type: architecture
 category: infrastructure
 status: active
 created: 2026-09-11
-modified: 2026-09-11
+modified: 2026-09-24
 authorship:
   created_by: collaborative
 curation:
@@ -26,16 +26,15 @@ It records three different kinds of information:
 
 - behavior stated by the official TUKE Perun documentation;
 - project rules adopted for this repository; and
-- cluster- or account-specific behavior that still requires an observed smoke
-  run.
+- cluster- or account-specific behavior that still requires an observed job.
 
-The official documentation was last checked on 2026-09-11. Perun policies and
+The official documentation was last checked on 2026-09-24. Perun policies and
 available software can change, so recheck the linked pages before changing
 partitions, resource limits, storage assumptions, or environment setup.
 
 Perun is distinct from the previously used shared RTX 4090 remote environment.
 That machine was a directly accessed Linux host. Perun is a Slurm-managed HPC
-system, and this repository has not yet recorded a successful Perun smoke run.
+system, and this repository has not yet recorded a successful Perun run.
 
 ## Operating model
 
@@ -48,8 +47,8 @@ The expected lifecycle is:
 4. Submit a batch file from the repository root with `sbatch`.
 5. Let Perun's prolog stage the submit directory to job-local Lustre scratch.
 6. Run one configured workflow inside the Slurm allocation.
-7. Let Perun's epilog synchronize new or modified outputs to persistent
-   storage.
+7. Let Perun's epilog synchronize new or modified outputs to a
+   `results_job_<job-id>/` directory on persistent storage.
 8. Inspect the job record and download compact artifacts for notebook analysis.
 
 Login nodes are the access, setup, transfer, and submission boundary. Expensive
@@ -140,6 +139,14 @@ The staging guide says hidden directories such as `.git/` and `.venv/`, Python
 cache directories, and existing `.out` or `.err` files are excluded. A Python
 environment required by a job must therefore live outside a hidden environment
 directory inside the repository.
+
+Perun's current documentation defines `SCRATCH_DIR` as the staged job root,
+`TMPDIR` as its temporary directory, and `RESULTS_DIR` as the intended output
+directory. It also documents `.rsyncignore` for files that must not be staged
+back. Future long workflows therefore place disposable state below
+`$TMPDIR/mlp-replacement/`, which the repository-root `.rsyncignore` excludes,
+and durable state below `$RESULTS_DIR`. The launcher removes only its exact
+per-job temporary subtree; it never removes the scratch root.
 
 Perun documents three general storage roles:
 
@@ -253,11 +260,36 @@ artifacts in dependency order. `swiglu-2` always requires a completed optimized
 directory submitted to `sbatch`, unless the path names persistent storage that
 is directly visible from compute nodes.
 
+Use a clean checkout for submission. Perun copies the whole submit directory,
+including untracked data, so a checkout containing the complete local results
+archive wastes staging time and scratch capacity. Transfer only the upstream
+artifacts needed by the intended run, and keep previous `results_job_*`
+directories outside the submit tree.
+
 Slurm `.out` and `.err` files remain operational logs. They are useful for
 diagnosis but do not replace the structured artifact. Future workflows that
 produce checkpoints, plot data, or larger tables must give those artifacts
 unique paths and document whether they are required for reproducibility or
 only convenient for analysis.
+
+### Future long-workflow storage contract
+
+SwiGLU-1 through SwiGLU-6 retain their historical artifact contracts. A future
+long-running runner accepts `--work-dir`, `--output-dir`, and optional
+`--resume`:
+
+- work data is disposable, cannot contain the output directory, and is never
+  referenced by durable JSON;
+- output data is relocatable and contains relative paths to its own files;
+- one verified optimizer checkpoint is retained during normal execution, with
+  an old and new generation coexisting only during atomic replacement;
+- failure retains the latest checkpoint, while successful finalization removes
+  it after the final bundle and result have been validated; and
+- activations, teacher outputs, and validation caches stay in CPU/GPU memory
+  unless a later scientific design explicitly requires serialization.
+
+The local and Perun launchers call the same Python module. They differ only in
+environment setup, resource declarations, and default work/output paths.
 
 ## First-session checklist
 
@@ -277,10 +309,10 @@ Then:
 4. Verify the Python package imports and record the interpreter path.
 5. Confirm model and dataset cache access.
 6. Change to the repository root.
-7. Submit `workflows/jobs/perun/smoke.sbatch`.
+7. Submit the intended configured workflow.
 8. Monitor the job and inspect its final resource record.
 9. Locate the synchronized JSON, `.out`, and `.err` artifacts.
-10. Download and inspect the JSON locally before increasing budgets.
+10. Download and inspect the JSON before submitting further workloads.
 
 Useful job-management commands are:
 
@@ -297,13 +329,14 @@ the failed job's configuration and logs.
 
 ## Validation status and open questions
 
-The repository's Slurm files have passed a local Bash syntax check. They have
-not yet been submitted to Perun. The first successful smoke job must establish:
+The repository's Slurm files have not yet been submitted to Perun from the
+researcher's account. The first intended scientific job must establish:
 
 - the actual account, QoS, and applicable concurrency limits;
 - the working Python and CUDA environment;
 - model and dataset access from a compute allocation;
 - the actual automatic-scratch and synchronized-result locations;
+- whether `.rsyncignore` excludes the temporary workflow subtree as documented;
 - epilog behavior for a successful job; and
 - whether the current CPU memory and wall-time requests are appropriate.
 

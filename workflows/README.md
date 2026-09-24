@@ -12,6 +12,7 @@ workflows/
 |-- runs/                    Python process entry points
 |   `-- model/               model-wide notebook migrations
 `-- jobs/
+    |-- local/               direct Linux-host launchers
     `-- perun/               TUKE Perun Slurm submission files
 ```
 
@@ -70,5 +71,24 @@ The older `runs/run_experiment.py` remains the generic configuration-driven
 entry point for one standard replacement experiment. It is not an alias for
 the multi-policy model-study runners.
 
-For commands specific to the tracked Slurm files, see
-[`jobs/perun/README.md`](jobs/perun/README.md).
+For executor-specific commands, see [`jobs/local/README.md`](jobs/local/README.md)
+and [`jobs/perun/README.md`](jobs/perun/README.md).
+
+## Storage contract for future long workflows
+
+SwiGLU-1 through SwiGLU-6 retain their historical CLI and artifact layouts.
+New long-running workflows use two operational paths without adding those
+paths to their scientific configuration:
+
+- `--work-dir` owns disposable files and is removed after the process;
+- `--output-dir` owns `result.json`, `run.json`, a resumable checkpoint while
+  training is active, and the final inference bundle.
+
+The paths may be repository-relative or absolute. A runner must reject equal
+or nested work/output locations, refuse a non-empty output directory for a new
+run, and ensure durable artifacts contain no references to the work directory.
+On successful completion it validates the final artifact before removing the
+optimizer checkpoint. A failed run retains its latest verified checkpoint.
+
+Executor launchers only bind these two paths and start the shared Python
+module. They do not own scientific preparation, recovery, or evaluation.

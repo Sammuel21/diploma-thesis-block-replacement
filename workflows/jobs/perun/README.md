@@ -13,7 +13,7 @@ validation assumptions. This README explains only the tracked job files.
 | `smoke.sbatch` | Runs `perun-smoke-linear.json` with minimal budgets to check the real model, data, GPU, workflow, and result path. It is an infrastructure check, not thesis evidence. |
 | `run_experiment.sbatch` | Runs one supplied JSON configuration in one isolated Python process on one GPU. |
 | `run_array.sbatch` | Maps a manifest of JSON configurations onto independent one-GPU Slurm array tasks. It does not distribute one experiment across GPUs. |
-| `run_model.sbatch` | Runs one allow-listed model-wide notebook migration (`compression-baseline`, `swiglu`, or `swiglu-2`) and forwards its Python CLI arguments. |
+| `run_model.sbatch` | Runs one allow-listed model-wide workflow and forwards its Python CLI arguments. Existing entries retain their historical `--output` interface; future long-running entries receive Perun work/output directories. |
 
 `smoke.sbatch` defaults to `gpu_short`, 48 GB of CPU memory, and one hour. The
 generic and array launchers default to `gpu_long`, 64 GB, and 72 hours.
@@ -48,6 +48,13 @@ repository.
 
 Run `sbatch` from the repository root. All configuration arguments below are
 repository-relative so they remain valid after automatic scratch activation.
+
+Use a clean Perun checkout as the submission directory. The prolog copies the
+whole submitted directory, including untracked runtime data, so do not keep the
+local historical `data/results/` archive or earlier `results_job_*` directories
+inside it. Transfer only the prerequisite artifacts required by the submitted
+workflow. Keep installed environments and reusable Hugging Face caches in
+persistent storage outside the checkout.
 
 ## Smoke job
 
@@ -150,6 +157,30 @@ distributed execution. `swiglu-2` is especially compute intensive; do not
 split it into independent array tasks unless its promotion and finalist
 dependencies are first redesigned explicitly.
 
+## Future long-running workflows
+
+A new long-running runner opts into the directory storage contract when its
+allow-list entry sets `STORAGE_CONTRACT="directories"`. The launcher then
+supplies:
+
+```text
+--work-dir   $TMPDIR/mlp-replacement/<workflow>-<job-id>
+--output-dir $RESULTS_DIR/<workflow>-<job-id>
+```
+
+The launcher owns the work-directory path and rejects a forwarded
+`--work-dir`. It removes only that exact per-job directory on normal exit,
+Python failure, `TERM`, or `INT`. The repository-root `.rsyncignore` also
+excludes `/tmp/mlp-replacement/` from epilog synchronization. These two
+protections keep disposable files out of persistent storage even though Perun
+stages new and modified scratch files back after the job.
+
+An explicit `--output-dir` may be forwarded for resume. Stage only the prior
+output directory into the submitted checkout and pass it with `--resume`; do
+not copy a complete historical results tree. The Python runner validates the
+checkpoint and owns durable cleanup. A completed run retains its structured
+results and final model but removes resumable optimizer state.
+
 ## Results
 
 The runners write their structured JSON paths inside the staged repository.
@@ -160,6 +191,8 @@ in a sibling `.run.json` sidecar.
 
 Current official Perun pages disagree on whether the synchronized
 `results_job_<job-id>/` directory appears under HOME or beside the submit
-directory. Inspect both after the smoke run and record the observed behavior in
-the canonical infrastructure guide. Do not rely on job scratch for persistent
+directory. Inspect both after the first intended scientific run and record the
+observed behavior in the canonical infrastructure guide. Verify hashes before
+moving the compact output to its canonical project location or deleting a
+redundant stage-out directory. Do not rely on job scratch for persistent
 results.
