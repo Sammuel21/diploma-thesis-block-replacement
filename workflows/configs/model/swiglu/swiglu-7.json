@@ -43,16 +43,8 @@
   },
   "preparation": {
     "candidate_id": "S5-C2",
-    "existing_targets": [0.2, 0.5],
-    "refit_targets": [0.3, 0.4],
     "initialization": "legacy_subset",
-    "start_tokens": 5001216,
-    "branch_recovery": {
-      "sequence_length": 128,
-      "microbatch_sequences": 8,
-      "gradient_accumulation_steps": 2,
-      "effective_batch_tokens": 2048
-    }
+    "start_tokens": 0
   },
   "recovery": {
     "target_tokens": 1000000000,

@@ -63,38 +63,31 @@ configuration](https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B/blob/main/confi
 for all three strategies. S7-0 uses the same geometry so it remains the internal
 control for retraining scope. A single sequence is one optimizer update,
 increasing the effective batch from 2,048 to 8,192 tokens and reducing the new
-post-branch updates to 121,461. This intentionally starts a new recovery regime;
-S7-0 is not an exact continuation control for the 128-token SwiGLU-6 trajectory.
+recovery budget to 122,072 optimizer updates. This intentionally starts a new
+recovery regime; S7-0 is not an exact continuation control for the 128-token
+SwiGLU-6 trajectory.
 
-The retained branch point is 5,001,216 cumulative tokens. Ordinary production
-updates consume one complete 8,192-token sequence. To preserve the exact 100M
-and 1B cumulative endpoints without repeating or inventing stream tokens, the
-last update of those two recovery segments uses the remaining 4,352-token and
-2,304-token sequence respectively. These two boundary updates are the only
-shorter production sequences.
+Every global recovery trajectory begins at token 0. Ordinary production updates
+consume one complete 8,192-token sequence. To preserve the exact 100M and 1B
+endpoints without repeating or inventing stream tokens, the last update of
+those two recovery segments uses the remaining 256-token and 2,304-token
+sequence respectively. These two boundary updates are the only shorter
+production sequences.
 
 ## Starting models
 
-All branches begin at 5,001,216 cumulative recovery tokens.
+Preparation applies the fixed S5-C2 legacy-subset width curves at all four
+budgets and freshly fits every selected replacement operator. It does not import
+a SwiGLU-5 recovery checkpoint, optimizer moments, RNG state, or accumulated
+recovery tokens. Each of the 12 production runs creates a fresh AdamW optimizer
+and starts global recovery at token 0.
 
-- The 20% and 50% starts are exact retained S5-C2 endpoints, including their
-  replacement optimizer moments and RNG state.
-- The 30% and 40% allocations apply the recorded S5-C2 legacy-subset width
-  curves at the intermediate budgets. Preparation refits only the selected
-  operator widths and then performs online dense-teacher, replacement-only
-  recovery to 5M tokens using the historical 128-token, 2,048-effective-token
-  S5 recipe. This matches the retained 20% and 50% branch construction before
-  every production trajectory switches to 8K.
-- Expanded-scope runs preserve the replacement optimizer moments. Newly
-  trainable parameters start with empty Adam state. Each result records this
-  behavior and its exact trainable-parameter groups.
-
-The 20% and 50% starts are exact historical branch states, but the subsequent
-S7-0 trajectory is descriptive rather than an exact continuation comparison
-with SwiGLU-6 because S7 uses 8K sequences and a larger effective batch. The new
-30% and 40% starts have no historical endpoint to replay. Comparisons among
-S7-0, S7-1, and S7-2 remain controlled because all three scopes at a target
-branch from the same prepared checkpoint and use the same 8K recovery recipe.
+The three scopes at one target use the same newly fitted replacement state and
+the same token-zero RNG state, which keeps their comparison controlled. “Fresh”
+therefore describes the global recovery trajectory; the compressed model still
+starts from the pretrained dense model plus locally fitted replacement
+operators rather than random model weights. S7-0 is the internal control.
+SwiGLU-6 remains a historical comparison only.
 
 Preparation is shared by the grid. It also copies the verified one-billion-token
 stream, historical validation batches, frozen WikiText corpora, benchmark
@@ -172,7 +165,7 @@ conservative output-disk reserve before recovery begins.
 Preparation requires these completed source records and only their referenced
 assets:
 
-- the SwiGLU-5 search JSON and retained S5-C2 20%/50% endpoints;
+- the SwiGLU-5 search JSON containing the fixed S5-C2 width curves;
 - the SwiGLU-6 preparation JSON, 1B token stream, and legacy evaluation batches;
 - the SwiGLU-6 frozen protocol JSON and both WikiText token files; and
 - the SwiGLU-6 evaluation JSON and dense raw benchmark records.

@@ -51,7 +51,24 @@ class SwiGLU7Contracts(unittest.TestCase):
             settings["recovery"]["segment_endpoints"],
             [100_000_000, 1_000_000_000],
         )
-        self.assertEqual(settings["preparation"]["branch_recovery"]["sequence_length"], 128)
+        self.assertEqual(
+            settings["preparation"],
+            {
+                "candidate_id": "S5-C2",
+                "initialization": "legacy_subset",
+                "start_tokens": 0,
+            },
+        )
+        segments = [(0, 100_000_000), (100_000_000, 1_000_000_000)]
+        batch_tokens = settings["recovery"]["effective_batch_tokens"]
+        self.assertEqual(
+            sum((end - start + batch_tokens - 1) // batch_tokens for start, end in segments),
+            122_072,
+        )
+        self.assertEqual(
+            [(end - start) % batch_tokens for start, end in segments],
+            [256, 2_304],
+        )
         self.assertEqual(settings["evaluation"]["contexts"], [128, 2048, 8192])
 
     def test_exact_endpoint_may_use_one_short_final_sequence(self):
@@ -158,42 +175,6 @@ class SwiGLU7Contracts(unittest.TestCase):
         self.assertIsInstance(model.projection, nn.Linear)
         self.assertFalse(any(isinstance(module, LoRALinear) for module in model.modules()))
         self.assertTrue(torch.allclose(actual, expected, atol=1e-6, rtol=1e-6))
-
-    def test_optimizer_expansion_preserves_replacement_moments_only(self):
-        source = {
-            "state": {
-                0: {"step": torch.tensor(4.0), "exp_avg": torch.tensor([1.0])},
-                1: {"step": torch.tensor(4.0), "exp_avg": torch.tensor([2.0])},
-            },
-            "param_groups": [
-                {
-                    "params": [0, 1],
-                    "lr": 3e-5,
-                    "initial_lr": 3e-5,
-                    "weight_decay": 0.0,
-                    "betas": (0.9, 0.999),
-                    "eps": 1e-8,
-                }
-            ],
-        }
-        groups = [
-            {
-                "parameters": [nn.Parameter(torch.zeros(1)), nn.Parameter(torch.zeros(1))],
-                "learning_rate": 3e-5,
-                "weight_decay": 0.0,
-            },
-            {
-                "parameters": [nn.Parameter(torch.zeros(1))],
-                "learning_rate": 3e-5,
-                "weight_decay": 0.0,
-            },
-        ]
-        expanded = swiglu_7.optimizer_state_for_groups(source, groups)
-        self.assertEqual(expanded["param_groups"][0]["params"], [0, 1])
-        self.assertEqual(expanded["param_groups"][1]["params"], [2])
-        self.assertEqual(set(expanded["state"]), {0, 1})
-        self.assertNotIn(2, expanded["state"])
-
 
 if __name__ == "__main__":
     unittest.main()

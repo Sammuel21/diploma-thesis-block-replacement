@@ -45,10 +45,7 @@ from mlp_replacement.compression.reconstruction import (
     load_replacement_state,
     replacement_state,
 )
-from mlp_replacement.compression.recovery import (
-    cache_teacher_logits,
-    recover_trainable_by_tokens,
-)
+from mlp_replacement.compression.recovery import cache_teacher_logits
 from mlp_replacement.data import PackedTokenCache
 from mlp_replacement.evaluation.bundles import (
     export_bundle,
@@ -74,7 +71,6 @@ from .shared import (
     evaluate_validation_kl_mixed,
     make_model_config,
     recovery_memory_record,
-    resolve_source_asset,
 )
 
 
@@ -149,18 +145,10 @@ def load_settings(path):
         raise ValueError("SwiGLU-7 fixes the established recovery recipe")
     if settings["preparation"] != {
         "candidate_id": "S5-C2",
-        "existing_targets": [0.2, 0.5],
-        "refit_targets": [0.3, 0.4],
         "initialization": "legacy_subset",
-        "start_tokens": 5_001_216,
-        "branch_recovery": {
-            "sequence_length": 128,
-            "microbatch_sequences": 8,
-            "gradient_accumulation_steps": 2,
-            "effective_batch_tokens": 2048,
-        },
+        "start_tokens": 0,
     }:
-        raise ValueError("SwiGLU-7 fixes the S5-C2 starting-state construction")
+        raise ValueError("SwiGLU-7 fixes fresh fitted S5-C2 starts at token zero")
     evaluation = settings["evaluation"]
     if (
         evaluation.get("contexts") != [128, 2048, 8192]
@@ -448,58 +436,6 @@ def settings_targets(values, source_name):
     return [float(value) for value in targets]
 
 
-def copy_existing_starts(output_dir, settings, search_path, search, s6_prepared):
-    import torch
-
-    starts = {}
-    candidate_id = settings["preparation"]["candidate_id"]
-    for target in settings["preparation"]["existing_targets"]:
-        key = str(target)
-        selection = search["results"]["selection"][key]
-        if selection["winner_candidate_id"] != candidate_id:
-            raise ValueError(f"Historical target {target} is not selected as S5-C2")
-        candidate = search["results"]["candidates"][key][candidate_id]
-        endpoint = selection["winner_endpoint"]
-        if int(endpoint["actual_tokens"]) != settings["preparation"]["start_tokens"]:
-            raise ValueError("Historical start is not the exact 5,001,216-token endpoint")
-        source = resolve_source_asset(endpoint["path"], search_path)
-        state = torch.load(source, map_location="cpu", weights_only=False)
-        recipe = {name: value for name, value in candidate.items() if name != "recovery"}
-        s6_record = s6_prepared["provenance"]["targets"][key]
-        if (
-            state.get("run_fingerprint") != search["run_fingerprint"]
-            or state.get("candidate_fingerprint") != content_digest(recipe)
-            or int(state.get("tokens_seen", -1)) != settings["preparation"]["start_tokens"]
-            or "optimizer_state" not in state
-            or "replacement_state" not in state
-        ):
-            raise ValueError(f"Historical start payload differs for target {target}")
-        if (
-            s6_record["endpoint"]["sha256"] != endpoint["sha256"]
-            or s6_record["candidate_fingerprint"] != state["candidate_fingerprint"]
-            or s6_record["packed_token_fingerprint"] != state.get("packed_token_fingerprint")
-        ):
-            raise ValueError(f"SwiGLU-6 provenance differs for target {target}")
-        destination = output_dir / "prepared" / "starts" / f"target-{target:.1f}.pt"
-        digest = copy_verified(source, destination, endpoint["sha256"])
-        starts[key] = {
-            "target": target,
-            "candidate_id": candidate_id,
-            "construction": "exact_swiglu_5_selected_endpoint",
-            "tokens_seen": int(endpoint["actual_tokens"]),
-            "allocation": deepcopy(candidate["allocation"]),
-            "allocation_solver": deepcopy(candidate["allocation_solver"]),
-            "path": relative_output(output_dir, destination),
-            "sha256": digest,
-        }
-        for row in starts[key]["allocation"]:
-            row.pop("state_path", None)
-            row.pop("state_sha256", None)
-            row.pop("fit_key", None)
-        del state
-    return starts
-
-
 def preparation_context(settings, search, s6_prepared, work_dir, output_dir, artifact):
     import torch
 
@@ -524,7 +460,7 @@ def preparation_context(settings, search, s6_prepared, work_dir, output_dir, art
     context.persist = lambda stage=None: persist(
         output_dir,
         artifact,
-        f"preparing_middle_targets:{stage or 'working'}",
+        f"preparing_fitted_starts:{stage or 'working'}",
         {"local_fits_completed": len(context.artifact["results"]["local_fitting"])},
     )
     model_config = make_model_config(settings["model"])
@@ -545,7 +481,7 @@ def preparation_context(settings, search, s6_prepared, work_dir, output_dir, art
     return context, model_config
 
 
-def build_middle_candidates(context, settings, targets):
+def build_start_candidates(context, settings, targets):
     import torch
 
     from mlp_replacement.operators import swiglu_neuron_importance_scores
@@ -669,14 +605,10 @@ def fit_state_map(candidate, student):
     return state
 
 
-def create_middle_start(
-    context,
+def create_fitted_start(
     model_config,
     candidate,
     settings,
-    stream,
-    stream_path,
-    legacy_path,
     output_dir,
     artifact,
 ):
@@ -687,76 +619,12 @@ def create_middle_start(
         model_config, settings["model"]["hidden_size"], candidate["allocation"]
     )
     load_replacement_state(student, fit_state_map(candidate, student))
-    device = next(student.parameters()).device
-    legacy = torch.load(legacy_path, map_location="cpu", weights_only=False)
-    validation_cache = cache_teacher_logits(
-        context.model,
-        legacy["recovery_validation"],
-        len(legacy["recovery_validation"]),
-        device,
-        "float16",
-    )
-    branch_recovery = settings["preparation"]["branch_recovery"]
-    cache = PackedTokenCache(
-        stream_path,
-        int(stream["token_count"]),
-        int(branch_recovery["sequence_length"]),
-        stream["sha256"],
-    )
-    recovery = settings["recovery"]
-    start_tokens = int(settings["preparation"]["start_tokens"])
-    checkpoint = {}
-
-    def retain_endpoint(event, optimizer, first_step):
-        checkpoint.update(
-            {
-                "event": event,
-                "optimizer_state": cpu_tree(optimizer.state_dict()),
-                "first_step": deepcopy(first_step),
-            }
-        )
-
-    result = recover_trainable_by_tokens(
-        student=student,
-        teacher=context.model,
-        parameter_groups=[
-            {
-                "name": "replacements",
-                "parameters": [parameter for module in train_modules for parameter in module.parameters()],
-                "learning_rate": recovery["learning_rate"],
-                "weight_decay": recovery["weight_decay"],
-            }
-        ],
-        train_modules=train_modules,
-        batch_at=lambda offset, count: cache.batch(
-            offset, count, branch_recovery["microbatch_sequences"]
-        ),
-        target_tokens=start_tokens,
-        schedule_tokens=start_tokens,
-        microbatch_tokens=(
-            branch_recovery["sequence_length"] * branch_recovery["microbatch_sequences"]
-        ),
-        accumulation_steps=branch_recovery["gradient_accumulation_steps"],
-        temperature=recovery["temperature"],
-        ce_weight=recovery["ce_weight"],
-        scheduler=recovery["scheduler"],
-        warmup_fraction=recovery["warmup_fraction"],
-        final_lr_ratio=recovery["final_lr_ratio"],
-        device=device,
-        autocast_dtype=torch.bfloat16,
-        checkpoint_schedule=((start_tokens, (start_tokens,)),),
-        on_checkpoint=retain_endpoint,
-        optimizer_backend=recovery["optimizer_backend"],
-    )
-    if result.tokens_seen != start_tokens or "optimizer_state" not in checkpoint:
-        raise RuntimeError("Middle-target 5M recovery did not reach its exact endpoint")
     rng = capture_rng()
-    validation_kl = evaluate_validation_kl_mixed(student, validation_cache, 1.0, device)
-    restore_rng(rng)
     clean_allocation = deepcopy(candidate["allocation"])
     for row in clean_allocation:
         row.pop("state_path", None)
         row.pop("state_sha256", None)
+        row.pop("fit_key", None)
     recipe = {
         key: deepcopy(value)
         for key, value in candidate.items()
@@ -770,14 +638,10 @@ def create_middle_start(
         "target": target,
         "candidate_id": settings["preparation"]["candidate_id"],
         "candidate_fingerprint": content_digest(recipe),
-        "stream_sha256": stream["sha256"],
-        "tokens_seen": result.tokens_seen,
-        "optimizer_updates": result.optimizer_updates,
-        "training_seconds": result.elapsed_seconds,
+        "tokens_seen": 0,
+        "optimizer_updates": 0,
+        "training_seconds": 0.0,
         "replacement_state": replacement_state(student, target_paths),
-        "optimizer_state": checkpoint["optimizer_state"],
-        "first_step": checkpoint["first_step"],
-        "recovery_validation_kl": validation_kl,
         **rng,
     }
     destination = output_dir / "prepared" / "starts" / f"target-{target:.1f}.pt"
@@ -785,17 +649,16 @@ def create_middle_start(
     record = {
         "target": target,
         "candidate_id": settings["preparation"]["candidate_id"],
-        "construction": "s5_c2_width_curves_refit_selected_operators_then_5m_recovery",
-        "tokens_seen": result.tokens_seen,
-        "optimizer_updates": result.optimizer_updates,
-        "training_seconds": result.elapsed_seconds,
-        "recovery_validation_kl": validation_kl,
+        "construction": "fresh_s5_c2_width_curve_operator_fit",
+        "tokens_seen": 0,
+        "optimizer_updates": 0,
+        "training_seconds": 0.0,
         "allocation": clean_allocation,
         "allocation_solver": deepcopy(candidate["allocation_solver"]),
         "path": relative_output(output_dir, destination),
         "sha256": file_digest(destination),
     }
-    del student, train_modules, validation_cache, legacy, payload, checkpoint
+    del student, train_modules, payload
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -857,19 +720,10 @@ def prepare(args, settings, config_path):
                 },
             }
         )
-        starts = copy_existing_starts(
-            output_dir,
-            settings,
-            paths["swiglu_5_search"],
-            values["swiglu_5_search"],
-            values["swiglu_6_prepared"],
-        )
-        artifact["results"].setdefault("starts", {}).update(starts)
-        persist(output_dir, artifact, "copied_existing_starts")
-
+        artifact["results"].setdefault("starts", {})
         missing = [
             float(target)
-            for target in settings["preparation"]["refit_targets"]
+            for target in settings["targets"]
             if str(float(target)) not in artifact["results"]["starts"]
         ]
         native_context = max(settings["evaluation"]["contexts"])
@@ -906,18 +760,12 @@ def prepare(args, settings, config_path):
                 )
             persist(output_dir, artifact, "dense_native_context_evaluation")
         if missing:
-            candidates = build_middle_candidates(context, settings, missing)
-            stream_path = output_path(output_dir, stream["path"])
-            legacy_path = output_path(output_dir, legacy["path"])
+            candidates = build_start_candidates(context, settings, missing)
             for target in missing:
-                create_middle_start(
-                    context,
+                create_fitted_start(
                     model_config,
                     candidates[target],
                     settings,
-                    stream,
-                    stream_path,
-                    legacy_path,
                     output_dir,
                     artifact,
                 )
@@ -1063,37 +911,6 @@ def configure_strategy(model, target_paths, strategy_id, settings):
     if any(id(value) in embedding_ids for value in flat):
         raise ValueError("SwiGLU-7 must keep embeddings and the language-model head frozen")
     return records, train_modules, adapters
-
-
-def optimizer_state_for_groups(source, groups):
-    if len(source.get("param_groups", [])) != 1:
-        raise ValueError("SwiGLU-7 starting states require one replacement optimizer group")
-    old_group = source["param_groups"][0]
-    old_ids = list(old_group["params"])
-    if len(old_ids) != len(groups[0]["parameters"]):
-        raise ValueError("Starting replacement optimizer state does not match the allocation")
-    state = {}
-    param_groups = []
-    next_id = 0
-    for index, group in enumerate(groups):
-        count = len(group["parameters"])
-        new_ids = list(range(next_id, next_id + count))
-        next_id += count
-        values = deepcopy(old_group)
-        values.update(
-            {
-                "params": new_ids,
-                "lr": float(group["learning_rate"]),
-                "initial_lr": float(group["learning_rate"]),
-                "weight_decay": float(group["weight_decay"]),
-            }
-        )
-        param_groups.append(values)
-        if index == 0:
-            for old_id, new_id in zip(old_ids, new_ids, strict=True):
-                if old_id in source["state"]:
-                    state[new_id] = cpu_tree(source["state"][old_id])
-    return {"state": state, "param_groups": param_groups}
 
 
 def trainable_state(model, groups):
@@ -1467,9 +1284,15 @@ def train(args, settings, config_path):
         prepared_path, prepared, prepared_root = load_prepared(args.prepared, settings)
         validate_evaluation_preflight(prepared, prepared_root, settings)
         start_record = prepared["results"]["starts"][str(target)]
+        if (
+            start_record.get("construction") != "fresh_s5_c2_width_curve_operator_fit"
+            or int(start_record.get("tokens_seen", -1)) != 0
+            or int(start_record.get("optimizer_updates", -1)) != 0
+        ):
+            raise ValueError("SwiGLU-7 requires a fresh fitted token-zero start")
         start_path = output_path(prepared_root, start_record["path"])
         if file_digest(start_path) != start_record["sha256"]:
-            raise ValueError("Prepared starting checkpoint changed")
+            raise ValueError("Prepared fitted starting state changed")
         stream = prepared["results"]["stream"]
         stream_path = output_path(prepared_root, stream["path"])
         if (
@@ -1531,6 +1354,13 @@ def train(args, settings, config_path):
         )
         persist(output_dir, artifact, "loading_models")
         start = torch.load(start_path, map_location="cpu", weights_only=False)
+        if (
+            int(start.get("tokens_seen", -1)) != 0
+            or int(start.get("optimizer_updates", -1)) != 0
+            or "optimizer_state" in start
+            or "stream_sha256" in start
+        ):
+            raise ValueError("Prepared start contains inherited recovery state")
         if int(start["tokens_seen"]) != int(start_record["tokens_seen"]):
             raise ValueError("Prepared start descriptor and payload disagree")
         model_config = make_model_config(settings["model"])
@@ -1539,8 +1369,8 @@ def train(args, settings, config_path):
             model_config, settings["model"]["hidden_size"], start_record["allocation"]
         )
         load_replacement_state(student, start["replacement_state"])
-        # Fix adapter initialization and other strategy-local randomness to
-        # the exact branch-point RNG. Resume restores its later RNG below.
+        # Give all three scopes at this target the same token-zero RNG state.
+        # Resume restores the later in-run state below.
         restore_rng(start)
         groups, train_modules, adapters = configure_strategy(
             student, target_paths, strategy_id, settings
@@ -1588,12 +1418,11 @@ def train(args, settings, config_path):
                 artifact["checkpoint"] = descriptor
                 restore_rng(recovered)
         if recovered is None:
-            optimizer_state = optimizer_state_for_groups(start["optimizer_state"], groups)
+            optimizer_state = None
             artifact["results"]["recovery"].update(
                 {
-                    "tokens_seen": int(start["tokens_seen"]),
-                    "optimizer_updates": int(start["optimizer_updates"]),
-                    "inherited_training_seconds": float(start.get("training_seconds", 0.0)),
+                    "tokens_seen": 0,
+                    "optimizer_updates": 0,
                 }
             )
             if not artifact["results"]["recovery"]["validation_history"]:
@@ -1638,12 +1467,8 @@ def train(args, settings, config_path):
         cursor = int(artifact["results"]["recovery"]["tokens_seen"])
         updates = int(artifact["results"]["recovery"]["optimizer_updates"])
         final_tokens = int(recovery["target_tokens"])
-        segment_boundaries = [
-            int(settings["preparation"]["start_tokens"]),
-            *recovery["segment_endpoints"],
-        ]
         while cursor < final_tokens:
-            origin = segment_origin(cursor, segment_boundaries)
+            origin = segment_origin(cursor, recovery["segment_endpoints"])
             end = next(value for value in recovery["segment_endpoints"] if value > cursor)
             schedule = segment_schedule(
                 origin,
