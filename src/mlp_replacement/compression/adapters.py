@@ -67,3 +67,36 @@ def lora_parameters(adapters):
     for adapter in adapters.values():
         parameters.extend((adapter.lora_a, adapter.lora_b))
     return parameters
+
+
+def merge_lora_adapters(model, adapters):
+    """Merge installed LoRA updates into their base linear projections.
+
+    The update is accumulated in FP32 and cast once to the base weight dtype,
+    matching the precision used by the exported inference model.  Wrappers are
+    replaced in place and the returned records describe the merged paths.
+    """
+
+    records = []
+    for path, adapter in adapters.items():
+        if not isinstance(adapter, LoRALinear):
+            raise TypeError(f"Expected a LoRALinear adapter at {path}")
+        if model.get_submodule(path) is not adapter:
+            raise ValueError(f"Model no longer owns the recorded adapter at {path}")
+        base = adapter.base
+        update = adapter.lora_b.detach().float() @ adapter.lora_a.detach().float()
+        merged = base.weight.detach().float() + update * float(adapter.scaling)
+        base.weight.data.copy_(merged.to(device=base.weight.device, dtype=base.weight.dtype))
+        base.train(adapter.training)
+        replace_submodule(model, path, base)
+        records.append(
+            {
+                "path": path,
+                "rank": adapter.rank,
+                "alpha": adapter.alpha,
+                "dropout": adapter.dropout.p,
+            }
+        )
+    if any(isinstance(module, LoRALinear) for module in model.modules()):
+        raise RuntimeError("Unmerged LoRA wrappers remain in the inference model")
+    return records

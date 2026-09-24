@@ -272,11 +272,11 @@ produce checkpoints, plot data, or larger tables must give those artifacts
 unique paths and document whether they are required for reproducibility or
 only convenient for analysis.
 
-### Future long-workflow storage contract
+### Long-workflow storage contract
 
-SwiGLU-1 through SwiGLU-6 retain their historical artifact contracts. A future
-long-running runner accepts `--work-dir`, `--output-dir`, and optional
-`--resume`:
+SwiGLU-1 through SwiGLU-6 retain their historical artifact contracts. SwiGLU-7
+is the first long-running runner to accept `--work-dir`, `--output-dir`, and
+optional `--resume`:
 
 - work data is disposable, cannot contain the output directory, and is never
   referenced by durable JSON;

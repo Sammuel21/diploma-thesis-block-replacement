@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "workflow": "swiglu-7",
+  "seed": 21,
+  "targets": [0.2, 0.3, 0.4, 0.5],
+  "strategies": {
+    "S7-0": {
+      "slug": "replacement-only",
+      "trainable_scope": "replacement_only"
+    },
+    "S7-1": {
+      "slug": "full-transformer-body",
+      "trainable_scope": "full_transformer_body"
+    },
+    "S7-2": {
+      "slug": "full-mlp-attention-lora",
+      "trainable_scope": "full_mlp_attention_lora",
+      "lora": {
+        "rank": 16,
+        "alpha": 32,
+        "dropout": 0.0,
+        "attention_projections": ["q_proj", "k_proj", "v_proj", "o_proj"]
+      }
+    }
+  },
+  "model": {
+    "model_id": "HuggingFaceTB/SmolLM2-1.7B",
+    "revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "tokenizer_revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "device": "cuda",
+    "dtype": "bfloat16",
+    "trust_remote_code": false,
+    "hidden_size": 2048,
+    "intermediate_size": 8192,
+    "num_layers": 24,
+    "tie_word_embeddings": true
+  },
+  "sources": {
+    "swiglu_5_search": "data/results/workflows/model/swiglu-5/search/run-001.json",
+    "swiglu_6_prepared": "data/results/workflows/model/swiglu-6/prepare-001.json",
+    "swiglu_6_protocol": "data/results/workflows/model/swiglu-6/protocol-001.json",
+    "swiglu_6_evaluation": "data/results/workflows/model/swiglu-6/evaluation-001.json"
+  },
+  "preparation": {
+    "candidate_id": "S5-C2",
+    "existing_targets": [0.2, 0.5],
+    "refit_targets": [0.3, 0.4],
+    "initialization": "legacy_subset",
+    "start_tokens": 5001216
+  },
+  "recovery": {
+    "target_tokens": 1000000000,
+    "segment_endpoints": [100000000, 1000000000],
+    "checkpoint_interval_tokens": 25000000,
+    "validation_interval_tokens": 25000000,
+    "legacy_ppl_tokens": [10000000, 25000000, 50000000, 100000000, 250000000, 500000000, 1000000000],
+    "optimizer": "AdamW",
+    "optimizer_backend": "fused",
+    "learning_rate": 0.00003,
+    "weight_decay": 0.0,
+    "temperature": 1.0,
+    "ce_weight": 0.0,
+    "scheduler": "constant",
+    "warmup_fraction": 0.0,
+    "final_lr_ratio": 1.0,
+    "sequence_length": 128,
+    "microbatch_sequences": 8,
+    "gradient_accumulation_steps": 2,
+    "effective_batch_tokens": 2048,
+    "forward_autocast_dtype": "bfloat16",
+    "trainable_parameter_dtype": "float32",
+    "optimizer_state_dtype": "float32",
+    "disk_reserve_fraction": 0.15
+  },
+  "evaluation": {
+    "harness_version": "0.4.13",
+    "seed": 21,
+    "contexts": [128, 2048],
+    "strides": [64, 1024],
+    "benchmark_context_length": 2048,
+    "tasks": ["piqa", "arc_easy", "arc_challenge", "winogrande", "hellaswag"],
+    "primary_metrics": {
+      "piqa": "acc_norm",
+      "arc_easy": "acc_norm",
+      "arc_challenge": "acc_norm",
+      "winogrande": "acc",
+      "hellaswag": "acc_norm"
+    },
+    "bootstrap_resamples": 10000
+  }
+}

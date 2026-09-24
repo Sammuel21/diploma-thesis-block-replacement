@@ -24,7 +24,7 @@ nohup bash workflows/jobs/local/run_model.sh <workflow> [arguments...] \
 ```
 
 The current allow-listed workflows retain their historical `--output`
-interfaces. Future long-running workflows use `--work-dir` for disposable
+interfaces. Directory-contract workflows use `--work-dir` for disposable
 state and `--output-dir` for durable state. Their local defaults are
 `data/work/<workflow>/<run-id>` and
 `data/results/workflows/model/<workflow>/<run-id>` respectively. The Python
@@ -32,3 +32,18 @@ runner owns validation, checkpointing, and resume behavior. The launcher
 removes only the default work directory it constructs; a caller-supplied work
 directory remains the runner's responsibility. The launcher never implements
 scientific work.
+
+SwiGLU-7 is the first allow-listed directory-contract workflow:
+
+```bash
+bash workflows/jobs/local/run_model.sh swiglu-7 prepare \
+  --output-dir data/results/workflows/model/swiglu-7/prepare-001
+
+bash workflows/jobs/local/run_model.sh swiglu-7 train \
+  --prepared data/results/workflows/model/swiglu-7/prepare-001/result.json \
+  --strategy S7-0 --target 0.2
+```
+
+When the output directory is explicit, the launcher still creates and removes
+its bounded default work directory. Use `--resume` with the same output
+directory after an interruption.

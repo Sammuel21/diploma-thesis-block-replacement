@@ -22,7 +22,8 @@ def segment_schedule(origin, end, requested, effective_tokens=2048):
     for request in sorted(set(int(value) for value in requested)):
         if not origin < request <= end:
             continue
-        actual = min(end, origin + ((request - origin + effective_tokens - 1) // effective_tokens) * effective_tokens)
+        updates = (request - origin + effective_tokens - 1) // effective_tokens
+        actual = min(end, origin + updates * effective_tokens)
         grouped.setdefault(actual, []).append(request)
     grouped.setdefault(end, [])
     if end not in grouped[end]:
@@ -90,6 +91,41 @@ def commit_checkpoint(directory, payload):
     return descriptor
 
 
+def commit_single_checkpoint(directory, payload):
+    """Commit one verified generation, then remove every older generation.
+
+    The tensor payload is flushed and renamed before its descriptor is
+    committed.  Older verified generations remain available until that new
+    descriptor exists and its digest has been checked.  This is the bounded
+    checkpoint policy for directory-contract workflows; ``commit_checkpoint``
+    deliberately keeps its historical two-generation behavior.
+    """
+
+    directory = Path(directory)
+    cursor = int(payload["tokens_seen"])
+    path = directory / f"checkpoint-{cursor:012d}.pt"
+    save_tensor_atomic(path, payload)
+    descriptor = {
+        "path": path.name,
+        "sha256": file_digest(path),
+        "tokens_seen": cursor,
+        "run_fingerprint": payload["run_fingerprint"],
+    }
+    write_json_atomic(path.with_suffix(".json"), descriptor)
+    generations = valid_checkpoint_records(directory, payload["run_fingerprint"])
+    if not generations or generations[0] != descriptor:
+        raise RuntimeError("New checkpoint generation did not verify after commit")
+    for old in generations[1:]:
+        old_path = contained_path(directory, old["path"])
+        old_path.unlink()
+        old_path.with_suffix(".json").unlink()
+    retained = {path.resolve(), path.with_suffix(".json").resolve()}
+    for orphan in directory.glob("checkpoint-*"):
+        if orphan.resolve() not in retained:
+            orphan.unlink()
+    return descriptor
+
+
 def valid_checkpoint_records(directory, run_fingerprint):
     """Ignore interrupted or corrupt generations; never accept foreign state."""
 
@@ -144,7 +180,11 @@ def recover_exact_segment(*, origin, end, cursor, schedule, batch_at, on_checkpo
         target_tokens=end - origin,
         schedule_tokens=end - origin,
         start_tokens=cursor - origin,
-        checkpoint_schedule=tuple((actual - origin, requested) for actual, requested in schedule if actual > cursor),
+        checkpoint_schedule=tuple(
+            (actual - origin, requested)
+            for actual, requested in schedule
+            if actual > cursor
+        ),
         on_checkpoint=forward_event,
         **kwargs,
     )

@@ -55,6 +55,7 @@ tolerances unchanged.
 | `swiglu/swiglu-4.ipynb` | `workflows.runs.model.swiglu.swiglu_4_recovery_analysis` | `workflows/configs/model/swiglu/swiglu-4-recovery-analysis.json` | completed global-recovery analysis |
 | `swiglu/swiglu-5.ipynb` | `workflows.runs.model.swiglu.swiglu_5_search` | `workflows/configs/model/swiglu/swiglu-5-search.json` | bounded search |
 | `swiglu/swiglu-5.ipynb` | `workflows.runs.model.swiglu.swiglu_5_confirmation` | `workflows/configs/model/swiglu/swiglu-5-confirmation.json` | gated 100M confirmation |
+| `swiglu/swiglu-7.ipynb` | `workflows.runs.model.swiglu.swiglu_7` | `workflows/configs/model/swiglu/swiglu-7.json` | shared preparation or one strategy/target production run |
 
 The two older notebooks contain historical and optimized sections. Their
 runners expose `--stage historical`, `--stage optimized`, and `--stage all`.
@@ -86,18 +87,24 @@ python -m workflows.runs.model.swiglu.swiglu_5_search \
   --output data/results/workflows/model/swiglu-5/search/<unique>.json
 ```
 
-Every runner accepts `--config` and `--output`. The two staged runners also
+Historical runners accept `--config` and `--output`. The two staged runners also
 accept `--historical-artifact` and `--historical-output`; `swiglu-2` accepts
 `--reference-artifact`. Repository-relative paths are resolved from the
 repository root, including inside Perun's staged copy.
 
-An output path is never overwritten. Each science artifact has a sibling
-`*.run.json` sidecar that is initialized before model loading and records the
-current stage, completed stage summaries, environment, and any exception raised
-after sidecar initialization. Preflight failures, such as a missing prerequisite
-artifact or an occupied output path, are reported through stderr before a new
-sidecar is created. The science JSON retains the source notebook's schema and
-table keys so a loading-only notebook can consume it without rerunning the fit.
+SwiGLU-7 instead has `prepare` and `train` subcommands and accepts
+`--work-dir`, `--output-dir`, and optional `--resume`. A train command also
+requires one prepared `result.json`, one strategy ID, and one target. The local
+and Perun launchers supply the two storage directories without changing the
+scientific configuration.
+
+An output path is never overwritten. Historical science artifacts have sibling
+`*.run.json` sidecars. SwiGLU-7 keeps `result.json` and `run.json` together in
+its output directory. These operational records capture the current stage,
+environment, progress, and any exception raised after initialization. Preflight
+failures such as an occupied output path are reported through stderr before an
+output is created. The science JSON retains the fields needed by its load-only
+notebook without rerunning the fit.
 
 The `swiglu` optimized path and every `swiglu-2` fitting phase capture a
 bounded group of MLP blocks, keep activation tensors on CPU in the model's

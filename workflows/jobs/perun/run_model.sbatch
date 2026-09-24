@@ -20,7 +20,7 @@ set -euo pipefail
 
 if (( $# < 1 )); then
     echo "Usage: sbatch [Slurm options] $0 WORKFLOW [WORKFLOW_ARGUMENTS...]" >&2
-    echo "Workflows: compression-baseline, swiglu, swiglu-2" >&2
+    echo "Workflows: compression-baseline, swiglu, swiglu-2, swiglu-7" >&2
     exit 2
 fi
 
@@ -37,7 +37,10 @@ case "$WORKFLOW_NAME" in
     swiglu-2)
         WORKFLOW_MODULE="workflows.runs.model.swiglu.swiglu_2_allocation"
         ;;
-    # Future long-running entries set STORAGE_CONTRACT="directories" here.
+    swiglu-7)
+        WORKFLOW_MODULE="workflows.runs.model.swiglu.swiglu_7"
+        STORAGE_CONTRACT="directories"
+        ;;
     *)
         echo "Unsupported model workflow: $WORKFLOW_NAME" >&2
         exit 2

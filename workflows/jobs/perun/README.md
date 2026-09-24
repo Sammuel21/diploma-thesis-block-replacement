@@ -13,7 +13,7 @@ validation assumptions. This README explains only the tracked job files.
 | `smoke.sbatch` | Runs `perun-smoke-linear.json` with minimal budgets to check the real model, data, GPU, workflow, and result path. It is an infrastructure check, not thesis evidence. |
 | `run_experiment.sbatch` | Runs one supplied JSON configuration in one isolated Python process on one GPU. |
 | `run_array.sbatch` | Maps a manifest of JSON configurations onto independent one-GPU Slurm array tasks. It does not distribute one experiment across GPUs. |
-| `run_model.sbatch` | Runs one allow-listed model-wide workflow and forwards its Python CLI arguments. Existing entries retain their historical `--output` interface; future long-running entries receive Perun work/output directories. |
+| `run_model.sbatch` | Runs one allow-listed model-wide workflow and forwards its Python CLI arguments. Existing entries retain their historical `--output` interface; directory-contract entries receive Perun work/output directories. |
 
 `smoke.sbatch` defaults to `gpu_short`, 48 GB of CPU memory, and one hour. The
 generic and array launchers default to `gpu_long`, 64 GB, and 72 hours.
@@ -180,6 +180,26 @@ output directory into the submitted checkout and pass it with `--resume`; do
 not copy a complete historical results tree. The Python runner validates the
 checkpoint and owns durable cleanup. A completed run retains its structured
 results and final model but removes resumable optimizer state.
+
+SwiGLU-7 is the first entry using this contract. Prepare its shared inputs once,
+then launch one production job for each strategy/target pair:
+
+```bash
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+  workflows/jobs/perun/run_model.sbatch swiglu-7 prepare
+
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+  --time=96:00:00 --mem=128G \
+  workflows/jobs/perun/run_model.sbatch swiglu-7 train \
+  --prepared /project/path/swiglu-7-prepare/result.json \
+  --strategy S7-0 --target 0.2
+```
+
+The first S7-0 20% production run is the integration and resource-calibration
+job. Use its `sacct`/`seff` evidence before submitting the remaining grid. See
+the [SwiGLU-7 experiment guide](../../../docs/experiments/model/swiglu/swiglu-7.md)
+for required source assets, the pinned evaluation dependencies, fixed
+treatments, and result handling.
 
 ## Results
 

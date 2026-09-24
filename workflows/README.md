@@ -74,11 +74,11 @@ the multi-policy model-study runners.
 For executor-specific commands, see [`jobs/local/README.md`](jobs/local/README.md)
 and [`jobs/perun/README.md`](jobs/perun/README.md).
 
-## Storage contract for future long workflows
+## Storage contract for long workflows
 
 SwiGLU-1 through SwiGLU-6 retain their historical CLI and artifact layouts.
-New long-running workflows use two operational paths without adding those
-paths to their scientific configuration:
+SwiGLU-7 and later long-running workflows use two operational paths without
+adding those paths to their scientific configuration:
 
 - `--work-dir` owns disposable files and is removed after the process;
 - `--output-dir` owns `result.json`, `run.json`, a resumable checkpoint while

@@ -17,6 +17,10 @@ the directory studies block interactions and sensitivity to multi-block replacem
 - `swiglu/swiglu-4.ipynb` reports the completed recovery-strategy comparison.
 - `swiglu/swiglu-5.ipynb` is the load-only report shared by the bounded search
   and optional gated confirmation.
+- `swiglu/swiglu-6.ipynb` reports long-recovery and frozen final-evaluation
+  artifacts.
+- `swiglu/swiglu-7.ipynb` compares the fixed production retraining scopes from
+  12 completed strategy/target artifacts.
 
 Single-block characterization and operator design remain under `notebooks/block/`.
 Scoped implementation instructions are in [`../AGENTS.md`](../AGENTS.md).

@@ -50,7 +50,7 @@ class RefactorImports(unittest.TestCase):
 
     def test_cli_and_swiglu6_imports_without_loading_models(self):
         for name in ("swiglu_5_search", "swiglu_5_confirmation", "swiglu_6_prepare",
-                     "swiglu_6_recovery", "swiglu_6_evaluate"):
+                     "swiglu_6_recovery", "swiglu_6_evaluate", "swiglu_7"):
             module = importlib.import_module(WORKFLOW + name)
             self.assertTrue(callable(module.main))
 

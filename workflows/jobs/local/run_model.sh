@@ -8,7 +8,7 @@ cd "$PROJECT_ROOT"
 
 if (( $# < 1 )); then
     echo "Usage: $0 WORKFLOW [WORKFLOW_ARGUMENTS...]" >&2
-    echo "Workflows: compression-baseline, swiglu, swiglu-2" >&2
+    echo "Workflows: compression-baseline, swiglu, swiglu-2, swiglu-7" >&2
     exit 2
 fi
 
@@ -25,14 +25,18 @@ case "$WORKFLOW_NAME" in
     swiglu-2)
         WORKFLOW_MODULE="workflows.runs.model.swiglu.swiglu_2_allocation"
         ;;
+    swiglu-7)
+        WORKFLOW_MODULE="workflows.runs.model.swiglu.swiglu_7"
+        STORAGE_CONTRACT="directories"
+        ;;
     *)
         echo "Unsupported model workflow: $WORKFLOW_NAME" >&2
         exit 2
         ;;
 esac
 
-# Existing workflows keep their historical --output contract. A future
-# long-running entry sets STORAGE_CONTRACT="directories" in the case above.
+# Existing workflows keep their historical --output contract. Long-running
+# entries opt into STORAGE_CONTRACT="directories" in the case above.
 if [[ "$STORAGE_CONTRACT" == "artifact" ]]; then
     HAS_OUTPUT=0
     for argument in "$@"; do
@@ -47,6 +51,10 @@ if [[ "$STORAGE_CONTRACT" == "artifact" ]]; then
     fi
 else
     RUN_ID="${MLP_REPLACEMENT_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
+    if [[ ! "$RUN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+        echo "MLP_REPLACEMENT_RUN_ID must be one safe path component." >&2
+        exit 2
+    fi
     HAS_WORK_DIR=0
     HAS_OUTPUT_DIR=0
     for argument in "$@"; do
