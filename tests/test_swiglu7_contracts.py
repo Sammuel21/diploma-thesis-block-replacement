@@ -7,6 +7,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
@@ -20,6 +22,7 @@ from mlp_replacement.compression.adapters import (
     merge_lora_adapters,
 )
 from mlp_replacement.compression import continuation
+from mlp_replacement.data import PackedTokenCache
 from workflows.runs.model.swiglu import swiglu_7
 
 
@@ -41,7 +44,26 @@ class SwiGLU7Contracts(unittest.TestCase):
         self.assertEqual(settings["targets"], [0.2, 0.3, 0.4, 0.5])
         self.assertEqual(list(settings["strategies"]), ["S7-0", "S7-1", "S7-2"])
         self.assertEqual(settings["recovery"]["learning_rate"], 3e-5)
+        self.assertEqual(settings["recovery"]["sequence_length"], 8192)
+        self.assertEqual(settings["recovery"]["effective_batch_tokens"], 8192)
         self.assertEqual(settings["recovery"]["target_tokens"], 1_000_000_000)
+        self.assertEqual(
+            settings["recovery"]["segment_endpoints"],
+            [100_000_000, 1_000_000_000],
+        )
+        self.assertEqual(settings["preparation"]["branch_recovery"]["sequence_length"], 128)
+        self.assertEqual(settings["evaluation"]["contexts"], [128, 2048, 8192])
+
+    def test_exact_endpoint_may_use_one_short_final_sequence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "tokens.int32"
+            np.arange(16, dtype=np.int32).tofile(path)
+            cache = PackedTokenCache(path, 16, 8, "fixture")
+            with self.assertRaisesRegex(ValueError, "complete sequences"):
+                cache.batch(8, 5, 1)
+            batch = cache.batch(8, 5, 1, allow_partial_sequence=True)
+            self.assertEqual(tuple(batch["input_ids"].shape), (1, 5))
+            self.assertTrue(torch.equal(batch["input_ids"][0], torch.arange(8, 13)))
 
     def test_notebook_is_load_only_and_has_no_fabricated_outputs(self):
         notebook = json.loads(

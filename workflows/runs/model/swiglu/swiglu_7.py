@@ -136,10 +136,10 @@ def load_settings(path):
         "scheduler": "constant",
         "warmup_fraction": 0.0,
         "final_lr_ratio": 1.0,
-        "sequence_length": 128,
-        "microbatch_sequences": 8,
-        "gradient_accumulation_steps": 2,
-        "effective_batch_tokens": 2048,
+        "sequence_length": 8192,
+        "microbatch_sequences": 1,
+        "gradient_accumulation_steps": 1,
+        "effective_batch_tokens": 8192,
         "forward_autocast_dtype": "bfloat16",
         "trainable_parameter_dtype": "float32",
         "optimizer_state_dtype": "float32",
@@ -153,17 +153,24 @@ def load_settings(path):
         "refit_targets": [0.3, 0.4],
         "initialization": "legacy_subset",
         "start_tokens": 5_001_216,
+        "branch_recovery": {
+            "sequence_length": 128,
+            "microbatch_sequences": 8,
+            "gradient_accumulation_steps": 2,
+            "effective_batch_tokens": 2048,
+        },
     }:
         raise ValueError("SwiGLU-7 fixes the S5-C2 starting-state construction")
     evaluation = settings["evaluation"]
     if (
-        evaluation.get("contexts") != [128, 2048]
-        or evaluation.get("strides") != [64, 1024]
+        evaluation.get("contexts") != [128, 2048, 8192]
+        or evaluation.get("strides") != [64, 1024, 4096]
+        or evaluation.get("benchmark_context_length") != 2048
         or evaluation.get("tasks")
         != ["piqa", "arc_easy", "arc_challenge", "winogrande", "hellaswag"]
         or evaluation.get("seed") != settings["seed"]
     ):
-        raise ValueError("SwiGLU-7 preserves the full SwiGLU-6 evaluation protocol")
+        raise ValueError("SwiGLU-7 fixes native-context likelihood and frozen task evaluation")
     return settings, path
 
 
@@ -312,17 +319,21 @@ def validate_source_contract(settings, search, prepared, protocol, evaluation):
     for key in model_keys:
         if prepared["configuration"]["model"].get(key) != settings["model"].get(key):
             raise ValueError(f"SwiGLU-6 model contract differs at {key}")
+    source_evaluation = protocol["configuration"]["evaluation"]
+    if (
+        source_evaluation.get("contexts") != [128, 2048]
+        or source_evaluation.get("strides") != [64, 1024]
+    ):
+        raise ValueError("SwiGLU-6 source does not contain the frozen short-context protocol")
     evaluation_keys = (
         "harness_version",
-        "contexts",
-        "strides",
         "benchmark_context_length",
         "tasks",
         "primary_metrics",
         "bootstrap_resamples",
     )
     for key in evaluation_keys:
-        if protocol["configuration"]["evaluation"].get(key) != settings["evaluation"].get(key):
+        if source_evaluation.get(key) != settings["evaluation"].get(key):
             raise ValueError(f"SwiGLU-6 evaluation contract differs at {key}")
 
 
@@ -685,10 +696,11 @@ def create_middle_start(
         device,
         "float16",
     )
+    branch_recovery = settings["preparation"]["branch_recovery"]
     cache = PackedTokenCache(
         stream_path,
         int(stream["token_count"]),
-        int(settings["recovery"]["sequence_length"]),
+        int(branch_recovery["sequence_length"]),
         stream["sha256"],
     )
     recovery = settings["recovery"]
@@ -716,11 +728,15 @@ def create_middle_start(
             }
         ],
         train_modules=train_modules,
-        batch_at=lambda offset, count: cache.batch(offset, count, recovery["microbatch_sequences"]),
+        batch_at=lambda offset, count: cache.batch(
+            offset, count, branch_recovery["microbatch_sequences"]
+        ),
         target_tokens=start_tokens,
         schedule_tokens=start_tokens,
-        microbatch_tokens=recovery["sequence_length"] * recovery["microbatch_sequences"],
-        accumulation_steps=recovery["gradient_accumulation_steps"],
+        microbatch_tokens=(
+            branch_recovery["sequence_length"] * branch_recovery["microbatch_sequences"]
+        ),
+        accumulation_steps=branch_recovery["gradient_accumulation_steps"],
         temperature=recovery["temperature"],
         ce_weight=recovery["ce_weight"],
         scheduler=recovery["scheduler"],
@@ -816,6 +832,10 @@ def prepare(args, settings, config_path):
         if was_completed:
             if set(artifact["results"]["starts"]) != {str(value) for value in settings["targets"]}:
                 raise ValueError("Completed preparation is missing a starting state")
+            dense_likelihood = artifact["results"]["dense_evaluation"]["likelihood"]
+            for split in ("validation", "test"):
+                if f"{split}-8192" not in dense_likelihood:
+                    raise ValueError("Completed preparation is missing native-context dense metrics")
             for record in artifact["results"]["starts"].values():
                 if file_digest(output_path(output_dir, record["path"])) != record["sha256"]:
                     raise ValueError("Completed preparation start changed")
@@ -852,7 +872,16 @@ def prepare(args, settings, config_path):
             for target in settings["preparation"]["refit_targets"]
             if str(float(target)) not in artifact["results"]["starts"]
         ]
-        if missing:
+        native_context = max(settings["evaluation"]["contexts"])
+        native_index = settings["evaluation"]["contexts"].index(native_context)
+        native_stride = settings["evaluation"]["strides"][native_index]
+        dense_likelihood = dense["likelihood"]
+        missing_dense = [
+            split for split in ("validation", "test")
+            if f"{split}-{native_context}" not in dense_likelihood
+        ]
+        context = None
+        if missing or missing_dense:
             context, model_config = preparation_context(
                 settings,
                 values["swiglu_5_search"],
@@ -861,6 +890,22 @@ def prepare(args, settings, config_path):
                 output_dir,
                 artifact,
             )
+        if missing_dense:
+            import numpy as np
+
+            for split in missing_dense:
+                record = protocol["corpora"][split]
+                path = output_path(output_dir, record["path"])
+                token_ids = np.memmap(path, mode="r", dtype=np.int32)
+                dense_likelihood[f"{split}-{native_context}"] = evaluate_rolling_likelihood(
+                    context.model,
+                    token_ids,
+                    native_context,
+                    native_stride,
+                    "cuda",
+                )
+            persist(output_dir, artifact, "dense_native_context_evaluation")
+        if missing:
             candidates = build_middle_candidates(context, settings, missing)
             stream_path = output_path(output_dir, stream["path"])
             legacy_path = output_path(output_dir, legacy["path"])
@@ -876,6 +921,7 @@ def prepare(args, settings, config_path):
                     output_dir,
                     artifact,
                 )
+        if context is not None:
             del context
         if set(artifact["results"]["starts"]) != {str(value) for value in settings["targets"]}:
             raise RuntimeError("Preparation did not produce all four starting states")
@@ -1144,6 +1190,10 @@ def validate_evaluation_preflight(prepared, prepared_root, settings):
         if file_digest(path) != record["sha256"] or path.stat().st_size != 4 * int(record["token_count"]):
             raise ValueError(f"Prepared WikiText {split} corpus changed")
     dense = prepared["results"]["dense_evaluation"]
+    for split in ("validation", "test"):
+        record = dense["likelihood"].get(f"{split}-8192")
+        if record is None or int(record.get("context_length", -1)) != 8192:
+            raise ValueError("Prepared dense evaluation lacks native-context likelihood")
     for task in settings["evaluation"]["tasks"]:
         record = dense["tasks"][task]
         path = output_path(prepared_root, record["path"])
@@ -1293,7 +1343,7 @@ def evaluate_final_model(
         persist(output_dir, artifact, "resident_memory")
     model, tokenizer, unused_manifest = load_bundle(bundle_path)
     if int(model.config.max_position_embeddings) < max(settings["evaluation"]["contexts"]):
-        raise ValueError("Final model does not support the 2,048-token evaluation context")
+        raise ValueError("Final model does not support the configured evaluation context")
     if "legacy_after_bf16" not in evaluation:
         evaluation["legacy_after_bf16"] = evaluate_lm_mixed(
             model, legacy["model_validation"], "cuda", 24
@@ -1331,6 +1381,23 @@ def evaluate_final_model(
                 )
                 persist(output_dir, artifact, f"likelihood:{key}")
     dense = prepared["results"]["dense_evaluation"]
+    if "likelihood_comparison_to_dense" not in evaluation:
+        evaluation["likelihood_comparison_to_dense"] = {}
+        for key, student_metrics in evaluation["likelihood"].items():
+            dense_metrics = dense["likelihood"][key]
+            evaluation["likelihood_comparison_to_dense"][key] = {
+                "student_loss": student_metrics["loss"],
+                "dense_loss": dense_metrics["loss"],
+                "student_minus_dense_loss": (
+                    student_metrics["loss"] - dense_metrics["loss"]
+                ),
+                "student_perplexity": student_metrics["perplexity"],
+                "dense_perplexity": dense_metrics["perplexity"],
+                "student_minus_dense_perplexity": (
+                    student_metrics["perplexity"] - dense_metrics["perplexity"]
+                ),
+            }
+        persist(output_dir, artifact, "likelihood_comparison_to_dense")
     task_comparisons = {}
     for task in settings["evaluation"]["tasks"]:
         record = evaluation["tasks"].get(task)
@@ -1571,8 +1638,12 @@ def train(args, settings, config_path):
         cursor = int(artifact["results"]["recovery"]["tokens_seen"])
         updates = int(artifact["results"]["recovery"]["optimizer_updates"])
         final_tokens = int(recovery["target_tokens"])
+        segment_boundaries = [
+            int(settings["preparation"]["start_tokens"]),
+            *recovery["segment_endpoints"],
+        ]
         while cursor < final_tokens:
-            origin = segment_origin(cursor, recovery["segment_endpoints"])
+            origin = segment_origin(cursor, segment_boundaries)
             end = next(value for value in recovery["segment_endpoints"] if value > cursor)
             schedule = segment_schedule(
                 origin,
@@ -1665,7 +1736,10 @@ def train(args, settings, config_path):
                 ],
                 train_modules=train_modules,
                 batch_at=lambda offset, count: cache.batch(
-                    offset, count, recovery["microbatch_sequences"]
+                    offset,
+                    count,
+                    recovery["microbatch_sequences"],
+                    allow_partial_sequence=True,
                 ),
                 microbatch_tokens=recovery["sequence_length"] * recovery["microbatch_sequences"],
                 accumulation_steps=recovery["gradient_accumulation_steps"],

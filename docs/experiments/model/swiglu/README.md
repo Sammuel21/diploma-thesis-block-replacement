@@ -34,7 +34,7 @@ SwiGLU-6 and SwiGLU-7 after their production results are analyzed.
 | [SwiGLU-4](swiglu-4.md) | Recovery objective, learning rate, RMSNorm, and LoRA comparison | Completed artifact present |
 | [SwiGLU-5](swiglu-5.md) | Efficient initialization/allocation search followed by gated confirmation | Search and both 100M confirmations completed |
 | [SwiGLU-6](swiglu-6.md) | 1B continuation, frozen final evaluation, and BF16 deployment accounting | Implemented; scientific execution pending |
-| [SwiGLU-7](swiglu-7.md) | Production comparison of replacement-only, full-body, and MLP-plus-attention-LoRA retraining | Implemented; scientific execution pending |
+| [SwiGLU-7](swiglu-7.md) | Native-8K production comparison of replacement-only, full-body, and MLP-plus-attention-LoRA retraining | Implemented; scientific execution pending |
 
 The maintained runners and configurations use the matching class directories
 under `workflows/runs/model/swiglu/` and `workflows/configs/model/swiglu/`.

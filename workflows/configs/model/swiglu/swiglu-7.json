@@ -46,7 +46,13 @@
     "existing_targets": [0.2, 0.5],
     "refit_targets": [0.3, 0.4],
     "initialization": "legacy_subset",
-    "start_tokens": 5001216
+    "start_tokens": 5001216,
+    "branch_recovery": {
+      "sequence_length": 128,
+      "microbatch_sequences": 8,
+      "gradient_accumulation_steps": 2,
+      "effective_batch_tokens": 2048
+    }
   },
   "recovery": {
     "target_tokens": 1000000000,
@@ -63,10 +69,10 @@
     "scheduler": "constant",
     "warmup_fraction": 0.0,
     "final_lr_ratio": 1.0,
-    "sequence_length": 128,
-    "microbatch_sequences": 8,
-    "gradient_accumulation_steps": 2,
-    "effective_batch_tokens": 2048,
+    "sequence_length": 8192,
+    "microbatch_sequences": 1,
+    "gradient_accumulation_steps": 1,
+    "effective_batch_tokens": 8192,
     "forward_autocast_dtype": "bfloat16",
     "trainable_parameter_dtype": "float32",
     "optimizer_state_dtype": "float32",
@@ -75,8 +81,8 @@
   "evaluation": {
     "harness_version": "0.4.13",
     "seed": 21,
-    "contexts": [128, 2048],
-    "strides": [64, 1024],
+    "contexts": [128, 2048, 8192],
+    "strides": [64, 1024, 4096],
     "benchmark_context_length": 2048,
     "tasks": ["piqa", "arc_easy", "arc_challenge", "winogrande", "hellaswag"],
     "primary_metrics": {

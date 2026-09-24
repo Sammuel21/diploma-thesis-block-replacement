@@ -38,15 +38,40 @@ into the attention weights before the final inference bundle is exported.
 
 Each strategy is run independently at 20%, 30%, 40%, and 50% eligible-MLP
 parameter removal. The grid therefore contains 12 fresh trajectories. Every
-trajectory ends at one billion cumulative recovery tokens. No result from one
-strategy or target selects or terminates another run.
+trajectory ends at exactly one billion cumulative recovery tokens. No result
+from one strategy or target selects or terminates another run.
 
 The recovery recipe is fixed across the grid: online dense-teacher KL at
 temperature 1, no cross-entropy term, fused AdamW, constant learning rate
-3e-5, weight decay 0, sequence length 128, effective batch 2,048 tokens, seed
-21, BF16 forward operations, and FP32 trainable parameters and optimizer state.
-There is no warmup or learning-rate decay. This isolates trainable scope as the
-planned treatment.
+3e-5, weight decay 0, sequence length 8,192, one sequence and 8,192 effective
+tokens per optimizer update, seed 21, BF16 forward operations, and FP32
+trainable parameters and optimizer state. There is no warmup or learning-rate
+decay. This isolates trainable scope as the planned treatment.
+
+### Native-context recovery decision
+
+SwiGLU-3 through SwiGLU-6 used 128-token recovery sequences and 2,048 effective
+tokens per update. That geometry was appropriate for the earlier
+replacement-only studies: it kept recovery inexpensive while the pretrained
+attention stack remained frozen. SwiGLU-7 directly updates attention in S7-1
+and adapts it through LoRA in S7-2. Training those branches only on 128-token
+windows would limit their recovery evidence to short dependencies.
+
+SwiGLU-7 therefore uses SmolLM2-1.7B's native 8,192-token context, recorded as
+`max_position_embeddings` in the [official model
+configuration](https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B/blob/main/config.json),
+for all three strategies. S7-0 uses the same geometry so it remains the internal
+control for retraining scope. A single sequence is one optimizer update,
+increasing the effective batch from 2,048 to 8,192 tokens and reducing the new
+post-branch updates to 121,461. This intentionally starts a new recovery regime;
+S7-0 is not an exact continuation control for the 128-token SwiGLU-6 trajectory.
+
+The retained branch point is 5,001,216 cumulative tokens. Ordinary production
+updates consume one complete 8,192-token sequence. To preserve the exact 100M
+and 1B cumulative endpoints without repeating or inventing stream tokens, the
+last update of those two recovery segments uses the remaining 4,352-token and
+2,304-token sequence respectively. These two boundary updates are the only
+shorter production sequences.
 
 ## Starting models
 
@@ -57,15 +82,19 @@ All branches begin at 5,001,216 cumulative recovery tokens.
 - The 30% and 40% allocations apply the recorded S5-C2 legacy-subset width
   curves at the intermediate budgets. Preparation refits only the selected
   operator widths and then performs online dense-teacher, replacement-only
-  recovery to 5M tokens to create their shared branch points.
+  recovery to 5M tokens using the historical 128-token, 2,048-effective-token
+  S5 recipe. This matches the retained 20% and 50% branch construction before
+  every production trajectory switches to 8K.
 - Expanded-scope runs preserve the replacement optimizer moments. Newly
   trainable parameters start with empty Adam state. Each result records this
   behavior and its exact trainable-parameter groups.
 
-The 20% and 50% starts support direct S7-0 comparison with the historical
-SwiGLU-6 trajectories. The new 30% and 40% starts have no historical endpoint
-to replay; comparisons among S7-0, S7-1, and S7-2 remain controlled because all
-three scopes at a target branch from the same prepared checkpoint.
+The 20% and 50% starts are exact historical branch states, but the subsequent
+S7-0 trajectory is descriptive rather than an exact continuation comparison
+with SwiGLU-6 because S7 uses 8K sequences and a larger effective batch. The new
+30% and 40% starts have no historical endpoint to replay. Comparisons among
+S7-0, S7-1, and S7-2 remain controlled because all three scopes at a target
+branch from the same prepared checkpoint and use the same 8K recovery recipe.
 
 Preparation is shared by the grid. It also copies the verified one-billion-token
 stream, historical validation batches, frozen WikiText corpora, benchmark
@@ -100,15 +129,25 @@ contracts.
 
 ## Final evaluation
 
-Every one of the 12 final models receives the complete frozen SwiGLU-6
-evaluation:
+Every one of the 12 final models receives the frozen SwiGLU-6 evaluation plus
+native-context likelihood measurement:
 
-- full WikiText-2 validation and test likelihood at contexts 128 and 2,048;
+- full WikiText-2 validation and test likelihood at contexts 128, 2,048, and
+  8,192, with respective strides 64, 1,024, and 4,096, including the dense
+  reference at every context;
 - zero-shot PIQA, ARC-Easy, ARC-Challenge, WinoGrande, and HellaSwag;
 - paired task differences against the same dense-model examples;
 - BF16 bundle bytes, parameter count, native buffer bytes, and fresh-process
   resident CPU/GPU memory; and
 - the fixed historical validation-prefix measurements along recovery.
+
+The shared preparation evaluates the dense model at 8K once and carries forward
+the frozen 128- and 2K-context dense records. The zero-shot task harness retains
+its frozen 2,048-token limit so its paired dense records remain directly
+comparable; these tasks do not supply the 8K claim. The WikiText likelihood
+evaluation supplies that native-context measurement. The historical
+recovery-validation cache remains 128 tokens for trajectory monitoring and
+continuity, while final model selection is not performed from it.
 
 The final test split is report-only. Architecture, targets, optimizer, learning
 rate, token budget, and evaluation cohort are fixed before it is read. The
@@ -185,9 +224,10 @@ seff <job-id>
 
 Use the observed resource envelope before scheduling the remaining 11 jobs.
 S7-1 has the largest memory requirement because its body weights, gradients,
-and Adam states are all trainable. Confirm the allocated H200 and host-memory
-limits before submitting S7-1. The runner is single-process and single-GPU, so
-requesting more GPUs does not accelerate it.
+Adam states, and 8K activations are all present during training. Confirm the
+allocated H200 and host-memory limits with the first intended run before
+submitting the remaining grid. The runner is single-process and single-GPU, so
+requesting more GPUs does not accelerate one trajectory.
 
 Submit the remaining fixed combinations by changing only `--strategy` and
 `--target`. If a job is interrupted, stage its complete output directory back
@@ -198,9 +238,10 @@ into the new submission and run the same command with `--resume` and an explicit
 
 `run.json` is the operational status record. `result.json` is the scientific
 record and contains the recovery trajectory, trainable-parameter accounting,
-final likelihood and task summaries, footprint, environment, source hashes,
-and code hashes. Raw paired benchmark samples live beneath the same output and
-are referenced relatively. `model/` is the only retained inference-weight copy.
+final likelihood with same-context dense differences, task summaries,
+footprint, environment, source hashes, and code hashes. Raw paired benchmark
+samples live beneath the same output and are referenced relatively. `model/`
+is the only retained inference-weight copy.
 
 After all 12 outputs have been verified and moved to the canonical local result
 paths used by the notebook, update `swiglu-progression.md` and

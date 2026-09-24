@@ -197,8 +197,12 @@ class PackedTokenCache:
     sequence_length: int
     fingerprint: str
 
-    def batch(self, token_offset, token_count, batch_size):
-        """Read consecutive complete sequences without repeating cache content."""
+    def batch(self, token_offset, token_count, batch_size, allow_partial_sequence=False):
+        """Read consecutive sequences without repeating cache content.
+
+        A caller may opt into one shorter sequence for an exact final token
+        boundary. Existing callers retain the complete-sequence requirement.
+        """
 
         import numpy as np
 
@@ -207,20 +211,24 @@ class PackedTokenCache:
         batch_size = int(batch_size)
         if token_offset < 0 or token_count < 1:
             raise ValueError("Packed-token offsets and counts must be positive")
-        if token_count % self.sequence_length:
+        partial_sequence = token_count % self.sequence_length
+        if partial_sequence and (
+            not allow_partial_sequence
+            or token_count >= self.sequence_length
+            or batch_size != 1
+        ):
             raise ValueError("Packed-token reads must contain complete sequences")
         if token_offset + token_count > self.token_count:
             raise ValueError("Packed-token read exceeds the finite cache")
-        sequence_count = token_count // self.sequence_length
+        sequence_count = 1 if partial_sequence else token_count // self.sequence_length
         if sequence_count > batch_size:
             raise ValueError("Packed-token read exceeds the configured microbatch")
         tokens = np.memmap(self.path, mode="r", dtype=np.int32)
         selected = np.asarray(
             tokens[token_offset : token_offset + token_count], dtype=np.int64
         ).copy()
-        input_ids = torch.from_numpy(selected).reshape(
-            sequence_count, self.sequence_length
-        )
+        sequence_width = token_count if partial_sequence else self.sequence_length
+        input_ids = torch.from_numpy(selected).reshape(sequence_count, sequence_width)
         return {
             "input_ids": input_ids,
             "attention_mask": torch.ones_like(input_ids),

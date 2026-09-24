@@ -195,9 +195,10 @@ sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
   --strategy S7-0 --target 0.2
 ```
 
-The first S7-0 20% production run is the integration and resource-calibration
-job. Use its `sacct`/`seff` evidence before submitting the remaining grid. See
-the [SwiGLU-7 experiment guide](../../../docs/experiments/model/swiglu/swiglu-7.md)
+The first S7-0 20% production run is the integration and native-8K
+resource-calibration job. Use its `sacct`/`seff` evidence before submitting the
+remaining grid, and do not extrapolate the earlier 128-token runtime directly.
+See the [SwiGLU-7 experiment guide](../../../docs/experiments/model/swiglu/swiglu-7.md)
 for required source assets, the pinned evaluation dependencies, fixed
 treatments, and result handling.
 

@@ -3,6 +3,7 @@
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
+local/
 
 # Data is local by default. The small MVP evidence logs are an explicit
 # reproducibility exception and are versioned with the prototype archive.
