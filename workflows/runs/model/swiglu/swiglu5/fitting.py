@@ -279,10 +279,20 @@ def selected_neurons(context, layer, pairs, width):
     return torch.argsort(scores, descending=True)[: int(width)].sort().values
 
 
-def build_width_curves(context, selection_cache):
+def build_width_curves(
+    context,
+    selection_cache,
+    initializations=("legacy_subset", "output_aware"),
+):
     layers = tuple(
         int(value) for value in context.settings["compatibility"]["eligible_layers"]
     )
+    initializations = tuple(str(value) for value in initializations)
+    if not initializations or any(
+        value not in {"legacy_subset", "output_aware"}
+        for value in initializations
+    ):
+        raise ValueError("Width curves require a supported initialization")
     group_size = int(context.settings["local_fitting"]["capture_group_size"])
     original_width = int(context.settings["model"]["intermediate_size"])
     ratios = tuple(float(value) for value in context.settings["allocation"]["width_ratios"])
@@ -291,7 +301,7 @@ def build_width_curves(context, selection_cache):
         group = layers[offset : offset + group_size]
         needed = any(
             curve_lookup(context, initialization, layer, width) is None
-            for initialization in ("legacy_subset", "output_aware")
+            for initialization in initializations
             for layer in group
             for width in widths
         )
@@ -308,7 +318,7 @@ def build_width_curves(context, selection_cache):
                 int(context.settings["local_fitting"]["batch_size"]),
             )
             ranking = torch.argsort(scores, descending=True)
-            for initialization in ("legacy_subset", "output_aware"):
+            for initialization in initializations:
                 for width in widths:
                     if curve_lookup(context, initialization, layer, width) is not None:
                         continue
@@ -353,7 +363,7 @@ def build_width_curves(context, selection_cache):
         release_cuda(torch)
         report_memory(f"After SwiGLU-5 width-curve group {group}")
 
-    for initialization in ("legacy_subset", "output_aware"):
+    for initialization in initializations:
         rows = context.artifact["results"]["width_curves"][initialization]
         for layer in layers:
             evaluations = {

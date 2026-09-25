@@ -47,6 +47,7 @@ from mlp_replacement.compression.reconstruction import (
 )
 from mlp_replacement.compression.recovery import cache_teacher_logits
 from mlp_replacement.data import PackedTokenCache
+from mlp_replacement.data_streams import build_finite_stream
 from mlp_replacement.evaluation.bundles import (
     export_bundle,
     load_bundle,
@@ -123,6 +124,17 @@ def load_settings(path):
     fixed = {
         "target_tokens": 1_000_000_000,
         "segment_endpoints": [100_000_000, 1_000_000_000],
+        "checkpoint_interval_tokens": 25_000_000,
+        "validation_interval_tokens": 25_000_000,
+        "monitoring_ppl_tokens": [
+            10_000_000,
+            25_000_000,
+            50_000_000,
+            100_000_000,
+            250_000_000,
+            500_000_000,
+            1_000_000_000,
+        ],
         "optimizer": "AdamW",
         "optimizer_backend": "fused",
         "learning_rate": 3e-5,
@@ -143,13 +155,45 @@ def load_settings(path):
     }
     if any(recovery.get(key) != value for key, value in fixed.items()):
         raise ValueError("SwiGLU-7 fixes the established recovery recipe")
+    if "sources" in settings:
+        raise ValueError("SwiGLU-7 must not depend on prior experiment artifacts")
     if settings["preparation"] != {
-        "candidate_id": "S5-C2",
+        "recipe_id": "S7-A0",
         "initialization": "legacy_subset",
+        "allocation_method": "discrete_width_curve",
         "start_tokens": 0,
     }:
-        raise ValueError("SwiGLU-7 fixes fresh fitted S5-C2 starts at token zero")
+        raise ValueError("SwiGLU-7 fixes one fresh discrete-allocation recipe")
+    data = settings["data"]
+    if (
+        data.get("sequence_length") != 128
+        or data.get("capture_batch_size") != 2
+        or data.get("local_source", {}).get("revision") is None
+        or data.get("recovery_source", {}).get("revision") is None
+        or data.get("model_validation_source", {}).get("revision") is None
+        or data.get("recovery_source", {}).get("first_shard") != 1
+        or data.get("recovery_source", {}).get("shard_count") != 1024
+    ):
+        raise ValueError("SwiGLU-7 requires pinned, independently prepared data")
+    if settings.get("calibration") != {
+        "selected_pairs": 393_216,
+        "pair_counts": [393_216],
+    }:
+        raise ValueError("SwiGLU-7 fixes the local calibration budget")
+    allocation = settings["allocation"]
+    if (
+        allocation.get("eligible_layers") != list(range(1, 23))
+        or allocation.get("protected_layers") != [0, 23]
+        or allocation.get("width_ratios")
+        != [0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0]
+        or allocation.get("selection_metric") != "singleton_fixed_teacher_kl_t1"
+        or allocation.get("allow_dense_layers") is not True
+        or allocation.get("boundary_width_policy")
+        != "best_interpolated_marginal_gain"
+    ):
+        raise ValueError("SwiGLU-7 fixes discrete singleton-KL width allocation")
     evaluation = settings["evaluation"]
+    task_datasets = evaluation.get("task_datasets", {})
     if (
         evaluation.get("contexts") != [128, 2048, 8192]
         or evaluation.get("strides") != [64, 1024, 4096]
@@ -157,6 +201,19 @@ def load_settings(path):
         or evaluation.get("tasks")
         != ["piqa", "arc_easy", "arc_challenge", "winogrande", "hellaswag"]
         or evaluation.get("seed") != settings["seed"]
+        or evaluation.get("wikitext_dataset")
+        != data["model_validation_source"]["path"]
+        or evaluation.get("wikitext_name")
+        != data["model_validation_source"]["name"]
+        or evaluation.get("wikitext_revision")
+        != data["model_validation_source"]["revision"]
+        or set(task_datasets) != set(evaluation.get("tasks", []))
+        or any(
+            not row.get("dataset")
+            or not row.get("revision")
+            or row.get("split") not in {"validation", "test"}
+            for row in task_datasets.values()
+        )
     ):
         raise ValueError("SwiGLU-7 fixes native-context likelihood and frozen task evaluation")
     return settings, path
@@ -242,208 +299,290 @@ def start_artifact(output_dir, settings, command, resume, identity):
     }
 
 
-def source_assets(path):
-    path = Path(path)
-    return path.with_suffix("").with_name(path.stem + ".assets")
+def effective_preparation_settings(settings):
+    """Adapt the explicit S7 configuration to the maintained fitting helpers."""
+
+    effective = deepcopy(settings)
+    effective["references"] = {
+        "selected_calibration_pairs": settings["calibration"]["selected_pairs"]
+    }
+    effective["compatibility"] = {
+        "eligible_layers": deepcopy(settings["allocation"]["eligible_layers"]),
+        "protected_layers": deepcopy(settings["allocation"]["protected_layers"]),
+    }
+    return effective
 
 
-def copy_verified(source, destination, expected_sha256=None):
-    source = Path(source)
-    destination = Path(destination)
-    observed = file_digest(source)
-    if expected_sha256 is not None and observed != expected_sha256:
-        raise ValueError(f"Source asset changed: {source}")
-    if destination.exists():
-        if file_digest(destination) != observed:
-            raise ValueError(f"Existing prepared asset differs: {destination}")
-    else:
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        temporary = destination.with_name(destination.name + ".tmp")
-        shutil.copy2(source, temporary)
-        if file_digest(temporary) != observed:
-            temporary.unlink(missing_ok=True)
-            raise IOError(f"Copied asset failed digest verification: {destination}")
-        temporary.replace(destination)
-    return observed
+def validated_attention_implementation(model):
+    implementation = getattr(model.config, "_attn_implementation", None)
+    if implementation not in {"sdpa", "flash_attention_2", "flash_attention_3"}:
+        raise RuntimeError(
+            "SwiGLU-7 native-8K execution requires SDPA or FlashAttention; "
+            f"the loaded model selected {implementation!r}"
+        )
+    return implementation
 
 
-def validate_source_contract(settings, search, prepared, protocol, evaluation):
-    if search.get("workflow") != "swiglu-5-search" or search.get("status") != "completed":
-        raise ValueError("Preparation requires the completed SwiGLU-5 search")
-    if (
-        prepared.get("workflow") != "swiglu-6"
-        or prepared.get("stage") != "prepare"
-        or prepared.get("status") != "completed"
-    ):
-        raise ValueError("Preparation requires the completed SwiGLU-6 prepared stream")
-    if (
-        protocol.get("workflow") != "swiglu-6"
-        or protocol.get("stage") != "evaluation-protocol"
-        or protocol.get("status") != "completed"
-    ):
-        raise ValueError("Preparation requires the completed SwiGLU-6 evaluation protocol")
-    if (
-        evaluation.get("workflow") != "swiglu-6"
-        or evaluation.get("stage") != "evaluation"
-        or evaluation.get("status") != "completed"
-    ):
-        raise ValueError("Preparation requires the completed SwiGLU-6 final evaluation")
-    model_keys = (
-        "model_id",
-        "revision",
-        "tokenizer_revision",
-        "hidden_size",
-        "intermediate_size",
-        "num_layers",
+def preparation_storage_preflight(work_dir, output_dir, settings):
+    hidden = int(settings["model"]["hidden_size"])
+    width = int(settings["model"]["intermediate_size"])
+    layers = len(settings["allocation"]["eligible_layers"])
+    original_parameters = layers * 3 * hidden * width
+    start_bytes = sum(
+        int(original_parameters * (1.0 - float(target))) * 4
+        for target in settings["targets"]
     )
-    for key in model_keys:
-        if search["configuration"]["model"].get(key) != settings["model"].get(key):
-            raise ValueError(f"SwiGLU-5 model contract differs at {key}")
-    if (
-        prepared["configuration"] != protocol["configuration"]
-        or prepared["configuration"] != evaluation["configuration"]
-    ):
-        raise ValueError("SwiGLU-6 preparation, protocol, and evaluation configurations differ")
-    for key in model_keys:
-        if prepared["configuration"]["model"].get(key) != settings["model"].get(key):
-            raise ValueError(f"SwiGLU-6 model contract differs at {key}")
-    source_evaluation = protocol["configuration"]["evaluation"]
-    if (
-        source_evaluation.get("contexts") != [128, 2048]
-        or source_evaluation.get("strides") != [64, 1024]
-    ):
-        raise ValueError("SwiGLU-6 source does not contain the frozen short-context protocol")
-    evaluation_keys = (
-        "harness_version",
-        "benchmark_context_length",
-        "tasks",
-        "primary_metrics",
-        "bootstrap_resamples",
+    curve_widths = {
+        min(width, max(1, round(width * float(ratio))))
+        for ratio in settings["allocation"]["width_ratios"]
+        if float(ratio) < 1.0
+    }
+    curve_bytes = layers * sum(3 * hidden * value * 4 for value in curve_widths)
+    output_required = int(
+        (
+            int(settings["recovery"]["target_tokens"]) * 4
+            + start_bytes
+            + 2_000_000_000
+        )
+        * 1.15
     )
-    for key in evaluation_keys:
-        if source_evaluation.get(key) != settings["evaluation"].get(key):
-            raise ValueError(f"SwiGLU-6 evaluation contract differs at {key}")
-
-
-def source_records(settings):
-    paths = {
-        name: resolve_path(Path(value)) for name, value in settings["sources"].items()
+    work_required = int((curve_bytes + 2_000_000_000) * 1.15)
+    output_free = shutil.disk_usage(output_dir).free
+    work_free = shutil.disk_usage(work_dir).free
+    same_device = work_dir.stat().st_dev == output_dir.stat().st_dev
+    if same_device:
+        if min(output_free, work_free) < output_required + work_required:
+            raise RuntimeError(
+                "SwiGLU-7 preparation requires at least "
+                f"{output_required + work_required:,} free bytes on shared storage"
+            )
+    elif output_free < output_required or work_free < work_required:
+        raise RuntimeError(
+            "SwiGLU-7 preparation lacks output or temporary storage capacity"
+        )
+    return {
+        "estimated_output_bytes": output_required,
+        "estimated_work_bytes": work_required,
+        "observed_output_free_bytes": output_free,
+        "observed_work_free_bytes": work_free,
+        "shared_filesystem": same_device,
     }
-    values = {name: read_json(path) for name, path in paths.items()}
-    validate_source_contract(
-        settings,
-        values["swiglu_5_search"],
-        values["swiglu_6_prepared"],
-        values["swiglu_6_protocol"],
-        values["swiglu_6_evaluation"],
+
+
+def local_preparation_data(settings, tokenizer):
+    context = SimpleNamespace(
+        settings=effective_preparation_settings(settings),
+        tokenizer=tokenizer,
     )
-    digests = {name: file_digest(path) for name, path in paths.items()}
-    prepared = values["swiglu_6_prepared"]
-    protocol = values["swiglu_6_protocol"]
-    evaluation = values["swiglu_6_evaluation"]
-    if prepared["provenance"]["search"]["sha256"] != digests["swiglu_5_search"]:
-        raise ValueError("SwiGLU-6 preparation does not reference this SwiGLU-5 search")
-    if protocol["prepared_sha256"] != digests["swiglu_6_prepared"]:
-        raise ValueError("SwiGLU-6 evaluation protocol does not reference this preparation")
-    if evaluation["protocol_sha256"] != digests["swiglu_6_protocol"]:
-        raise ValueError("SwiGLU-6 evaluation does not reference this frozen protocol")
-    provenance = {name: {"sha256": digest} for name, digest in digests.items()}
-    return paths, values, provenance
+    return build_local_data(context)
 
 
-def copy_shared_preparation(output_dir, paths, values):
-    prepared_root = output_dir / "prepared"
-    s6_prepared = values["swiglu_6_prepared"]
-    s6_prepared_assets = source_assets(paths["swiglu_6_prepared"])
-    source_stream = contained_path(s6_prepared_assets, s6_prepared["results"]["stream"]["path"])
-    stream_path = prepared_root / "recovery-tokens.int32"
-    stream_sha = copy_verified(source_stream, stream_path, s6_prepared["results"]["stream"]["sha256"])
-    stream = {
-        **deepcopy(s6_prepared["results"]["stream"]),
-        "path": relative_output(output_dir, stream_path),
-        "sha256": stream_sha,
-    }
-    legacy_source = contained_path(s6_prepared_assets, s6_prepared["legacy_evaluation"]["path"])
-    legacy_path = prepared_root / "legacy-evaluation-batches.pt"
-    legacy_sha = copy_verified(legacy_source, legacy_path, s6_prepared["legacy_evaluation"]["sha256"])
-    legacy = {
-        **deepcopy(s6_prepared["legacy_evaluation"]),
-        "path": relative_output(output_dir, legacy_path),
-        "sha256": legacy_sha,
-    }
-
-    protocol = values["swiglu_6_protocol"]
-    protocol_assets = source_assets(paths["swiglu_6_protocol"])
-    corpora = {}
-    for split, record in protocol["corpora"].items():
-        source = contained_path(protocol_assets, record["path"])
-        destination = prepared_root / "evaluation" / f"wikitext-{split}.int32"
-        digest = copy_verified(source, destination, record["sha256"])
-        corpora[split] = {
-            **deepcopy(record),
-            "path": relative_output(output_dir, destination),
-            "sha256": digest,
-        }
-
-    evaluation = values["swiglu_6_evaluation"]
-    evaluation_assets = source_assets(paths["swiglu_6_evaluation"])
-    dense = deepcopy(evaluation["results"]["models"]["dense"])
-    dense_tasks = {}
-    for task, record in dense["tasks"].items():
-        source = contained_path(evaluation_assets, record["path"])
-        destination = prepared_root / "evaluation" / "dense" / f"{task}.json"
-        digest = copy_verified(source, destination, record["sha256"])
-        dense_tasks[task] = {"path": relative_output(output_dir, destination), "sha256": digest}
-    dense["tasks"] = dense_tasks
-    historical = {}
-    cohort_by_id = {row["id"]: row for row in evaluation["cohort"]}
-    for target in settings_targets(values, "swiglu_6_evaluation"):
-        matches = [
-            row
-            for row in evaluation["cohort"]
-            if float(row.get("target", -1)) == target
-            and int(row.get("tokens", -1)) == 1_000_000_000
-        ]
-        if len(matches) != 1:
-            raise ValueError(f"SwiGLU-6 evaluation lacks one 1B control for target {target}")
-        model_id = matches[0]["id"]
-        model_result = deepcopy(evaluation["results"]["models"][model_id])
-        model_result.pop("tasks", None)
-        cohort = deepcopy(cohort_by_id[model_id])
-        cohort.pop("weights_path", None)
-        for row in cohort.get("allocation", []):
-            row.pop("state_path", None)
-            row.pop("state_sha256", None)
-            row.pop("fit_key", None)
-        historical[str(target)] = {
-            "model_id": model_id,
-            "cohort": cohort,
-            "metrics": model_result,
-            "comparison": deepcopy(evaluation["results"]["comparisons"][model_id]),
-        }
-    frozen_protocol = {
-        "protocol_fingerprint": protocol["protocol_fingerprint"],
-        "harness_source_hashes": deepcopy(protocol["harness_source_hashes"]),
-        "tasks": deepcopy(protocol["tasks"]),
-        "wikitext_revision": protocol["wikitext_revision"],
-        "corpora": corpora,
-    }
-    return stream, legacy, frozen_protocol, dense, historical
-
-
-def settings_targets(values, source_name):
-    targets = values[source_name]["configuration"].get("targets", [])
-    return [float(value) for value in targets]
-
-
-def preparation_context(settings, search, s6_prepared, work_dir, output_dir, artifact):
+def prepare_monitoring_evaluation(settings, output_dir, artifact, tokenizer):
     import torch
 
-    effective = deepcopy(search["configuration"])
-    effective["data"]["local_source"]["revision"] = s6_prepared["results"]["dataset_revision"]
-    effective["data"]["model_validation_source"]["revision"] = s6_prepared[
-        "legacy_evaluation"
-    ]["wikitext_revision"]
+    existing = artifact["results"].get("monitoring_evaluation")
+    if existing is not None:
+        path = output_path(output_dir, existing["path"])
+        if file_digest(path) != existing["sha256"]:
+            raise ValueError("Prepared local evaluation batches changed")
+        return None
+    local_data = local_preparation_data(settings, tokenizer)
+    path = output_dir / "prepared" / "local-evaluation-batches.pt"
+    save_tensor_atomic(
+        path,
+        {
+            key: list(local_data[key])
+            for key in ("recovery_validation", "model_validation")
+        },
+    )
+    artifact["results"]["monitoring_evaluation"] = {
+        "path": relative_output(output_dir, path),
+        "sha256": file_digest(path),
+        "sequence_length": int(settings["data"]["sequence_length"]),
+        "c4_revision": settings["data"]["local_source"]["revision"],
+        "wikitext_revision": settings["data"]["model_validation_source"]["revision"],
+    }
+    persist(output_dir, artifact, "local_evaluation_prepared")
+    return local_data
+
+
+def prepare_recovery_stream(settings, output_dir, artifact, tokenizer):
+    existing = artifact["results"].get("stream")
+    if existing is not None:
+        path = output_path(output_dir, existing["path"])
+        if (
+            file_digest(path) != existing["sha256"]
+            or path.stat().st_size != 4 * int(existing["token_count"])
+        ):
+            raise ValueError("Prepared recovery stream changed")
+        return existing
+
+    from datasets import load_dataset
+    from huggingface_hub import HfApi
+
+    source = settings["data"]["recovery_source"]
+    info = HfApi().dataset_info(
+        source["path"],
+        revision=source["revision"],
+        files_metadata=True,
+    )
+    if info.sha != source["revision"]:
+        raise ValueError("Resolved C4 revision differs from the pinned revision")
+    inventory = {item.rfilename: item for item in info.siblings}
+    used_shards = []
+
+    def records():
+        for index in range(int(source["first_shard"]), int(source["shard_count"])):
+            name = f"en/c4-train.{index:05d}-of-{int(source['shard_count']):05d}.json.gz"
+            if name not in inventory:
+                raise FileNotFoundError(f"Pinned C4 shard is missing: {name}")
+            entry = inventory[name]
+            lfs = entry.lfs
+            used_shards.append(
+                {
+                    "path": name,
+                    "git_blob": entry.blob_id,
+                    "sha256": (
+                        lfs.get("sha256")
+                        if isinstance(lfs, dict)
+                        else getattr(lfs, "sha256", None)
+                    ),
+                }
+            )
+            yield from load_dataset(
+                source["path"],
+                revision=source["revision"],
+                data_files={"train": name},
+                split="train",
+                streaming=True,
+            )
+
+    def progress(tokens, documents):
+        persist(
+            output_dir,
+            artifact,
+            "recovery_stream",
+            {"tokens": tokens, "documents": documents},
+        )
+
+    path = output_dir / "prepared" / "recovery-tokens.int32"
+    record = build_finite_stream(
+        records(),
+        tokenizer,
+        path,
+        settings["recovery"]["target_tokens"],
+        text_column=source["text_column"],
+        on_progress=progress,
+    )
+    record.update(
+        {
+            "path": relative_output(output_dir, path),
+            "sequence_length": settings["recovery"]["sequence_length"],
+            "dataset": source["path"],
+            "dataset_revision": source["revision"],
+            "source_shards": used_shards,
+        }
+    )
+    artifact["results"]["stream"] = record
+    persist(output_dir, artifact, "recovery_stream_prepared")
+    return record
+
+
+def write_int32_corpus(path, values):
+    import numpy as np
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    array = np.asarray(values, dtype=np.int32)
+    if path.exists():
+        if path.stat().st_size != array.nbytes:
+            raise ValueError(f"Prepared corpus extent differs: {path}")
+        observed = np.memmap(path, mode="r", dtype=np.int32)
+        if not np.array_equal(observed, array):
+            raise ValueError(f"Prepared corpus contents differ: {path}")
+    else:
+        temporary = path.with_name(path.name + ".tmp")
+        temporary.unlink(missing_ok=True)
+        array.tofile(temporary)
+        temporary.replace(path)
+    return {
+        "path": path,
+        "sha256": file_digest(path),
+        "token_count": int(array.size),
+    }
+
+
+def prepare_evaluation_protocol(settings, output_dir, artifact, tokenizer):
+    existing = artifact["results"].get("evaluation_protocol")
+    if existing is not None:
+        for record in existing["corpora"].values():
+            path = output_path(output_dir, record["path"])
+            if (
+                file_digest(path) != record["sha256"]
+                or path.stat().st_size != 4 * int(record["token_count"])
+            ):
+                raise ValueError("Prepared evaluation corpus changed")
+        return existing
+
+    if version("lm_eval") != settings["evaluation"]["harness_version"]:
+        raise ValueError("Install the pinned evaluation harness before preparation")
+
+    import numpy as np
+    from datasets import load_dataset
+    from huggingface_hub import HfApi
+
+    evaluation = settings["evaluation"]
+    tasks = {}
+    for task in evaluation["tasks"]:
+        config = native_task_config(task)
+        pinned = evaluation["task_datasets"][task]
+        split = config.get("test_split") or config["validation_split"]
+        if config["dataset_path"] != pinned["dataset"] or split != pinned["split"]:
+            raise ValueError(f"Pinned benchmark definition changed: {task}")
+        resolved = HfApi().dataset_info(
+            pinned["dataset"],
+            revision=pinned["revision"],
+        ).sha
+        if resolved != pinned["revision"]:
+            raise ValueError(f"Resolved benchmark revision changed: {task}")
+        tasks[task] = deepcopy(pinned)
+    corpora = {}
+    for split in ("validation", "test"):
+        rows = load_dataset(
+            evaluation["wikitext_dataset"],
+            evaluation["wikitext_name"],
+            revision=evaluation["wikitext_revision"],
+            split=split,
+        )
+        text = "\n\n".join(str(row.get("text") or "") for row in rows)
+        ids = tokenizer(
+            text,
+            add_special_tokens=False,
+            return_attention_mask=False,
+        ).input_ids
+        path = output_dir / "prepared" / "evaluation" / f"wikitext-{split}.int32"
+        record = write_int32_corpus(path, np.asarray(ids, dtype=np.int32))
+        corpora[split] = {
+            **record,
+            "path": relative_output(output_dir, record["path"]),
+        }
+    protocol = {
+        "harness_version": evaluation["harness_version"],
+        "harness_source_hashes": task_files(),
+        "tasks": tasks,
+        "wikitext_revision": evaluation["wikitext_revision"],
+        "corpora": corpora,
+    }
+    protocol["protocol_fingerprint"] = content_digest(protocol)
+    artifact["results"]["evaluation_protocol"] = protocol
+    persist(output_dir, artifact, "evaluation_protocol_prepared")
+    return protocol
+
+
+def preparation_context(settings, work_dir, output_dir, artifact, local_data=None):
+    import torch
+
+    effective = effective_preparation_settings(settings)
     context = SimpleNamespace()
     context.settings = effective
     context.output = work_dir / "refit-context.json"
@@ -451,8 +590,7 @@ def preparation_context(settings, search, s6_prepared, work_dir, output_dir, art
     context.artifact = {
         "results": {
             "width_curves": {
-                "legacy_subset": deepcopy(search["results"]["width_curves"]["legacy_subset"]),
-                "output_aware": [],
+                "legacy_subset": [],
             },
             "local_fitting": [],
         }
@@ -465,20 +603,125 @@ def preparation_context(settings, search, s6_prepared, work_dir, output_dir, art
     )
     model_config = make_model_config(settings["model"])
     context.model, context.tokenizer = load_model_and_tokenizer(model_config)
+    context.attention_implementation = validated_attention_implementation(context.model)
     context.device = next(context.model.parameters()).device
     context.model_dtype = next(context.model.parameters()).dtype
     context.blocks = {row.index: row for row in discover_mlp_blocks(context.model)}
-    expected = set(int(value) for value in effective["compatibility"]["eligible_layers"])
+    expected = set(int(value) for value in settings["allocation"]["eligible_layers"])
     if (
         set(context.blocks) != set(range(settings["model"]["num_layers"]))
         or not expected <= set(context.blocks)
     ):
-        raise ValueError("Loaded model topology differs from the S5-C2 fitting contract")
-    context.data = build_local_data(context)
+        raise ValueError("Loaded model topology differs from the S7 fitting contract")
+    context.data = local_data if local_data is not None else build_local_data(context)
     torch.manual_seed(settings["seed"])
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(settings["seed"])
     return context, model_config
+
+
+def clean_width_curve_rows(rows):
+    cleaned = deepcopy(rows)
+    for row in cleaned:
+        row.pop("state_path", None)
+        row.pop("state_sha256", None)
+    return cleaned
+
+
+def clean_local_fitting_rows(rows):
+    cleaned = deepcopy(rows)
+    for row in cleaned:
+        row.pop("state_path", None)
+        row.pop("state_sha256", None)
+    return cleaned
+
+
+def prepare_dense_evaluation(context, settings, output_dir, artifact):
+    import numpy as np
+    import torch
+
+    protocol = artifact["results"]["evaluation_protocol"]
+    dense = artifact["results"].setdefault(
+        "dense_evaluation",
+        {"likelihood": {}, "tasks": {}, "status": "running"},
+    )
+    parameters = list(context.model.parameters())
+    buffers = list(context.model.buffers())
+    dense["footprint"] = {
+        "parameters": sum(value.numel() for value in parameters),
+        "parameter_bytes": sum(value.numel() * value.element_size() for value in parameters),
+        "buffer_bytes": sum(value.numel() * value.element_size() for value in buffers),
+    }
+    dense["attention_implementation"] = context.attention_implementation
+    monitor_record = artifact["results"]["monitoring_evaluation"]
+    monitor_path = output_path(output_dir, monitor_record["path"])
+    if file_digest(monitor_path) != monitor_record["sha256"]:
+        raise ValueError("Prepared monitoring evaluation batches changed")
+    monitoring = torch.load(monitor_path, map_location="cpu", weights_only=False)
+    if "monitoring_validation" not in dense:
+        dense["monitoring_validation"] = evaluate_lm_mixed(
+            context.model,
+            monitoring["model_validation"],
+            "cuda",
+            settings["data"]["model_validation_batches"],
+        )
+        persist(output_dir, artifact, "dense_monitoring_evaluation")
+
+    corpora = {}
+    for split, record in protocol["corpora"].items():
+        path = output_path(output_dir, record["path"])
+        if file_digest(path) != record["sha256"]:
+            raise ValueError(f"Prepared WikiText {split} corpus changed")
+        values = np.memmap(path, mode="r", dtype=np.int32)
+        if len(values) != int(record["token_count"]):
+            raise ValueError(f"Prepared WikiText {split} extent changed")
+        corpora[split] = values
+    for split, values in corpora.items():
+        for context_length, stride in zip(
+            settings["evaluation"]["contexts"],
+            settings["evaluation"]["strides"],
+            strict=True,
+        ):
+            key = f"{split}-{context_length}"
+            if key not in dense["likelihood"]:
+                dense["likelihood"][key] = evaluate_rolling_likelihood(
+                    context.model,
+                    values,
+                    context_length,
+                    stride,
+                    "cuda",
+                )
+                persist(output_dir, artifact, f"dense_likelihood:{key}")
+
+    for task in settings["evaluation"]["tasks"]:
+        if task in dense["tasks"]:
+            record = dense["tasks"][task]
+            if file_digest(output_path(output_dir, record["path"])) != record["sha256"]:
+                raise ValueError(f"Prepared dense benchmark changed: {task}")
+            continue
+        config = native_task_config(task)
+        config["dataset_kwargs"] = {
+            **(config.get("dataset_kwargs") or {}),
+            "revision": protocol["tasks"][task]["revision"],
+        }
+        config["num_fewshot"] = 0
+        result = evaluate_pinned_task(
+            context.model,
+            context.tokenizer,
+            task,
+            settings["evaluation"],
+            config,
+        )
+        path = output_dir / "prepared" / "evaluation" / "dense" / f"{task}.json"
+        write_json_atomic(path, result)
+        dense["tasks"][task] = {
+            "path": relative_output(output_dir, path),
+            "sha256": file_digest(path),
+        }
+        persist(output_dir, artifact, f"dense_benchmark:{task}")
+    dense["status"] = "completed"
+    persist(output_dir, artifact, "dense_evaluation_completed")
+    return dense
 
 
 def build_start_candidates(context, settings, targets):
@@ -491,7 +734,7 @@ def build_start_candidates(context, settings, targets):
     allocations = {target: discrete_allocation(context, initialization, target) for target in targets}
     candidates = {
         target: {
-            "candidate_id": settings["preparation"]["candidate_id"],
+            "recipe_id": settings["preparation"]["recipe_id"],
             "target": target,
             "initialization": initialization,
             "allocation_method": "discrete_width_curve",
@@ -631,13 +874,14 @@ def create_fitted_start(
         if key != "allocation"
     }
     recipe["allocation"] = clean_allocation
+    recipe_fingerprint = content_digest(recipe)
     payload = {
         "schema_version": SCHEMA_VERSION,
         "workflow": WORKFLOW,
         "stage": "prepared-start",
         "target": target,
-        "candidate_id": settings["preparation"]["candidate_id"],
-        "candidate_fingerprint": content_digest(recipe),
+        "recipe_id": settings["preparation"]["recipe_id"],
+        "recipe_fingerprint": recipe_fingerprint,
         "tokens_seen": 0,
         "optimizer_updates": 0,
         "training_seconds": 0.0,
@@ -648,8 +892,9 @@ def create_fitted_start(
     save_tensor_atomic(destination, payload)
     record = {
         "target": target,
-        "candidate_id": settings["preparation"]["candidate_id"],
-        "construction": "fresh_s5_c2_width_curve_operator_fit",
+        "recipe_id": settings["preparation"]["recipe_id"],
+        "recipe_fingerprint": recipe_fingerprint,
+        "construction": "fresh_s7_discrete_width_curve_fit",
         "tokens_seen": 0,
         "optimizer_updates": 0,
         "training_seconds": 0.0,
@@ -667,100 +912,214 @@ def create_fitted_start(
     return record
 
 
+def validate_completed_preparation(artifact, output_dir, settings):
+    results = artifact["results"]
+    required = {
+        "stream",
+        "monitoring_evaluation",
+        "evaluation_protocol",
+        "dense_evaluation",
+        "width_curves",
+        "local_fitting",
+        "starts",
+    }
+    if not required <= set(results):
+        raise ValueError("Completed preparation is missing required S7-owned results")
+    stream = results["stream"]
+    stream_path = output_path(output_dir, stream["path"])
+    if (
+        int(stream["token_count"]) != settings["recovery"]["target_tokens"]
+        or stream_path.stat().st_size != 4 * int(stream["token_count"])
+        or file_digest(stream_path) != stream["sha256"]
+    ):
+        raise ValueError("Completed preparation recovery stream changed")
+    monitor = results["monitoring_evaluation"]
+    if file_digest(output_path(output_dir, monitor["path"])) != monitor["sha256"]:
+        raise ValueError("Completed preparation monitoring batches changed")
+    protocol = results["evaluation_protocol"]
+    for record in protocol["corpora"].values():
+        path = output_path(output_dir, record["path"])
+        if (
+            file_digest(path) != record["sha256"]
+            or path.stat().st_size != 4 * int(record["token_count"])
+        ):
+            raise ValueError("Completed preparation evaluation corpus changed")
+    dense = results["dense_evaluation"]
+    expected_likelihood = {
+        f"{split}-{context}"
+        for split in ("validation", "test")
+        for context in settings["evaluation"]["contexts"]
+    }
+    if dense.get("status") != "completed" or set(dense["likelihood"]) != expected_likelihood:
+        raise ValueError("Completed preparation lacks the dense likelihood reference")
+    if set(dense["tasks"]) != set(settings["evaluation"]["tasks"]):
+        raise ValueError("Completed preparation lacks dense benchmark records")
+    for record in dense["tasks"].values():
+        if file_digest(output_path(output_dir, record["path"])) != record["sha256"]:
+            raise ValueError("Completed preparation dense benchmark changed")
+    curves = results["width_curves"]
+    curve_rows = curves.get("rows", [])
+    expected_curve_points = {
+        (layer, min(settings["model"]["intermediate_size"], max(1, round(
+            settings["model"]["intermediate_size"] * ratio
+        ))))
+        for layer in settings["allocation"]["eligible_layers"]
+        for ratio in settings["allocation"]["width_ratios"]
+    }
+    observed_curve_points = {
+        (int(row["layer"]), int(row["replacement_width"])) for row in curve_rows
+    }
+    if (
+        curves.get("initialization") != settings["preparation"]["initialization"]
+        or observed_curve_points != expected_curve_points
+        or len(curve_rows) != len(expected_curve_points)
+        or any("state_path" in row or "state_sha256" in row for row in curve_rows)
+    ):
+        raise ValueError("Completed preparation width curves are incomplete")
+    fitting_rows = results["local_fitting"]
+    fit_keys = [row.get("fit_key") for row in fitting_rows]
+    if (
+        len(fitting_rows) < len(settings["allocation"]["eligible_layers"]) * 6
+        or None in fit_keys
+        or len(fit_keys) != len(set(fit_keys))
+        or any("state_path" in row or "state_sha256" in row for row in fitting_rows)
+    ):
+        raise ValueError("Completed preparation local-fit evidence is incomplete")
+    expected_starts = {str(value) for value in settings["targets"]}
+    if set(results["starts"]) != expected_starts:
+        raise ValueError("Completed preparation is missing a starting state")
+    for record in results["starts"].values():
+        if (
+            record.get("construction") != "fresh_s7_discrete_width_curve_fit"
+            or record.get("recipe_id") != settings["preparation"]["recipe_id"]
+            or len(record.get("allocation", []))
+            != len(settings["allocation"]["eligible_layers"])
+            or file_digest(output_path(output_dir, record["path"])) != record["sha256"]
+        ):
+            raise ValueError("Completed preparation starting state changed")
+
+
 def prepare(args, settings, config_path):
     work_dir, output_dir = resolve_storage(args.work_dir, args.output_dir, args.resume)
     artifact = start_artifact(output_dir, settings, "prepare", args.resume, {"kind": "shared"})
     try:
-        paths, values, provenance = source_records(settings)
         contract = {
             "configuration": settings,
             "configuration_sha256": file_digest(config_path),
-            "sources": provenance,
             "code_hashes": code_hashes(),
         }
         run_fingerprint = content_digest(contract)
         if args.resume and artifact.get("run_fingerprint") != run_fingerprint:
-            raise ValueError("Preparation sources, configuration, or maintained code changed")
+            raise ValueError("Preparation configuration or maintained code changed")
         was_completed = artifact.get("status") == "completed"
         artifact.update(
             {
                 "run_fingerprint": run_fingerprint,
                 "code_hashes": contract["code_hashes"],
-                "provenance": provenance,
+                "provenance": {
+                    "base_model": {
+                        "model_id": settings["model"]["model_id"],
+                        "revision": settings["model"]["revision"],
+                        "tokenizer_revision": settings["model"]["tokenizer_revision"],
+                    },
+                    "datasets": {
+                        "c4": settings["data"]["recovery_source"]["revision"],
+                        "wikitext": settings["evaluation"]["wikitext_revision"],
+                    },
+                    "prior_experiment_artifacts": [],
+                },
                 "configuration_sha256": contract["configuration_sha256"],
                 "status": "running",
                 "error": None,
             }
         )
         if was_completed:
-            if set(artifact["results"]["starts"]) != {str(value) for value in settings["targets"]}:
-                raise ValueError("Completed preparation is missing a starting state")
-            dense_likelihood = artifact["results"]["dense_evaluation"]["likelihood"]
-            for split in ("validation", "test"):
-                if f"{split}-8192" not in dense_likelihood:
-                    raise ValueError("Completed preparation is missing native-context dense metrics")
-            for record in artifact["results"]["starts"].values():
-                if file_digest(output_path(output_dir, record["path"])) != record["sha256"]:
-                    raise ValueError("Completed preparation start changed")
-            artifact["status"] = "completed"
-            persist(output_dir, artifact, "completed")
+            validate_completed_preparation(artifact, output_dir, settings)
             return
-        persist(output_dir, artifact, "copying_shared_inputs")
-        stream, legacy, protocol, dense, historical = copy_shared_preparation(output_dir, paths, values)
-        artifact["results"].update(
-            {
-                "stream": stream,
-                "legacy_evaluation": legacy,
-                "evaluation_protocol": protocol,
-                "dense_evaluation": dense,
-                "swiglu_6_controls": historical,
-                "refit_dataset_revisions": {
-                    "c4": values["swiglu_6_prepared"]["results"]["dataset_revision"],
-                    "wikitext": values["swiglu_6_prepared"]["legacy_evaluation"]["wikitext_revision"],
-                },
-            }
+
+        if "storage_preflight" not in artifact["results"]:
+            artifact["results"]["storage_preflight"] = preparation_storage_preflight(
+                work_dir,
+                output_dir,
+                settings,
+            )
+            persist(output_dir, artifact, "storage_preflight")
+
+        from transformers import AutoTokenizer
+
+        tokenizer = AutoTokenizer.from_pretrained(
+            settings["model"]["model_id"],
+            revision=settings["model"]["tokenizer_revision"],
+            trust_remote_code=settings["model"]["trust_remote_code"],
         )
+        prepare_evaluation_protocol(settings, output_dir, artifact, tokenizer)
+        local_data = prepare_monitoring_evaluation(
+            settings,
+            output_dir,
+            artifact,
+            tokenizer,
+        )
+        prepare_recovery_stream(settings, output_dir, artifact, tokenizer)
         artifact["results"].setdefault("starts", {})
         missing = [
             float(target)
             for target in settings["targets"]
             if str(float(target)) not in artifact["results"]["starts"]
         ]
-        native_context = max(settings["evaluation"]["contexts"])
-        native_index = settings["evaluation"]["contexts"].index(native_context)
-        native_stride = settings["evaluation"]["strides"][native_index]
-        dense_likelihood = dense["likelihood"]
-        missing_dense = [
-            split for split in ("validation", "test")
-            if f"{split}-{native_context}" not in dense_likelihood
-        ]
+        dense_complete = (
+            artifact["results"].get("dense_evaluation", {}).get("status")
+            == "completed"
+        )
         context = None
-        if missing or missing_dense:
+        if missing or not dense_complete:
             context, model_config = preparation_context(
                 settings,
-                values["swiglu_5_search"],
-                values["swiglu_6_prepared"],
                 work_dir,
                 output_dir,
                 artifact,
+                local_data=local_data,
             )
-        if missing_dense:
-            import numpy as np
-
-            for split in missing_dense:
-                record = protocol["corpora"][split]
-                path = output_path(output_dir, record["path"])
-                token_ids = np.memmap(path, mode="r", dtype=np.int32)
-                dense_likelihood[f"{split}-{native_context}"] = evaluate_rolling_likelihood(
-                    context.model,
-                    token_ids,
-                    native_context,
-                    native_stride,
-                    "cuda",
-                )
-            persist(output_dir, artifact, "dense_native_context_evaluation")
         if missing:
+            from .swiglu5.fitting import build_width_curves
+
+            selection_cache = cache_teacher_logits(
+                context.model,
+                context.data["allocation_selection"],
+                context.data["partition_batches"]["allocation_selection"],
+                context.device,
+                "float16",
+            )
+            build_width_curves(
+                context,
+                selection_cache,
+                initializations=(settings["preparation"]["initialization"],),
+            )
+            artifact["results"]["width_curves"] = {
+                "initialization": settings["preparation"]["initialization"],
+                "rows": clean_width_curve_rows(
+                    context.artifact["results"]["width_curves"][
+                        settings["preparation"]["initialization"]
+                    ]
+                ),
+            }
+            persist(output_dir, artifact, "width_curves_completed")
             candidates = build_start_candidates(context, settings, missing)
+            fitting_by_key = {
+                row["fit_key"]: row
+                for row in artifact["results"].get("local_fitting", [])
+            }
+            fitting_by_key.update(
+                {
+                    row["fit_key"]: row
+                    for row in clean_local_fitting_rows(
+                        context.artifact["results"]["local_fitting"]
+                    )
+                }
+            )
+            artifact["results"]["local_fitting"] = [
+                fitting_by_key[key] for key in sorted(fitting_by_key)
+            ]
+            persist(output_dir, artifact, "local_fitting_completed")
             for target in missing:
                 create_fitted_start(
                     model_config,
@@ -769,15 +1128,27 @@ def prepare(args, settings, config_path):
                     output_dir,
                     artifact,
                 )
+            del selection_cache, candidates
+        if not dense_complete:
+            prepare_dense_evaluation(context, settings, output_dir, artifact)
         if context is not None:
             del context
-        if set(artifact["results"]["starts"]) != {str(value) for value in settings["targets"]}:
-            raise RuntimeError("Preparation did not produce all four starting states")
+        gc.collect()
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
+        validate_completed_preparation(artifact, output_dir, settings)
         artifact["status"] = "completed"
         persist(output_dir, artifact, "completed")
     except BaseException as error:
         artifact["status"] = "failed"
-        artifact["error"] = f"{type(error).__name__}: {error}".replace(str(work_dir), "<work-dir>")
+        artifact["error"] = f"{type(error).__name__}: {error}".replace(
+            str(work_dir), "<work-dir>"
+        )
         persist(output_dir, artifact, "failed")
         raise
 
@@ -967,7 +1338,7 @@ def desired_requests(settings):
                     recovery["validation_interval_tokens"],
                 )
             )
-            + recovery["legacy_ppl_tokens"]
+            + recovery["monitoring_ppl_tokens"]
             + recovery["segment_endpoints"]
         )
     )
@@ -1063,14 +1434,21 @@ def evaluate_final_model(
     import torch
 
     evaluation = artifact["results"].setdefault("evaluation", {"likelihood": {}, "tasks": {}})
-    legacy_record = prepared["results"]["legacy_evaluation"]
-    legacy_path = output_path(prepared_root, legacy_record["path"])
-    if file_digest(legacy_path) != legacy_record["sha256"]:
-        raise ValueError("Prepared legacy evaluation batches changed")
-    legacy = torch.load(legacy_path, map_location="cpu", weights_only=False)
-    if "legacy_before_bf16" not in evaluation:
-        evaluation["legacy_before_bf16"] = evaluate_lm_mixed(
-            student, legacy["model_validation"], "cuda", 24
+    monitoring_record = prepared["results"]["monitoring_evaluation"]
+    monitoring_path = output_path(prepared_root, monitoring_record["path"])
+    if file_digest(monitoring_path) != monitoring_record["sha256"]:
+        raise ValueError("Prepared monitoring evaluation batches changed")
+    monitoring = torch.load(
+        monitoring_path,
+        map_location="cpu",
+        weights_only=False,
+    )
+    if "monitoring_before_bf16" not in evaluation:
+        evaluation["monitoring_before_bf16"] = evaluate_lm_mixed(
+            student,
+            monitoring["model_validation"],
+            "cuda",
+            settings["data"]["model_validation_batches"],
         )
     merged = []
     if adapters:
@@ -1159,17 +1537,21 @@ def evaluate_final_model(
             raise ValueError("Resident-memory measurement belongs to another bundle")
         persist(output_dir, artifact, "resident_memory")
     model, tokenizer, unused_manifest = load_bundle(bundle_path)
+    evaluation["attention_implementation"] = validated_attention_implementation(model)
     if int(model.config.max_position_embeddings) < max(settings["evaluation"]["contexts"]):
         raise ValueError("Final model does not support the configured evaluation context")
-    if "legacy_after_bf16" not in evaluation:
-        evaluation["legacy_after_bf16"] = evaluate_lm_mixed(
-            model, legacy["model_validation"], "cuda", 24
+    if "monitoring_after_bf16" not in evaluation:
+        evaluation["monitoring_after_bf16"] = evaluate_lm_mixed(
+            model,
+            monitoring["model_validation"],
+            "cuda",
+            settings["data"]["model_validation_batches"],
         )
         evaluation["bf16_conversion_ppl_delta"] = (
-            evaluation["legacy_after_bf16"]["perplexity"]
-            - evaluation["legacy_before_bf16"]["perplexity"]
+            evaluation["monitoring_after_bf16"]["perplexity"]
+            - evaluation["monitoring_before_bf16"]["perplexity"]
         )
-        persist(output_dir, artifact, "legacy_evaluation")
+        persist(output_dir, artifact, "monitoring_evaluation")
     protocol = prepared["results"]["evaluation_protocol"]
     if (
         version("lm_eval") != settings["evaluation"]["harness_version"]
@@ -1265,7 +1647,7 @@ def evaluate_final_model(
         1.0 - evaluation["footprint"]["parameters"] / dense["footprint"]["parameters"]
     )
     evaluation["status"] = "completed"
-    del model, tokenizer, legacy
+    del model, tokenizer, monitoring
     gc.collect()
     torch.cuda.empty_cache()
 
@@ -1285,7 +1667,7 @@ def train(args, settings, config_path):
         validate_evaluation_preflight(prepared, prepared_root, settings)
         start_record = prepared["results"]["starts"][str(target)]
         if (
-            start_record.get("construction") != "fresh_s5_c2_width_curve_operator_fit"
+            start_record.get("construction") != "fresh_s7_discrete_width_curve_fit"
             or int(start_record.get("tokens_seen", -1)) != 0
             or int(start_record.get("optimizer_updates", -1)) != 0
         ):
@@ -1359,6 +1741,9 @@ def train(args, settings, config_path):
             or int(start.get("optimizer_updates", -1)) != 0
             or "optimizer_state" in start
             or "stream_sha256" in start
+            or start.get("recipe_id") != start_record.get("recipe_id")
+            or start.get("recipe_fingerprint")
+            != start_record.get("recipe_fingerprint")
         ):
             raise ValueError("Prepared start contains inherited recovery state")
         if int(start["tokens_seen"]) != int(start_record["tokens_seen"]):
@@ -1368,6 +1753,10 @@ def train(args, settings, config_path):
         student, target_paths, unused_train_modules = build_swiglu_student(
             model_config, settings["model"]["hidden_size"], start_record["allocation"]
         )
+        artifact["results"]["attention_implementation"] = {
+            "teacher": validated_attention_implementation(teacher),
+            "student": validated_attention_implementation(student),
+        }
         load_replacement_state(student, start["replacement_state"])
         # Give all three scopes at this target the same token-zero RNG state.
         # Resume restores the later in-run state below.
@@ -1385,15 +1774,19 @@ def train(args, settings, config_path):
         if strategy_id == "S7-2":
             artifact["results"]["trainable_scope"]["lora"] = deepcopy(settings["strategies"]["S7-2"]["lora"])
         device = next(student.parameters()).device
-        legacy_record = prepared["results"]["legacy_evaluation"]
-        legacy_path = output_path(prepared_root, legacy_record["path"])
-        if file_digest(legacy_path) != legacy_record["sha256"]:
+        monitoring_record = prepared["results"]["monitoring_evaluation"]
+        monitoring_path = output_path(prepared_root, monitoring_record["path"])
+        if file_digest(monitoring_path) != monitoring_record["sha256"]:
             raise ValueError("Prepared validation batches changed")
-        legacy = torch.load(legacy_path, map_location="cpu", weights_only=False)
+        monitoring = torch.load(
+            monitoring_path,
+            map_location="cpu",
+            weights_only=False,
+        )
         validation_cache = cache_teacher_logits(
             teacher,
-            legacy["recovery_validation"],
-            len(legacy["recovery_validation"]),
+            monitoring["recovery_validation"],
+            len(monitoring["recovery_validation"]),
             device,
             "float16",
         )
@@ -1439,7 +1832,10 @@ def train(args, settings, config_path):
                         ),
                         "learning_rates": [group["learning_rate"] for group in groups],
                         "wikitext_validation": evaluate_lm_mixed(
-                            student, legacy["model_validation"], device, 24
+                            student,
+                            monitoring["model_validation"],
+                            device,
+                            settings["data"]["model_validation_batches"],
                         ),
                     }
                 )
@@ -1492,9 +1888,15 @@ def train(args, settings, config_path):
                     "recovery_validation_kl": validation_kl,
                     "learning_rates": list(event.learning_rates),
                 }
-                if any(point in recovery["legacy_ppl_tokens"] for point in event.requested_checkpoint_tokens):
+                if any(
+                    point in recovery["monitoring_ppl_tokens"]
+                    for point in event.requested_checkpoint_tokens
+                ):
                     row["wikitext_validation"] = evaluate_lm_mixed(
-                        student, legacy["model_validation"], device, 24
+                        student,
+                        monitoring["model_validation"],
+                        device,
+                        settings["data"]["model_validation_batches"],
                     )
                 restore_rng(rng)
                 results = artifact["results"]["recovery"]
@@ -1588,7 +1990,7 @@ def train(args, settings, config_path):
                 restore_rng(state)
                 del state
                 gc.collect()
-        del validation_cache, legacy, teacher
+        del validation_cache, monitoring, teacher
         gc.collect()
         torch.cuda.empty_cache()
         for group in groups:

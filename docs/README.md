@@ -5,7 +5,7 @@ type: index
 category: documentation
 status: active
 created: 2026-07-17
-modified: 2026-09-18
+modified: 2026-09-25
 authorship:
   created_by: unknown
 curation:
@@ -58,8 +58,13 @@ Markdown files in this directory follow the
 ## Infrastructure
 
 - [TUKE Perun workflow infrastructure](infrastructure/perun.md) records the
-  access, Slurm, storage, environment, scratch, artifact, and validation
-  requirements for unattended Perun workflows.
+  stable access, Slurm, storage, environment, scratch, and artifact contracts
+  for unattended Perun workflows.
+- [TUKE Perun project status](infrastructure/perun-status.md) tracks current
+  readiness, available capacity, cumulative consumption, and open questions.
+- [TUKE Perun experiment log](infrastructure/perun-log.md) is the append-only
+  record of submitted jobs, allocations, outcomes, resource measurements, and
+  artifact locations.
 
 ## Experiment workflows
 

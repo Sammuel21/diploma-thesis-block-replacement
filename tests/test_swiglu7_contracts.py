@@ -54,10 +54,16 @@ class SwiGLU7Contracts(unittest.TestCase):
         self.assertEqual(
             settings["preparation"],
             {
-                "candidate_id": "S5-C2",
+                "recipe_id": "S7-A0",
                 "initialization": "legacy_subset",
+                "allocation_method": "discrete_width_curve",
                 "start_tokens": 0,
             },
+        )
+        self.assertNotIn("sources", settings)
+        self.assertEqual(
+            settings["data"]["recovery_source"]["revision"],
+            "1588ec454efa1a09f29cd18ddd04fe05fc8653a2",
         )
         segments = [(0, 100_000_000), (100_000_000, 1_000_000_000)]
         batch_tokens = settings["recovery"]["effective_batch_tokens"]

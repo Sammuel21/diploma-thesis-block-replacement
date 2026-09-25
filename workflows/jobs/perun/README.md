@@ -14,6 +14,7 @@ validation assumptions. This README explains only the tracked job files.
 | `run_experiment.sbatch` | Runs one supplied JSON configuration in one isolated Python process on one GPU. |
 | `run_array.sbatch` | Maps a manifest of JSON configurations onto independent one-GPU Slurm array tasks. It does not distribute one experiment across GPUs. |
 | `run_model.sbatch` | Runs one allow-listed model-wide workflow and forwards its Python CLI arguments. Existing entries retain their historical `--output` interface; directory-contract entries receive Perun work/output directories. |
+| `swiglu_7.sbatch` | Runs the independent SwiGLU-7 preparation or maps array tasks `0-11` onto its fixed three-scope/four-target grid. |
 
 `smoke.sbatch` defaults to `gpu_short`, 48 GB of CPU memory, and one hour. The
 generic and array launchers default to `gpu_long`, 64 GB, and 72 hours.
@@ -21,6 +22,10 @@ generic and array launchers default to `gpu_long`, 64 GB, and 72 hours.
 because the migrated studies contain long local-fitting loops. These are
 starting values, not measured requirements. Options passed to `sbatch` may
 override them.
+
+`swiglu_7.sbatch` requests one GPU, eight CPUs, 128 GB RAM, and 48 hours on
+`gpu_long`. It is the preferred new-run launcher for SwiGLU-7; `run_model.sbatch`
+remains the explicit single-run/resume interface.
 
 ## Submission inputs
 
@@ -181,26 +186,41 @@ not copy a complete historical results tree. The Python runner validates the
 checkpoint and owns durable cleanup. A completed run retains its structured
 results and final model but removes resumable optimizer state.
 
-SwiGLU-7 is the first entry using this contract. Prepare its shared inputs once,
-then launch one production job for each strategy/target pair:
+SwiGLU-7 is the first entry using this contract. Its preparation is independent:
+it regenerates the fixed allocation curves, four fitted starts, recovery data,
+and evaluation references from pinned model/dataset sources. No SwiGLU-5 or
+SwiGLU-6 runtime artifact is staged.
+
+Prepare once with the dedicated job:
 
 ```bash
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
-  workflows/jobs/perun/run_model.sbatch swiglu-7 prepare
-
-sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
-  --time=96:00:00 --mem=128G \
-  workflows/jobs/perun/run_model.sbatch swiglu-7 train \
-  --prepared /project/path/swiglu-7-prepare/result.json \
-  --strategy S7-0 --target 0.2
+  workflows/jobs/perun/swiglu_7.sbatch prepare
 ```
 
-The first S7-0 20% production run is the integration and native-8K
-resource-calibration job. Use its `sacct`/`seff` evidence before submitting the
-remaining grid, and do not extrapolate the earlier 128-token runtime directly.
+After stage-out, verify the complete
+`results/swiglu-7/prepare-001` directory and move it to stable PROJECT storage.
+Then submit the fixed grid; `%4` is only a scheduler concurrency limit:
+
+```bash
+export S7_PREPARED="/project/path/swiglu-7/prepare-001/result.json"
+
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+  --array=0-11%4 \
+  workflows/jobs/perun/swiglu_7.sbatch train "$S7_PREPARED"
+```
+
+Tasks `0-3`, `4-7`, and `8-11` map respectively to S7-0, S7-1, and S7-2;
+within each group the targets are 0.2, 0.3, 0.4, and 0.5. Each task writes a
+separate identity-named directory below its own `$RESULTS_DIR`. Do not point
+checkpoint-heavy live output at slow persistent NFS.
+
+Use task 0 as the first native-8K resource measurement when scheduler policy
+does not permit releasing the full array immediately. Do not extrapolate the
+earlier 128-token runtime without accounting for 8K attention.
 See the [SwiGLU-7 experiment guide](../../../docs/experiments/model/swiglu/swiglu-7.md)
-for required source assets, the pinned evaluation dependencies, fixed
-treatments, and result handling.
+for prerequisites, resume commands, allocation mapping, estimated cost, and
+result handling.
 
 ## Results
 
@@ -212,8 +232,9 @@ in a sibling `.run.json` sidecar.
 
 Current official Perun pages disagree on whether the synchronized
 `results_job_<job-id>/` directory appears under HOME or beside the submit
-directory. Inspect both after the first intended scientific run and record the
-observed behavior in the canonical infrastructure guide. Verify hashes before
+directory. Inspect both after the first intended scientific run, append the job
+and observed behavior to the [Perun experiment
+log](../../../docs/infrastructure/perun-log.md), and update the [Perun project
+status](../../../docs/infrastructure/perun-status.md). Verify hashes before
 moving the compact output to its canonical project location or deleting a
-redundant stage-out directory. Do not rely on job scratch for persistent
-results.
+redundant stage-out directory. Do not rely on job scratch for persistent results.

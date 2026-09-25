@@ -5,7 +5,7 @@ type: architecture
 category: infrastructure
 status: active
 created: 2026-09-11
-modified: 2026-09-24
+modified: 2026-09-25
 authorship:
   created_by: collaborative
 curation:
@@ -26,15 +26,20 @@ It records three different kinds of information:
 
 - behavior stated by the official TUKE Perun documentation;
 - project rules adopted for this repository; and
-- cluster- or account-specific behavior that still requires an observed job.
+- procedures for validating cluster- or account-specific behavior.
 
-The official documentation was last checked on 2026-09-24. Perun policies and
+Current project readiness, available capacity, and cumulative use belong in
+the [Perun status](perun-status.md). Individual submitted jobs and their
+measured allocations belong in the append-only [Perun experiment
+log](perun-log.md).
+
+The official documentation was last checked on 2026-09-25. Perun policies and
 available software can change, so recheck the linked pages before changing
 partitions, resource limits, storage assumptions, or environment setup.
 
 Perun is distinct from the previously used shared RTX 4090 remote environment.
 That machine was a directly accessed Linux host. Perun is a Slurm-managed HPC
-system, and this repository has not yet recorded a successful Perun run.
+system.
 
 ## Operating model
 
@@ -202,7 +207,7 @@ interpreter directly. This avoids hardcoding a user-specific Conda installation
 path in version control. Before submission, verify at least the Python,
 PyTorch, CUDA, Transformers, and Datasets imports in the selected environment.
 
-The following items remain unverified for this project:
+Before relying on an environment for a long job, validate:
 
 - the NVIDIA driver and CUDA versions exposed to jobs;
 - compatibility of the selected PyTorch build with the H200 nodes;
@@ -210,8 +215,9 @@ The following items remain unverified for this project:
 - whether Hugging Face models and datasets must be downloaded on a login node
   and consumed from a pre-populated cache.
 
-The first smoke run must resolve these points before larger calibration or
-recovery budgets are submitted. Authentication tokens, if required, must be
+Record the observed versions and access behavior in the [Perun experiment
+log](perun-log.md), then update [Perun status](perun-status.md) before the rest
+of a grid is submitted. Authentication tokens, if required, must be
 provided through the user environment or an approved secret mechanism and
 must never be stored in a JSON configuration or job file.
 
@@ -326,27 +332,6 @@ scancel <job-id>
 Record an `OUT_OF_MEMORY` or `TIMEOUT` result as a resource-planning outcome;
 do not silently rerun with substantially larger resources without preserving
 the failed job's configuration and logs.
-
-## Validation status and open questions
-
-The repository's Slurm files have not yet been submitted to Perun from the
-researcher's account. The first intended scientific job must establish:
-
-- the actual account, QoS, and applicable concurrency limits;
-- the working Python and CUDA environment;
-- model and dataset access from a compute allocation;
-- the actual automatic-scratch and synchronized-result locations;
-- whether `.rsyncignore` excludes the temporary workflow subtree as documented;
-- epilog behavior for a successful job; and
-- whether the current CPU memory and wall-time requests are appropriate.
-
-The official claim that epilog synchronization also runs for failed jobs
-remains unverified until a failure is observed or tested deliberately without
-risking a valuable experiment.
-
-Update this document with observed, non-sensitive behavior after that run.
-Keep official documentation, project decisions, and empirical cluster
-observations visibly distinguished.
 
 ## Official documentation
 

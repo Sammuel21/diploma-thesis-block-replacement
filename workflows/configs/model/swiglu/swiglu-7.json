@@ -35,15 +35,77 @@
     "num_layers": 24,
     "tie_word_embeddings": true
   },
-  "sources": {
-    "swiglu_5_search": "data/results/workflows/model/swiglu-5/search/run-001.json",
-    "swiglu_6_prepared": "data/results/workflows/model/swiglu-6/prepare-001.json",
-    "swiglu_6_protocol": "data/results/workflows/model/swiglu-6/protocol-001.json",
-    "swiglu_6_evaluation": "data/results/workflows/model/swiglu-6/evaluation-001.json"
+  "data": {
+    "sequence_length": 128,
+    "capture_batch_size": 2,
+    "local_source": {
+      "path": "allenai/c4",
+      "name": null,
+      "split": "train",
+      "text_column": "text",
+      "revision": "1588ec454efa1a09f29cd18ddd04fe05fc8653a2",
+      "data_file": "en/c4-train.00000-of-01024.json.gz",
+      "streaming": false
+    },
+    "recovery_source": {
+      "path": "allenai/c4",
+      "revision": "1588ec454efa1a09f29cd18ddd04fe05fc8653a2",
+      "text_column": "text",
+      "first_shard": 1,
+      "shard_count": 1024
+    },
+    "model_validation_source": {
+      "path": "Salesforce/wikitext",
+      "name": "wikitext-2-raw-v1",
+      "split": "validation",
+      "text_column": "text",
+      "revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+      "data_file": null,
+      "streaming": false
+    },
+    "model_validation_batches": 24,
+    "partition_batches": {
+      "calibration": 48,
+      "operator_validation": 24,
+      "old_recovery": 64,
+      "recovery_validation": 24,
+      "additional_calibration": 336,
+      "allocation_selection": 12,
+      "appended_calibration": 1152
+    }
+  },
+  "calibration": {
+    "selected_pairs": 393216,
+    "pair_counts": [393216]
+  },
+  "local_fitting": {
+    "parameter_dtype": "float32",
+    "optimizer": "AdamW",
+    "learning_rate": 0.001,
+    "batch_size": 2048,
+    "weight_decay": 0.0,
+    "max_epochs": 64,
+    "early_stopping_patience": 3,
+    "early_stopping_min_delta": 0.0,
+    "scheduler": "constant",
+    "initialization": "importance_teacher_subset",
+    "capture_group_size": 6
+  },
+  "allocation": {
+    "eligible_layers": [
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+      12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22
+    ],
+    "protected_layers": [0, 23],
+    "width_ratios": [0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0],
+    "selection_metric": "singleton_fixed_teacher_kl_t1",
+    "allow_dense_layers": true,
+    "boundary_width_policy": "best_interpolated_marginal_gain"
   },
   "preparation": {
-    "candidate_id": "S5-C2",
+    "recipe_id": "S7-A0",
     "initialization": "legacy_subset",
+    "allocation_method": "discrete_width_curve",
     "start_tokens": 0
   },
   "recovery": {
@@ -51,7 +113,7 @@
     "segment_endpoints": [100000000, 1000000000],
     "checkpoint_interval_tokens": 25000000,
     "validation_interval_tokens": 25000000,
-    "legacy_ppl_tokens": [10000000, 25000000, 50000000, 100000000, 250000000, 500000000, 1000000000],
+    "monitoring_ppl_tokens": [10000000, 25000000, 50000000, 100000000, 250000000, 500000000, 1000000000],
     "optimizer": "AdamW",
     "optimizer_backend": "fused",
     "learning_rate": 0.00003,
@@ -73,10 +135,40 @@
   "evaluation": {
     "harness_version": "0.4.13",
     "seed": 21,
+    "wikitext_dataset": "Salesforce/wikitext",
+    "wikitext_name": "wikitext-2-raw-v1",
+    "wikitext_revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
     "contexts": [128, 2048, 8192],
     "strides": [64, 1024, 4096],
     "benchmark_context_length": 2048,
     "tasks": ["piqa", "arc_easy", "arc_challenge", "winogrande", "hellaswag"],
+    "task_datasets": {
+      "piqa": {
+        "dataset": "baber/piqa",
+        "revision": "142f6d7367fd9877f0fb3b5734ea6a545f54cdd1",
+        "split": "validation"
+      },
+      "arc_easy": {
+        "dataset": "allenai/ai2_arc",
+        "revision": "210d026faf9955653af8916fad021475a3f00453",
+        "split": "test"
+      },
+      "arc_challenge": {
+        "dataset": "allenai/ai2_arc",
+        "revision": "210d026faf9955653af8916fad021475a3f00453",
+        "split": "test"
+      },
+      "winogrande": {
+        "dataset": "allenai/winogrande",
+        "revision": "01e74176c63542e6b0bcb004dcdea22d94fb67b5",
+        "split": "validation"
+      },
+      "hellaswag": {
+        "dataset": "Rowan/hellaswag",
+        "revision": "218ec52e09a7e7462a5400043bb9a69a41d06b76",
+        "split": "validation"
+      }
+    },
     "primary_metrics": {
       "piqa": "acc_norm",
       "arc_easy": "acc_norm",
