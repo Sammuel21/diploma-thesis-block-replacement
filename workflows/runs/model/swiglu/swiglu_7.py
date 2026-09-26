@@ -407,6 +407,7 @@ def prepare_monitoring_evaluation(settings, output_dir, artifact, tokenizer):
 
 
 def prepare_recovery_stream(settings, output_dir, artifact, tokenizer):
+    path = output_dir / "prepared" / "recovery-tokens.int32"
     existing = artifact["results"].get("stream")
     if existing is not None:
         path = output_path(output_dir, existing["path"])
@@ -416,6 +417,11 @@ def prepare_recovery_stream(settings, output_dir, artifact, tokenizer):
         ):
             raise ValueError("Prepared recovery stream changed")
         return existing
+
+    # The file rename and result.json commit are separate atomic operations.
+    # A terminated process can therefore leave an unrecorded complete-looking
+    # stream; it has no durable provenance and must be regenerated on resume.
+    path.unlink(missing_ok=True)
 
     from datasets import load_dataset
     from huggingface_hub import HfApi
@@ -465,7 +471,6 @@ def prepare_recovery_stream(settings, output_dir, artifact, tokenizer):
             {"tokens": tokens, "documents": documents},
         )
 
-    path = output_dir / "prepared" / "recovery-tokens.int32"
     record = build_finite_stream(
         records(),
         tokenizer,
