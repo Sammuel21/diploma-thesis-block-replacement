@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -l
 #SBATCH --job-name=swiglu-7
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
