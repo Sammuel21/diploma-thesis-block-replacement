@@ -1,4 +1,4 @@
-#!/bin/bash -l
+#!/bin/bash
 #SBATCH --job-name=swiglu-7
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
@@ -12,11 +12,31 @@
 #SBATCH --time=48:00:00
 #SBATCH --export=ALL
 
-if ! source .activate_scratch; then
-    echo "Perun scratch activation failed; submit this job from the repository root." >&2
-    exit 1
-fi
 set -euo pipefail
+
+SUBMIT_DIR="${SLURM_SUBMIT_DIR:?Slurm did not define SLURM_SUBMIT_DIR}"
+SCRATCH_USER="${SLURM_JOB_USER:-${USER:?Neither Slurm nor the shell defined a username}}"
+if [[ ! "$SCRATCH_USER" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "Refusing unsafe scratch username: $SCRATCH_USER" >&2
+    exit 2
+fi
+
+JOB_SCRATCH_DIR="/mnt/scratch/$SCRATCH_USER/mlp-replacement/job-$SLURM_JOB_ID"
+export SCRATCH_DIR="$JOB_SCRATCH_DIR"
+export TMPDIR="$JOB_SCRATCH_DIR/tmp"
+export RESULTS_DIR="$JOB_SCRATCH_DIR/results"
+STAGE_OUT_DIR="$SUBMIT_DIR/results_job_$SLURM_JOB_ID"
+
+case "$JOB_SCRATCH_DIR" in
+    "/mnt/scratch/$SCRATCH_USER/mlp-replacement/job-$SLURM_JOB_ID") ;;
+    *)
+        echo "Refusing unsafe job scratch path: $JOB_SCRATCH_DIR" >&2
+        exit 2
+        ;;
+esac
+
+mkdir -p "$TMPDIR" "$RESULTS_DIR"
+cd "$SUBMIT_DIR"
 
 MODE="${1:-}"
 if [[ -z "$MODE" ]]; then
@@ -27,7 +47,7 @@ fi
 shift
 
 PYTHON_BIN="${MLP_REPLACEMENT_PYTHON:-python3}"
-export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$SUBMIT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
 export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 
@@ -40,10 +60,25 @@ case "$WORK_DIR" in
         exit 2
         ;;
 esac
-cleanup_work_dir() {
-    rm -rf -- "$WORK_DIR"
+stage_out() {
+    local job_status=$?
+    local sync_status
+    trap - EXIT
+    set +e
+    mkdir -p "$STAGE_OUT_DIR"
+    rsync -a "$RESULTS_DIR/" "$STAGE_OUT_DIR/"
+    sync_status=$?
+    if (( sync_status == 0 )); then
+        rm -rf -- "$JOB_SCRATCH_DIR"
+    else
+        echo "Stage-out failed; scratch retained at $JOB_SCRATCH_DIR" >&2
+    fi
+    if (( job_status == 0 && sync_status != 0 )); then
+        job_status=$sync_status
+    fi
+    exit "$job_status"
 }
-trap cleanup_work_dir EXIT
+trap stage_out EXIT
 trap 'exit 143' TERM
 trap 'exit 130' INT
 
@@ -89,7 +124,9 @@ case "$MODE" in
 esac
 
 echo "Job: ${SLURM_JOB_ID} on ${SLURM_NODELIST}"
-echo "Checkout directory: $PWD"
+echo "Checkout directory: $SUBMIT_DIR"
+echo "Job scratch directory: $JOB_SCRATCH_DIR"
+echo "Stage-out directory: $STAGE_OUT_DIR"
 echo "Mode: $MODE"
 echo "Python: $PYTHON_BIN"
 echo "Temporary workflow directory: $WORK_DIR"
