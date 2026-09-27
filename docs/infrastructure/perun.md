@@ -33,7 +33,7 @@ the [Perun status](perun-status.md). Individual submitted jobs and their
 measured allocations belong in the append-only [Perun experiment
 log](perun-log.md).
 
-The official documentation was last checked on 2026-09-25. Perun policies and
+The official documentation was last checked on 2026-09-27. Perun policies and
 available software can change, so recheck the linked pages before changing
 partitions, resource limits, storage assumptions, or environment setup.
 
@@ -50,10 +50,10 @@ The expected lifecycle is:
    appropriate HOME or PROJECT storage.
 3. Inspect the assigned account, QoS, partitions, and storage usage.
 4. Submit a batch file from the repository root with `sbatch`.
-5. Let Perun's prolog stage the submit directory to job-local Lustre scratch.
+5. Let the job copy its required code and inputs to a unique directory below
+   `/mnt/scratch/$USER`.
 6. Run one configured workflow inside the Slurm allocation.
-7. Let Perun's epilog synchronize new or modified outputs to a
-   `results_job_<job-id>/` directory on persistent storage.
+7. Let the job copy its durable output back to PROJECT and verify the copy.
 8. Inspect the job record and download compact artifacts for notebook analysis.
 
 Login nodes are the access, setup, transfer, and submission boundary. Expensive
@@ -80,7 +80,8 @@ Account and QoS values are project-specific and must not be hardcoded in the
 tracked job files. Inspect the values assigned to the current user:
 
 ```bash
-sacctmgr show user "$USER" withassoc format=account,qos
+scontrol show assoc_mgr users="$USER" accounts="$PERUN_ACCOUNT" flags=assoc
+scontrol show assoc_mgr qos="$PERUN_QOS" flags=qos
 ```
 
 The documented partitions as of 2026-09-11 are:
@@ -113,7 +114,7 @@ values are supplied to `sbatch`:
 
 ```bash
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
-  workflows/jobs/perun/smoke.sbatch
+  workflows/jobs/perun/scratch_probe.sbatch
 ```
 
 Command-line Slurm options can override tracked defaults without editing the
@@ -121,42 +122,40 @@ job file. Current workflows use one GPU and one Python process per job. Do not
 request multiple GPUs unless the invoked Python workflow explicitly implements
 distributed execution.
 
-Submit from the repository root. Perun documents that its prolog stages the
-directory from which `sbatch` is invoked. Use repository-relative configuration
-and output paths so the workflow remains valid in the staged copy.
+Submit from the repository root. Maintained manual-staging launchers use
+`SLURM_SUBMIT_DIR` as their source, copy the checkout to SCRATCH, and then run
+with repository-relative paths from that staged copy.
 
-## Automatic scratch and storage
+## Manual scratch and storage
 
-The maintained jobs explicitly run:
+PERUN support confirmed on 2026-09-27 that `.activate_scratch` is not currently
+available and that automatic transfer or synchronization is not part of the
+operational system. Jobs must copy inputs to SCRATCH and durable results back
+to persistent storage themselves. The supported scratch mount is
+`/mnt/scratch`.
 
-```bash
-source .activate_scratch
-```
+PERUN provisions `/mnt/scratch/$USER` in advance. Users must not create that
+top-level directory; contact support if it is missing or not writable. A job
+may create a unique child such as `/mnt/scratch/$USER/job_$SLURM_JOB_ID`.
 
-The official example guide says the prolog copies the submit directory into a
-per-job Lustre scratch directory and creates `.activate_scratch`. Sourcing the
-helper changes the working directory to the staged copy and defines scratch
-environment variables. The epilog then synchronizes new or modified results
-out of scratch and cleans the job area.
+The CPU-only manual pipeline probe succeeded as job 91981 on 2026-09-27. It
+copied the checkout from PROJECT to SCRATCH, executed there, copied its result
+to PROJECT, verified the persistent file, and removed only its marker-verified
+job directory.
 
-Jobs 91205 and 91278 did not receive the documented helper, and job 91277 did
-not receive the complete documented scratch variables. The maintained launcher
-retains the official automatic-scratch contract; manual scratch creation and
-direct large PROJECT output are not accepted substitutes. Further submissions
-are blocked until Perun support confirms why the prolog did not initialize.
+The dedicated SwiGLU-7 launcher follows the same contract. It:
 
-The staging guide says hidden directories such as `.git/` and `.venv/`, Python
-cache directories, and existing `.out` or `.err` files are excluded. A Python
-environment required by a job must therefore live outside a hidden environment
-directory inside the repository.
+- stages the checkout and prepared input into a unique job directory;
+- defines `SCRATCH_DIR`, `TMPDIR`, and `RESULTS_DIR` inside that directory;
+- keeps disposable fitting state below `TMPDIR`;
+- copies its identity-named output to `PROJECT/perun-results/swiglu-7/` on
+  success, Python failure, `TERM`, or `INT`;
+- verifies the staged `result.json` before removing job scratch; and
+- preserves scratch and its PROJECT lock when stage-out cannot be verified.
 
-Perun's current documentation defines `SCRATCH_DIR` as the staged job root,
-`TMPDIR` as its temporary directory, and `RESULTS_DIR` as the intended output
-directory. It also documents `.rsyncignore` for files that must not be staged
-back. Future long workflows therefore place disposable state below
-`$TMPDIR/mlp-replacement/`, which the repository-root `.rsyncignore` excludes,
-and durable state below `$RESULTS_DIR`. The launcher removes only its exact
-per-job temporary subtree; it never removes the scratch root.
+The older generic PERUN launchers still use the unavailable automatic-scratch
+contract and are not validated deployment paths under the current cluster
+configuration. SwiGLU-7 must use `swiglu_7.sbatch` for new runs and resumes.
 
 Perun documents three general storage roles:
 
@@ -170,25 +169,9 @@ Inspect storage usage with `perunfsusage`. Large Hugging Face caches and Conda
 package caches can exhaust persistent quotas; keep them outside the repository
 and monitor their size.
 
-### Unresolved scratch documentation differences
-
-Two current official pages disagree on details:
-
-- the complete submission guide describes synchronized results under
-  `~/results_job_<job-id>/`, while the dedicated scratch guide shows
-  `<submit-directory>/results_job_<job-id>/`; and
-- the dedicated scratch guide states a seven-day cleanup period, while the
-  general storage page states that scratch data is deleted 60 days after last
-  access.
-
-These statements may refer to different scratch areas or documentation
-versions, but that distinction is not explicit. Until observed on the cluster:
-
-- check both documented result locations after the smoke job;
-- record the actual location in this document;
-- copy important results to HOME, PROJECT, or the local workstation promptly;
-  and
-- never treat scratch as persistent storage.
+PERUN support states that SCRATCH data is deleted after 60 days without access.
+Never treat it as persistent storage. The project intentionally stages large
+SwiGLU-7 outputs to PROJECT rather than HOME.
 
 ## Python environment
 
@@ -253,12 +236,12 @@ notebook.
 ## Artifact contract
 
 The generic runner writes one crash-aware JSON record beneath
-`data/results/perun/` in the staged repository. The migrated model-wide
-workflows instead write a notebook-compatible science artifact and a sibling
-`.run.json` operational sidecar. The sidecar contains the resolved workflow
-configuration, environment information, completed-stage summaries, final
-artifact path, and failure details when Python starts successfully and later
-raises an exception. Neither form overwrites an existing output path.
+`data/results/perun/` in its working checkout. SwiGLU-1 through SwiGLU-6 retain
+their historical artifact contracts. SwiGLU-7 writes `result.json`, `run.json`,
+checkpoints while incomplete, raw evaluation records, and its final model
+bundle inside one identity-named output directory. Its dedicated launcher
+copies that complete directory to `PROJECT/perun-results/swiglu-7/` and
+verifies `result.json` before removing job scratch.
 
 Existing experiment artifacts beneath `data/results/` are runtime data and are
 excluded from Git. A fresh Perun clone therefore does not contain historical
@@ -271,11 +254,10 @@ artifacts in dependency order. `swiglu-2` always requires a completed optimized
 directory submitted to `sbatch`, unless the path names persistent storage that
 is directly visible from compute nodes.
 
-Use a clean checkout for submission. Perun copies the whole submit directory,
-including untracked data, so a checkout containing the complete local results
-archive wastes staging time and scratch capacity. Transfer only the upstream
-artifacts needed by the intended run, and keep previous `results_job_*`
-directories outside the submit tree.
+Use a clean checkout for submission. A manual-staging launcher copies the
+submit directory, including untracked data not covered by its exclusions, so a
+checkout containing a complete local results archive wastes staging time and
+scratch capacity. Keep large runtime data outside the checkout.
 
 Slurm `.out` and `.err` files remain operational logs. They are useful for
 diagnosis but do not replace the structured artifact. Future workflows that
@@ -307,9 +289,11 @@ environment setup, resource declarations, and default work/output paths.
 Before the first job:
 
 ```bash
-sacctmgr show user "$USER" withassoc format=account,qos
+scontrol show assoc_mgr users="$USER" accounts="$PERUN_ACCOUNT" flags=assoc
+scontrol show assoc_mgr qos="$PERUN_QOS" flags=qos
 sinfo -s
 perunfsusage
+test -w "/mnt/scratch/$USER" && echo "SCRATCH: writable"
 ```
 
 Then:
@@ -321,18 +305,22 @@ Then:
 5. Confirm model and dataset cache access.
 6. Change to the repository root.
 7. Submit the intended configured workflow.
-8. Monitor the job and inspect its final resource record.
-9. Locate the synchronized JSON, `.out`, and `.err` artifacts.
-10. Download and inspect the JSON before submitting further workloads.
+8. Monitor the scheduler `.out` and `.err` files in the submit directory.
+9. Inspect the persistent result under PROJECT after the launcher reports a
+   verified stage-out.
+10. Inspect `result.json` and `run.json` before submitting dependent workloads.
 
 Useful job-management commands are:
 
 ```bash
 squeue -u "$USER"
 scontrol show job <job-id>
-sacct -j <job-id> --format=JobID,State,Elapsed,MaxRSS,ReqMem
 scancel <job-id>
 ```
+
+`sacct` is disabled for regular users on the current deployment. Ask PERUN
+support for historical accounting or resource statistics that are not exposed
+by `scontrol` or the workflow artifacts.
 
 Record an `OUT_OF_MEMORY` or `TIMEOUT` result as a resource-planning outcome;
 do not silently rerun with substantially larger resources without preserving
@@ -344,7 +332,7 @@ the failed job's configuration and logs.
 - [VPN access](https://wiki.perun.tuke.sk/vpn_windows/)
 - [Creating an SSH key](https://wiki.perun.tuke.sk/perun/ssh/)
 - [Data transfer](https://wiki.perun.tuke.sk/data_transfer/)
-- [Example Slurm scripts and automatic scratch](https://wiki.perun.tuke.sk/perun/slurm/example/)
+- [Example Slurm scripts](https://wiki.perun.tuke.sk/perun/slurm/example/)
 - [Available partitions](https://wiki.perun.tuke.sk/slurm/partitions/)
 - [Job states and reason codes](https://wiki.perun.tuke.sk/slurm/states/)
 - [Dedicated scratch guide](https://wiki.perun.tuke.sk/slurm/scratch/)
@@ -352,3 +340,7 @@ the failed job's configuration and logs.
 - [`perunfsusage` manual](https://wiki.perun.tuke.sk/env/perunfsusage/)
 - [Conda guide](https://wiki.perun.tuke.sk/perun/env/conda/)
 - [Python virtual-environment guide](https://wiki.perun.tuke.sk/perun/env/pve/)
+
+The current automatic-scratch examples do not match the operational system
+confirmed by PERUN support on 2026-09-27. Use the manual staging contract above
+until support announces otherwise.

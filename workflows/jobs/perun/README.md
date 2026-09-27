@@ -14,7 +14,7 @@ validation assumptions. This README explains only the tracked job files.
 | `smoke.sbatch` | Runs `perun-smoke-linear.json` with minimal budgets to check the real model, data, GPU, workflow, and result path. It is an infrastructure check, not thesis evidence. |
 | `run_experiment.sbatch` | Runs one supplied JSON configuration in one isolated Python process on one GPU. |
 | `run_array.sbatch` | Maps a manifest of JSON configurations onto independent one-GPU Slurm array tasks. It does not distribute one experiment across GPUs. |
-| `run_model.sbatch` | Runs one allow-listed model-wide workflow and forwards its Python CLI arguments. Existing entries retain their historical `--output` interface; directory-contract entries receive Perun work/output directories. |
+| `run_model.sbatch` | Runs the historical allow-listed model-wide workflows that still depend on the unavailable automatic-scratch helper. It is not the SwiGLU-7 launcher. |
 | `swiglu_7.sbatch` | Runs the independent SwiGLU-7 preparation or maps array tasks `0-11` onto its fixed three-scope/four-target grid. |
 
 `smoke.sbatch` defaults to `gpu_short`, 48 GB of CPU memory, and one hour. The
@@ -25,8 +25,8 @@ starting values, not measured requirements. Options passed to `sbatch` may
 override them.
 
 `swiglu_7.sbatch` requests one GPU, eight CPUs, 128 GB RAM, and 48 hours on
-`gpu_long`. It is the preferred new-run launcher for SwiGLU-7; `run_model.sbatch`
-remains the explicit single-run/resume interface.
+`gpu_long`. It is the only supported PERUN launcher for SwiGLU-7 new runs and
+resumes.
 
 ## Manual scratch probe
 
@@ -52,9 +52,10 @@ On a Perun login node, inspect and export the account and QoS assigned to the
 current user:
 
 ```bash
-sacctmgr show user "$USER" withassoc format=account,qos
 export PERUN_ACCOUNT="your-project-account"
 export PERUN_QOS="your-project-qos"
+scontrol show assoc_mgr users="$USER" accounts="$PERUN_ACCOUNT" flags=assoc
+scontrol show assoc_mgr qos="$PERUN_QOS" flags=qos
 ```
 
 Activate the project environment and export its absolute interpreter path:
@@ -63,6 +64,8 @@ Activate the project environment and export its absolute interpreter path:
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate mlp-replacement
 export MLP_REPLACEMENT_PYTHON="$(command -v python)"
+export HF_HOME="/mnt/project/$PERUN_ACCOUNT/huggingface-cache"
+mkdir -p "$HF_HOME"
 ```
 
 The job files request export of the submission environment. They intentionally
@@ -70,14 +73,10 @@ do not hardcode an environment name or path. The interpreter must remain
 accessible from compute nodes and must not be a `.venv/` inside the staged
 repository.
 
-Run `sbatch` from the repository root. All configuration arguments below are
-repository-relative so they remain valid after automatic scratch activation.
-
-Use a clean Perun checkout as the submission directory. The prolog copies the
-whole submitted directory, including untracked runtime data, so do not keep the
-local historical `data/results/` archive or earlier `results_job_*` directories
-inside it. Transfer only the prerequisite artifacts required by the submitted
-workflow. Keep installed environments and reusable Hugging Face caches in
+Run `sbatch` from the repository root. The dedicated SwiGLU-7 launcher copies
+that checkout to a unique `/mnt/scratch/$USER/job_<job-key>` directory. Use a
+clean checkout so untracked runtime data does not waste staging time or scratch
+capacity. Keep installed environments and the reusable Hugging Face cache in
 persistent storage outside the checkout.
 
 ## Smoke job
@@ -181,38 +180,19 @@ distributed execution. `swiglu-2` is especially compute intensive; do not
 split it into independent array tasks unless its promotion and finalist
 dependencies are first redesigned explicitly.
 
-## Future long-running workflows
+## SwiGLU-7 production workflow
 
-A new long-running runner opts into the directory storage contract when its
-allow-list entry sets `STORAGE_CONTRACT="directories"`. The launcher then
-supplies:
-
-```text
---work-dir   $TMPDIR/mlp-replacement/<workflow>-<job-id>
---output-dir $RESULTS_DIR/<workflow>-<job-id>
-```
-
-The launcher owns the work-directory path and rejects a forwarded
-`--work-dir`. It removes only that exact per-job directory on normal exit,
-Python failure, `TERM`, or `INT`. The repository-root `.rsyncignore` also
-excludes `/tmp/mlp-replacement/` from epilog synchronization. These two
-protections keep disposable files out of persistent storage even though Perun
-stages new and modified scratch files back after the job.
-
-An explicit `--output-dir` may be forwarded for resume. Stage only the prior
-output directory into the submitted checkout and pass it with `--resume`; do
-not copy a complete historical results tree. The Python runner validates the
-checkpoint and owns durable cleanup. A completed run retains its structured
-results and final model but removes resumable optimizer state.
+The launcher creates disposable work and live output below its per-job SCRATCH
+directory. It manually copies the live output to the stable identity path
+`PROJECT/perun-results/swiglu-7/<run-id>` on normal completion, Python failure,
+`TERM`, or `INT`. It verifies `result.json` before removing scratch. If copy or
+verification fails, it preserves both scratch and a PROJECT lock for manual
+recovery instead of risking the persistent copy.
 
 SwiGLU-7 is the first entry using this contract. Its preparation is independent:
 it regenerates the fixed allocation curves, four fitted starts, recovery data,
 and evaluation references from pinned model/dataset sources. No SwiGLU-5 or
 SwiGLU-6 runtime artifact is staged.
-
-Jobs 91205 and 91278 did not receive the documented `.activate_scratch` helper.
-Do not resubmit this workflow until Perun support confirms that automatic
-scratch initialization is working for the account.
 
 Prepare once with the dedicated job:
 
@@ -221,12 +201,12 @@ sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
   workflows/jobs/perun/swiglu_7.sbatch prepare
 ```
 
-After stage-out, verify the complete
-`results/swiglu-7/prepare-001` directory and move it to stable PROJECT storage.
-Then submit the fixed grid; `%4` is only a scheduler concurrency limit:
+After a verified stage-out, preparation is already stored at
+`$PERUN_PROJECT/perun-results/swiglu-7/prepare-001`. Then submit the fixed grid;
+`%4` is only a scheduler concurrency limit:
 
 ```bash
-export S7_PREPARED="/project/path/swiglu-7/prepare-001/result.json"
+export S7_PREPARED="$PERUN_PROJECT/perun-results/swiglu-7/prepare-001/result.json"
 
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
   --array=0-11%4 \
@@ -238,6 +218,21 @@ within each group the targets are 0.2, 0.3, 0.4, and 0.5. Each task writes a
 separate identity-named directory below its own `$RESULTS_DIR`. Do not point
 checkpoint-heavy live output at slow persistent NFS.
 
+Resume preparation or one failed array element from its persistent PROJECT
+output:
+
+```bash
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+  workflows/jobs/perun/swiglu_7.sbatch prepare --resume
+
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=5 \
+  workflows/jobs/perun/swiglu_7.sbatch train --resume "$S7_PREPARED"
+```
+
+Task 5 is S7-1 at target 0.3. Replace it with the failed task index. Never run
+two jobs for the same identity simultaneously. A lock left after an incomplete
+stage-out requires inspection and manual recovery before resubmission.
+
 Use task 0 as the first native-8K resource measurement when scheduler policy
 does not permit releasing the full array immediately. Do not extrapolate the
 earlier 128-token runtime without accounting for 8K attention.
@@ -245,19 +240,11 @@ See the [SwiGLU-7 experiment guide](../../../docs/experiments/model/swiglu/swigl
 for prerequisites, resume commands, allocation mapping, estimated cost, and
 result handling.
 
-## Results
+## Results and logs
 
-The runners write their structured JSON paths inside the staged repository.
-The `.out` and `.err` files contain console output and tracebacks. The generic
-runner stores failure state in its run JSON. Model-wide migrations store their
-notebook-compatible science artifact separately and record progress or failure
-in a sibling `.run.json` sidecar.
-
-Current official Perun pages disagree on whether the synchronized
-`results_job_<job-id>/` directory appears under HOME or beside the submit
-directory. Inspect both after the first successful intended scientific run,
-append the job and observed behavior to the [Perun experiment
-log](../../../docs/infrastructure/perun-log.md), and update the [Perun project
-status](../../../docs/infrastructure/perun-status.md). Verify hashes before
-moving compact output to its canonical project location. Do not rely on job
-scratch for persistent results.
+Slurm writes `swiglu-7_<job-id>.out` and `.err` in the repository from which
+the job was submitted. Each identity-named PROJECT output contains the
+structured `result.json` and `run.json`; completed training outputs also retain
+raw evaluation records and the final `model/` bundle. Incomplete training
+outputs retain one verified checkpoint. These files are copied to PROJECT, not
+HOME, and SCRATCH is never the only durable copy after a verified stage-out.

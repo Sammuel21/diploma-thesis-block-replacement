@@ -23,7 +23,7 @@ Current state:
 - PERUN provisions `/mnt/scratch/$USER` in advance;
 - `.activate_scratch` is unavailable as of 2026-09-27;
 - `sacct` is disabled for regular users;
-- do not submit SwiGLU-7 until its launcher uses manual staging.
+- SwiGLU-7 uses its dedicated manual-staging launcher.
 
 ## 1. Connect
 
@@ -231,7 +231,65 @@ Confirm it left the queue:
 squeue -j "$JOB_ID"
 ```
 
-## 10. Manual staging inside a job
+## 10. Run SwiGLU-7
+
+Submit preparation from the repository root:
+
+```bash
+PREP_SUBMISSION=$(sbatch --parsable \
+  --account="$PERUN_ACCOUNT" \
+  --qos="$PERUN_QOS" \
+  workflows/jobs/perun/swiglu_7.sbatch prepare)
+
+export PREP_JOB="${PREP_SUBMISSION%%;*}"
+echo "PREP_JOB=$PREP_JOB"
+```
+
+The verified preparation output is:
+
+```bash
+export S7_PREPARED="$PERUN_PROJECT/perun-results/swiglu-7/prepare-001/result.json"
+test -f "$S7_PREPARED"
+```
+
+Submit the 12 fixed trajectories with at most four running concurrently:
+
+```bash
+TRAIN_SUBMISSION=$(sbatch --parsable \
+  --account="$PERUN_ACCOUNT" \
+  --qos="$PERUN_QOS" \
+  --array=0-11%4 \
+  workflows/jobs/perun/swiglu_7.sbatch train "$S7_PREPARED")
+
+export TRAIN_ARRAY="${TRAIN_SUBMISSION%%;*}"
+echo "TRAIN_ARRAY=$TRAIN_ARRAY"
+```
+
+Resume preparation:
+
+```bash
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+  workflows/jobs/perun/swiglu_7.sbatch prepare --resume
+```
+
+Resume one failed array task, for example task 6:
+
+```bash
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=6 \
+  workflows/jobs/perun/swiglu_7.sbatch train --resume "$S7_PREPARED"
+```
+
+Inspect SwiGLU-7 persistent outputs:
+
+```bash
+find "$PERUN_PROJECT/perun-results/swiglu-7" \
+  -maxdepth 3 \( -name 'result.json' -o -name 'run.json' \) -print
+```
+
+The scheduler logs remain in the repository as
+`swiglu-7_<job-id>.out` and `swiglu-7_<job-id>.err`.
+
+## 11. Manual staging inside a job
 
 The user SCRATCH directory must already exist. Create only a unique child
 directory for the job, then copy the checkout into it:
@@ -260,7 +318,7 @@ rsync -a "$JOB_SCRATCH/results/" "$RESULT_DEST/"
 
 Verify the PROJECT copy before deleting anything from SCRATCH.
 
-## 11. Environment checks
+## 12. Environment checks
 
 Confirm the interpreter:
 
@@ -278,7 +336,7 @@ python -c 'from importlib.metadata import version; import torch, transformers, d
 python -m pip check
 ```
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 Confirm identity and project membership:
 
@@ -308,6 +366,10 @@ cat "${JOB_NAME}_${JOB_ID}.err"
 
 For job history or official consumption statistics, contact PERUN support.
 Regular users cannot use `sacct`.
+
+If a SwiGLU-7 `*.perun-lock` remains, inspect its `owner.txt` and the recorded
+SCRATCH directory before resubmitting. The lock means stage-out did not finish;
+do not delete it until `result.json` has been copied to PROJECT and verified.
 
 ## References
 

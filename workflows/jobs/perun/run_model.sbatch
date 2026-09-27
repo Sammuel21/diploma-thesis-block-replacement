@@ -12,15 +12,12 @@
 #SBATCH --time=96:00:00
 #SBATCH --export=ALL
 
-if ! source .activate_scratch; then
-    echo "Perun scratch activation failed; submit this job from the repository root." >&2
-    exit 1
-fi
 set -euo pipefail
 
 if (( $# < 1 )); then
     echo "Usage: sbatch [Slurm options] $0 WORKFLOW [WORKFLOW_ARGUMENTS...]" >&2
-    echo "Workflows: compression-baseline, swiglu, swiglu-2, swiglu-7" >&2
+    echo "Workflows: compression-baseline, swiglu, swiglu-2" >&2
+    echo "Use swiglu_7.sbatch for SwiGLU-7 new runs and resumes." >&2
     exit 2
 fi
 
@@ -38,14 +35,19 @@ case "$WORKFLOW_NAME" in
         WORKFLOW_MODULE="workflows.runs.model.swiglu.swiglu_2_allocation"
         ;;
     swiglu-7)
-        WORKFLOW_MODULE="workflows.runs.model.swiglu.swiglu_7"
-        STORAGE_CONTRACT="directories"
+        echo "Use workflows/jobs/perun/swiglu_7.sbatch for SwiGLU-7." >&2
+        exit 2
         ;;
     *)
         echo "Unsupported model workflow: $WORKFLOW_NAME" >&2
         exit 2
         ;;
 esac
+
+if ! source .activate_scratch; then
+    echo "Perun scratch activation failed; submit this job from the repository root." >&2
+    exit 1
+fi
 
 if [[ "$STORAGE_CONTRACT" == "artifact" ]]; then
     HAS_OUTPUT=0

@@ -5,7 +5,7 @@ type: report
 category: infrastructure
 status: active
 created: 2026-09-25
-modified: 2026-09-26
+modified: 2026-09-27
 authorship:
   created_by: collaborative
 curation:
@@ -51,12 +51,15 @@ Use `Unknown` when the scheduler did not expose a measurement and `Not
 applicable` only when the field cannot apply. Do not infer MaxRSS, GPU memory,
 or consumed hours from requested limits.
 
-After completion, collect the scheduler record with commands such as:
+Capture the live or recently completed controller record with:
 
 ```bash
-sacct -j <job-id> --format=JobID,JobName,State,ExitCode,Partition,AllocTRES,Elapsed,Timelimit,MaxRSS,ReqMem,Start,End
-seff <job-id>
+scontrol show job <job-id>
 ```
+
+`sacct` is disabled for regular users on the current deployment. Request
+historical accounting, MaxRSS, or other unavailable statistics from PERUN
+support and add them to the entry when received.
 
 GPU peak memory must come from job telemetry or the workflow artifact, not from
 the requested GPU model. Allocation GPU-hours are GPU count multiplied by
@@ -127,3 +130,31 @@ Entries are appended below in submission order.
 - Verification: `scontrol show job`, scheduler stderr, account identity, Slurm prolog configuration, and expected scratch paths inspected
 - Experiment document: [SwiGLU-7](../experiments/model/swiglu/swiglu-7.md)
 - Notes: login shell plus `source .activate_scratch` still found no helper. No documented progress log or surviving per-job scratch directory was observed.
+
+## [2026-09-27 11:51 cluster time] 91634 | Automatic-scratch CPU probe
+
+- Outcome: FAILED; exit code `1:0`; reason `NonZeroExitCode`
+- Submission: `workflows/jobs/perun/scratch_probe.sbatch`; automatic-helper probe
+- Provenance: commit `a5f0d52`; no Python or scientific workflow
+- Allocation: `cpu_short`; 1 node (`cn02`); no GPU; 1 CPU; 1 GB requested memory; five-minute limit
+- Consumption: queue 0 seconds; elapsed 0 seconds reported; requested GPU-hour ceiling 0; allocation GPU-hours 0; CPU core-hours 0; MaxRSS Unknown; peak GPU memory Not applicable
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Not applicable
+- Outputs: no structured result; scheduler logs retained in PROJECT checkout
+- Continuation: not resumable; no checkpoint
+- Verification: `scontrol show job`, scheduler stdout, and scheduler stderr inspected
+- Experiment document: [SwiGLU-7](../experiments/model/swiglu/swiglu-7.md)
+- Notes: `.activate_scratch` was absent. PERUN support later confirmed that the helper is unavailable and staging must be manual.
+
+## [2026-09-27 time unrecorded] 91981 | Manual PROJECT-SCRATCH pipeline probe
+
+- Outcome: COMPLETED; exit code unrecorded; reason none
+- Submission: `workflows/jobs/perun/scratch_probe.sbatch`; manual staging probe
+- Provenance: commit `c237809`; no Python or scientific workflow
+- Allocation: `cpu_short`; 1 node (`cn02`); no GPU; 1 CPU; 1 GB requested memory; five-minute limit
+- Consumption: queue Unknown; elapsed Unknown; requested GPU-hour ceiling 0; allocation GPU-hours 0; CPU core-hours Unknown; MaxRSS Unknown; peak GPU memory Not applicable
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Not applicable
+- Outputs: one small text record in PROJECT `perun-results/job_91981/`; exact bytes unrecorded; scheduler logs in the PROJECT checkout
+- Continuation: not resumable; no checkpoint
+- Verification: result reported `status=ok`; persistent PROJECT file was read successfully; marker-protected job SCRATCH was absent after verified stage-out
+- Experiment document: [SwiGLU-7](../experiments/model/swiglu/swiglu-7.md)
+- Notes: Demonstrated manual checkout staging, execution from SCRATCH, explicit PROJECT stage-out, verification, and scoped cleanup without a GPU allocation.

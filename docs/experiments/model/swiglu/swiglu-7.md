@@ -100,7 +100,6 @@ separate explicit choice under the repository instructions.
 - Runner: `workflows/runs/model/swiglu/swiglu_7.py`
 - Local launcher: `workflows/jobs/local/run_model.sh`
 - Dedicated PERUN job: `workflows/jobs/perun/swiglu_7.sbatch`
-- Generic PERUN resume launcher: `workflows/jobs/perun/run_model.sbatch`
 - Report notebook: `notebooks/model/swiglu/swiglu-7.ipynb`
 
 ## PERUN prerequisites
@@ -118,13 +117,18 @@ the model with PyTorch SDPA or a supported FlashAttention implementation.
 Set the project-specific values only in the shell:
 
 ```bash
-sacctmgr show user "$USER" withassoc format=account,qos
 export PERUN_ACCOUNT="your-project-account"
 export PERUN_QOS="your-project-qos"
+export PERUN_PROJECT="/mnt/project/$PERUN_ACCOUNT"
+
+scontrol show assoc_mgr users="$USER" accounts="$PERUN_ACCOUNT" flags=assoc
+scontrol show assoc_mgr qos="$PERUN_QOS" flags=qos
 
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate mlp-replacement
 export MLP_REPLACEMENT_PYTHON="$(command -v python)"
+export HF_HOME="$PERUN_PROJECT/huggingface-cache"
+mkdir -p "$HF_HOME"
 ```
 
 Confirm the selected interpreter before allocating a long job:
@@ -145,31 +149,24 @@ sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
 
 The job uses one H200, eight CPUs, 128 GB RAM, and a 48-hour limit within
 PERUN's documented [`gpu_long` four-day ceiling](https://wiki.perun.tuke.sk/slurm/partitions/).
-Temporary fit states go below `$TMPDIR`; durable preparation data goes to
-`$RESULTS_DIR/swiglu-7/prepare-001` and is staged out by PERUN. Jobs 91205 and
-91278 did not receive the documented `.activate_scratch` helper, so do not
-resubmit until Perun support confirms automatic scratch initialization. After a
-successful preparation:
+The launcher manually copies the checkout to a unique directory below
+`/mnt/scratch/$USER`, runs there, then copies and verifies durable preparation
+data at `$PERUN_PROJECT/perun-results/swiglu-7/prepare-001`. PERUN support
+confirmed that automatic scratch activation and synchronization are not
+currently available. After a successful preparation:
 
-1. inspect `sacct`, `seff`, `result.json`, and `run.json`;
-2. locate `results_job_<job-id>/results/swiglu-7/prepare-001`;
-3. move the complete `prepare-001` directory to stable PROJECT storage; and
-4. retain its internal directory structure and verify `result.json` plus the
-   recorded hashes.
+1. inspect the scheduler `.out` and `.err` files in the repository;
+2. inspect PROJECT `result.json` and `run.json`;
+3. confirm `result.json` reports `status: completed`; and
+4. retain the complete `prepare-001` directory and its internal structure.
 
-PERUN's current pages disagree about the exact `results_job_<job-id>` parent,
-so check both the submit directory and HOME after the first successful job.
-
-Submit the fixed grid only after the prepared path is readable from a compute
-node. If PROJECT storage is not directly visible inside allocations, copy the
-complete prepared directory into an `inputs/` directory in the clean checkout
-before submission and pass that repository-relative `result.json` path instead.
-PERUN will then stage it with each task. `%4` is a concurrency cap, not a
-scientific parameter; lower it if the project has fewer than four concurrent
-GPUs:
+Submit the fixed grid only after the prepared PROJECT path is complete. Each
+task copies the whole preparation directory to its own SCRATCH directory before
+Python starts. `%4` is a concurrency cap, not a scientific parameter; lower it
+if scheduler availability or project policy requires it:
 
 ```bash
-export S7_PREPARED="/project/path/swiglu-7/prepare-001/result.json"
+export S7_PREPARED="$PERUN_PROJECT/perun-results/swiglu-7/prepare-001/result.json"
 
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=0-11%4 \
   workflows/jobs/perun/swiglu_7.sbatch train "$S7_PREPARED"
@@ -183,26 +180,42 @@ Array mapping is deterministic:
 | 4-7 | S7-1 | 0.2, 0.3, 0.4, 0.5 |
 | 8-11 | S7-2 | 0.2, 0.3, 0.4, 0.5 |
 
-Each task writes to its own `$RESULTS_DIR/swiglu-7/<strategy>-target-<target>-run-001`
-directory. Do not direct these checkpoint-heavy outputs to slow persistent NFS
-during training. Move verified stage-out directories to their canonical
-PROJECT/local locations afterward.
+Each task writes live checkpoints to its own SCRATCH output and stages them to
+`$PERUN_PROJECT/perun-results/swiglu-7/<strategy>-target-<target>-run-001`.
+Checkpoint-heavy writes therefore do not target persistent PROJECT storage
+during training.
 
-For an interrupted trajectory, place its complete output directory inside the
-next submitted checkout (or another path that is staged into that job) and use
-the generic launcher with the same identity:
+## Failure and continuation
+
+On a Python exception, `TERM`, or `INT`, the launcher copies the latest
+`result.json`, `run.json`, and verified checkpoint to PROJECT before exiting.
+Resume preparation with:
 
 ```bash
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
-  --time=48:00:00 --mem=128G \
-  workflows/jobs/perun/run_model.sbatch swiglu-7 train \
-  --resume \
-  --prepared "$S7_PREPARED" \
-  --strategy S7-1 --target 0.4 \
-  --output-dir resume/S7-1-target-0.4-run-001
+  workflows/jobs/perun/swiglu_7.sbatch prepare --resume
 ```
 
-Never run two jobs against the same output directory.
+Preparation reuses completed durable stages, although work inside the active
+local-fitting stage can be repeated. Resume one failed training task by its
+original array index, for example task 6 (S7-1 at target 0.4):
+
+```bash
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=6 \
+  workflows/jobs/perun/swiglu_7.sbatch train --resume "$S7_PREPARED"
+```
+
+Training restores model, optimizer, RNG, and progress from the latest verified
+25-million-token checkpoint, so at most the work since that checkpoint is
+repeated. Never run two jobs for the same identity simultaneously.
+
+If stage-out is interrupted or the node is lost, the launcher leaves a
+`*.perun-lock` under the SwiGLU-7 PROJECT result root and, when available, the
+marker-protected job directory in SCRATCH. Do not delete either blindly. Verify
+the owner file, manually complete the SCRATCH-to-PROJECT copy, compare
+`result.json`, and only then remove that exact scratch directory and lock. A
+missing scratch directory after a hard node loss means recovery is limited to
+the last already verified PROJECT copy.
 
 ## Planning cost
 

@@ -38,13 +38,13 @@ usernames, credentials, and secret-bearing paths are not recorded.
 | Project allocation and concurrency limits | Partially verified | QoS exposes 8,424 allocated GPU-hours and no explicit per-user concurrent-GPU limit; scheduler availability still applies. |
 | GPU partition | Available | Three jobs received one GPU on `gpu_long`; all failed during launcher startup before Python. |
 | Persistent HOME/PROJECT storage | Available | HOME and the active 1 TB PROJECT allocation were observed with `perunfsusage`. |
-| Automatic scratch and result synchronization | Blocked | Jobs 91205 and 91278 received no `.activate_scratch` helper; job 91277 lacked `RESULTS_DIR`. The launcher retains the documented automatic-scratch contract pending Perun support. |
+| Manual scratch and PROJECT stage-out | Available | PERUN support confirmed the manual contract; CPU probe 91981 copied PROJECT to SCRATCH, ran there, copied and verified its result in PROJECT, and cleaned only its job directory. |
 | Python/CUDA environment | Login-node verified | Python 3.12, PyTorch 2.11.0+cu128, Transformers 5.14.1, Datasets 5.0.0, and lm-eval 0.4.13 import successfully when the Conda library directory leads `LD_LIBRARY_PATH`. Compute-node execution remains unobserved. |
 | Model and dataset availability | Unknown | The pinned SmolLM2 revision, tokenizer, C4 inputs, WikiText inputs, and evaluation datasets must be readable from a compute job. |
 | SwiGLU-7 runner | Ready by static inspection | Preparation now builds its own allocation curves, fitted starts, 1B-token stream, monitoring data, evaluation protocol, and dense references. It declares no prior-experiment artifact inputs. |
-| SwiGLU-7 PERUN job | Blocked by scratch initialization | `swiglu_7.sbatch` follows the documented `source .activate_scratch` contract and retains the fixed preparation plus task `0-11` mapping. Do not resubmit until the missing helper is resolved. |
+| SwiGLU-7 PERUN job | Ready by static inspection | `swiglu_7.sbatch` implements the demonstrated manual staging contract, fixed task `0-11` mapping, persistent PROJECT outputs, locking, verified stage-out, and resume. GPU execution remains unobserved. |
 | SwiGLU-7 prerequisite artifacts | None | No SwiGLU-1 through SwiGLU-6 runtime artifact is required. The pinned model and datasets must still be available from the compute allocation. |
-| Recorded Perun execution | Three startup failures | Jobs 91205, 91277, and 91278 each failed after one second before Python started. |
+| Recorded Perun execution | Manual pipeline verified | Three GPU startup failures and one CPU automatic-helper probe failure preceded successful manual CPU probe 91981. No SwiGLU-7 Python stage has run yet. |
 
 ## Available capacity
 
@@ -53,13 +53,13 @@ the project. Replace `Unknown` only with live, non-sensitive evidence.
 
 | Resource | Cluster-documented capacity | Project-available capacity | Evidence date |
 | --- | --- | --- | --- |
-| GPU hardware | NVIDIA H200; up to 8 GPUs per GPU node | Unknown | Not observed |
-| GPU partitions | `gpu_short` up to 2 days; `gpu_long` up to 4 days | Unknown | Not observed |
+| GPU hardware | NVIDIA H200; up to 8 GPUs per GPU node | One GPU allocated per failed startup job; type not directly observed | 2026-09-26 |
+| GPU partitions | `gpu_short` up to 2 days; `gpu_long` up to 4 days | `gpu_long` accepted three submissions | 2026-09-26 |
 | Concurrent jobs/GPUs | Cluster and QoS dependent | Unknown | Not observed |
 | CPU allocation | Partition and QoS dependent | Unknown | Not observed |
-| HOME storage | 500 GB documented per user | Unknown free/used | Not observed |
-| PROJECT storage | Project-specific | Unknown free/used | Not observed |
-| SCRATCH storage | Temporary; no fixed quota currently documented | Unknown current use | Not observed |
+| HOME storage | 500 GB documented per user | 500 GB allocation; about 665 MB used when inspected | 2026-09-26 |
+| PROJECT storage | Project-specific | 1 TB allocation; writable | 2026-09-27 |
+| SCRATCH storage | Temporary; no fixed quota currently documented | User root provisioned and writable; manual job child verified | 2026-09-27 |
 
 ## Cumulative consumption
 
@@ -71,16 +71,16 @@ are tracked separately and are not reported as consumption.
 
 | Measure | Recorded total |
 | --- | ---: |
-| Submitted jobs | 3 |
-| Successful jobs | 0 |
-| Failed, canceled, timed-out, or OOM jobs | 3 |
+| Submitted jobs | 5 |
+| Successful jobs | 1 |
+| Failed, canceled, timed-out, or OOM jobs | 4 |
 | Requested GPU-hour ceiling | 144 |
 | Allocation GPU-hours consumed | 0.000833 |
-| CPU core-hours consumed | 0.006667 |
-| Elapsed wall time | 3 seconds |
+| CPU core-hours consumed | At least 0.006667; probe 91981 elapsed unavailable |
+| Elapsed wall time | At least 3 seconds; probe 91981 elapsed unavailable |
 | Maximum observed host memory | Not observed |
 | Maximum observed GPU memory | Not observed |
-| Durable output bytes | 0 |
+| Durable output bytes | One small probe text file; exact bytes unrecorded |
 
 ## SwiGLU-7 plan
 
@@ -91,12 +91,12 @@ trajectory.
 
 | Resource | Planned request or location | Current status |
 | --- | --- | --- |
-| GPU | 1 H200-class GPU via `gpu_long` | Project access unknown |
+| GPU | 1 H200-class GPU via `gpu_long` | One-GPU allocations accepted; Python/CUDA execution still unverified |
 | CPU | 8 CPUs per task | Unmeasured |
 | Host memory | 128 GB | Unmeasured; sized for S7-1 checkpoint and Adam-state assembly |
 | Wall time | 48 hours per job | Within the documented `gpu_long` ceiling; estimated above the 8-24 hour trajectory bands, but unmeasured |
-| Temporary work | `$TMPDIR/mlp-replacement/swiglu-7-<job-id>-<task>` | Requires automatic scratch initialization |
-| Durable job output | `$RESULTS_DIR/swiglu-7/<run-id>`, then persistent stage-out | Automatic stage-out remains unobserved |
+| Temporary work | `/mnt/scratch/$USER/job_<job-key>/tmp/mlp-replacement/...` | Manual directory contract verified by CPU probe |
+| Durable job output | `PROJECT/perun-results/swiglu-7/<run-id>` | Launcher performs and verifies manual stage-out |
 | Output reserve | Trainable state, optimizer state, and final bundle estimate, plus 15% | Exact bytes depend on strategy and target |
 | Prepared data | About 16-20 GB durable plus 15-20 GB temporary fitting state | Estimate from configured tensor extents; unmeasured |
 | Planned allocation cost | 124-266 H200 GPU-hours for preparation plus all 12 runs | Estimate from recorded RTX 4090 SwiGLU-5/6 timings and the changed 8K workload; not consumption |
@@ -115,11 +115,8 @@ scientific contract.
 - Which Python, PyTorch, CUDA, Transformers, Datasets, and `lm_eval` versions
   work on an allocated H200?
 - Can compute nodes read the required model, cache, and dataset locations?
-- Why did the documented prolog fail to create `.activate_scratch` for jobs
-  91205 and 91278?
 - Is the compute-node failure to resolve the numeric user ID related to scratch
   initialization?
-- Where does automatic stage-out place `results_job_<job-id>` for this account?
 - Are the current memory and wall-time requests sufficient for each SwiGLU-7
   retraining scope?
 
