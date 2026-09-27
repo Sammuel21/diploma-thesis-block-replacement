@@ -10,6 +10,7 @@ validation assumptions. This README explains only the tracked job files.
 
 | File | Purpose |
 | --- | --- |
+| `scratch_probe.sbatch` | Performs a five-minute CPU-only check of PERUN automatic scratch activation and result stage-out without loading Python or requesting a GPU. |
 | `smoke.sbatch` | Runs `perun-smoke-linear.json` with minimal budgets to check the real model, data, GPU, workflow, and result path. It is an infrastructure check, not thesis evidence. |
 | `run_experiment.sbatch` | Runs one supplied JSON configuration in one isolated Python process on one GPU. |
 | `run_array.sbatch` | Maps a manifest of JSON configurations onto independent one-GPU Slurm array tasks. It does not distribute one experiment across GPUs. |
@@ -26,6 +27,21 @@ override them.
 `swiglu_7.sbatch` requests one GPU, eight CPUs, 128 GB RAM, and 48 hours on
 `gpu_long`. It is the preferred new-run launcher for SwiGLU-7; `run_model.sbatch`
 remains the explicit single-run/resume interface.
+
+## Automatic scratch probe
+
+Before allocating a GPU, test PERUN's documented automatic scratch pipeline:
+
+```bash
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+  workflows/jobs/perun/scratch_probe.sbatch
+```
+
+The probe uses `cpu_short`, one CPU, 1 GB RAM, and a five-minute limit. It uses
+the documented standalone `source .activate_scratch` command, verifies the
+scratch variables and working directory, and writes
+`results/perun-scratch-probe.txt`. After completion, verify that PERUN's epilog
+staged that file into the corresponding `results_job_<job-id>/` directory.
 
 ## Submission inputs
 
