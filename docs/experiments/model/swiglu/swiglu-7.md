@@ -162,13 +162,13 @@ currently available. After a successful preparation:
 
 Submit the fixed grid only after the prepared PROJECT path is complete. Each
 task copies the whole preparation directory to its own SCRATCH directory before
-Python starts. `%4` is a concurrency cap, not a scientific parameter; lower it
-if scheduler availability or project policy requires it:
+Python starts. `%12` permits all 12 independent one-GPU tasks to run
+concurrently; scheduler availability can still keep some tasks pending:
 
 ```bash
 export S7_PREPARED="$PERUN_PROJECT/perun-results/swiglu-7/prepare-001/result.json"
 
-sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=0-11%4 \
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=0-11%12 \
   workflows/jobs/perun/swiglu_7.sbatch train "$S7_PREPARED"
 ```
 
@@ -233,8 +233,8 @@ more expensive 8K attention and, for S7-1/S7-2, broader gradient computation.
 | One S7-2 trajectory, including final evaluation | 10-22 GPU-hours |
 | Entire preparation plus 12-run grid | **124-266 GPU-hours** |
 
-With four concurrent GPUs, the compute portion is roughly 1.5-3 days after
-queueing and stage-out; serial execution is roughly 5-11 days. The tracked
+With 12 concurrent GPUs, the training grid's compute portion is roughly 12-24
+hours after queueing; serial execution is roughly 5-11 days. The tracked
 48-hour request gives each task substantial headroom. The requested ceiling
 for all 13 jobs is 624 GPU-hours, but only elapsed allocation time counts as
 consumption.

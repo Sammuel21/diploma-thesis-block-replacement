@@ -203,13 +203,14 @@ sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
 
 After a verified stage-out, preparation is already stored at
 `$PERUN_PROJECT/perun-results/swiglu-7/prepare-001`. Then submit the fixed grid;
-`%4` is only a scheduler concurrency limit:
+`%12` allows all 12 independent one-GPU tasks to run concurrently when the
+scheduler has capacity:
 
 ```bash
 export S7_PREPARED="$PERUN_PROJECT/perun-results/swiglu-7/prepare-001/result.json"
 
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
-  --array=0-11%4 \
+  --array=0-11%12 \
   workflows/jobs/perun/swiglu_7.sbatch train "$S7_PREPARED"
 ```
 

@@ -252,13 +252,13 @@ export S7_PREPARED="$PERUN_PROJECT/perun-results/swiglu-7/prepare-001/result.jso
 test -f "$S7_PREPARED"
 ```
 
-Submit the 12 fixed trajectories with at most four running concurrently:
+Submit the 12 fixed trajectories with up to 12 running concurrently:
 
 ```bash
 TRAIN_SUBMISSION=$(sbatch --parsable \
   --account="$PERUN_ACCOUNT" \
   --qos="$PERUN_QOS" \
-  --array=0-11%4 \
+  --array=0-11%12 \
   workflows/jobs/perun/swiglu_7.sbatch train "$S7_PREPARED")
 
 export TRAIN_ARRAY="${TRAIN_SUBMISSION%%;*}"

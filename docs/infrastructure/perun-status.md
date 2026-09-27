@@ -102,11 +102,11 @@ trajectory.
 | Planned allocation cost | 124-266 H200 GPU-hours for preparation plus all 12 runs | Estimate from recorded RTX 4090 SwiGLU-5/6 timings and the changed 8K workload; not consumption |
 | Expected VRAM | S7-0 25-50 GB; S7-1 35-70 GB; S7-2 30-60 GB | Planning bands only; H200 supplies 141 GB HBM |
 
-Submit preparation first and verify its hashes and stage-out location. A `%4`
-array concurrency cap gives an estimated 1.5-3 days of compute after
-preparation, excluding queue time. If allocation policy permits, task 0
-(S7-0/20%) can establish throughput and memory evidence before the remaining
-tasks are released. See the [SwiGLU-7 experiment
+Submit preparation first and verify its hashes and stage-out location. A `%12`
+array concurrency cap permits all 12 one-GPU tasks to run simultaneously and
+gives an estimated 12-24 hours of training-grid compute after preparation,
+excluding queue time. Scheduler availability may start fewer than 12 tasks at
+once. See the [SwiGLU-7 experiment
 guide](../experiments/model/swiglu/swiglu-7.md) for the estimate basis and
 scientific contract.
 
