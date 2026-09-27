@@ -52,15 +52,12 @@ accessible from compute nodes and must not be a `.venv/` inside the staged
 repository.
 
 Run `sbatch` from the repository root. All configuration arguments below are
-repository-relative. The general launchers use Perun's automatic scratch
-helper. The dedicated SwiGLU-7 launcher instead creates its work and result
-directories explicitly below `/mnt/scratch/$USER` and synchronizes results to
-`results_job_<job-id>/` beside the submitted checkout. This avoids depending
-on `.activate_scratch`, which was absent in live PROJECT-directory submissions.
+repository-relative so they remain valid after automatic scratch activation.
 
-Use a clean Perun checkout as the submission directory. Do not keep the local
-historical `data/results/` archive or earlier `results_job_*` directories inside
-it. Transfer only the prerequisite artifacts required by the submitted
+Use a clean Perun checkout as the submission directory. The prolog copies the
+whole submitted directory, including untracked runtime data, so do not keep the
+local historical `data/results/` archive or earlier `results_job_*` directories
+inside it. Transfer only the prerequisite artifacts required by the submitted
 workflow. Keep installed environments and reusable Hugging Face caches in
 persistent storage outside the checkout.
 
@@ -189,12 +186,14 @@ not copy a complete historical results tree. The Python runner validates the
 checkpoint and owns durable cleanup. A completed run retains its structured
 results and final model but removes resumable optimizer state.
 
-SwiGLU-7 is the first entry using this contract. Its dedicated launcher uses
-explicit per-job scratch and stage-out rather than Perun's automatic helper.
-Its preparation is independent:
+SwiGLU-7 is the first entry using this contract. Its preparation is independent:
 it regenerates the fixed allocation curves, four fitted starts, recovery data,
 and evaluation references from pinned model/dataset sources. No SwiGLU-5 or
 SwiGLU-6 runtime artifact is staged.
+
+Jobs 91205 and 91278 did not receive the documented `.activate_scratch` helper.
+Do not resubmit this workflow until Perun support confirms that automatic
+scratch initialization is working for the account.
 
 Prepare once with the dedicated job:
 
@@ -204,8 +203,7 @@ sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
 ```
 
 After stage-out, verify the complete
-`results_job_<job-id>/swiglu-7/prepare-001` directory beside the checkout and
-move it to stable PROJECT storage.
+`results/swiglu-7/prepare-001` directory and move it to stable PROJECT storage.
 Then submit the fixed grid; `%4` is only a scheduler concurrency limit:
 
 ```bash
@@ -236,11 +234,11 @@ runner stores failure state in its run JSON. Model-wide migrations store their
 notebook-compatible science artifact separately and record progress or failure
 in a sibling `.run.json` sidecar.
 
-The dedicated SwiGLU-7 launcher writes `results_job_<job-id>/` beside the
-submitted checkout. Other launchers still depend on Perun's automatic stage-out,
-whose documented HOME-versus-submit-directory location remains unresolved.
-Append every job to the [Perun experiment
-log](../../../docs/infrastructure/perun-log.md), update the [Perun project
-status](../../../docs/infrastructure/perun-status.md), and verify hashes before
+Current official Perun pages disagree on whether the synchronized
+`results_job_<job-id>/` directory appears under HOME or beside the submit
+directory. Inspect both after the first successful intended scientific run,
+append the job and observed behavior to the [Perun experiment
+log](../../../docs/infrastructure/perun-log.md), and update the [Perun project
+status](../../../docs/infrastructure/perun-status.md). Verify hashes before
 moving compact output to its canonical project location. Do not rely on job
 scratch for persistent results.

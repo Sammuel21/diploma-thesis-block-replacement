@@ -5,7 +5,7 @@ type: experiment
 category: experiments/model/swiglu
 status: active
 created: 2026-09-24
-modified: 2026-09-26
+modified: 2026-09-27
 authorship:
   created_by: collaborative
 curation:
@@ -145,20 +145,26 @@ sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
 
 The job uses one H200, eight CPUs, 128 GB RAM, and a 48-hour limit within
 PERUN's documented [`gpu_long` four-day ceiling](https://wiki.perun.tuke.sk/slurm/partitions/).
-The dedicated launcher creates both variables explicitly below
-`/mnt/scratch/$USER/mlp-replacement/job-<job-id>`. Temporary fit states go
-below `$TMPDIR`; preparation data goes to
-`$RESULTS_DIR/swiglu-7/prepare-001`. On exit, the launcher synchronizes durable
-output beside the submitted checkout. After completion:
+Temporary fit states go below `$TMPDIR`; durable preparation data goes to
+`$RESULTS_DIR/swiglu-7/prepare-001` and is staged out by PERUN. Jobs 91205 and
+91278 did not receive the documented `.activate_scratch` helper, so do not
+resubmit until Perun support confirms automatic scratch initialization. After a
+successful preparation:
 
 1. inspect `sacct`, `seff`, `result.json`, and `run.json`;
-2. locate `results_job_<job-id>/swiglu-7/prepare-001`;
+2. locate `results_job_<job-id>/results/swiglu-7/prepare-001`;
 3. move the complete `prepare-001` directory to stable PROJECT storage; and
 4. retain its internal directory structure and verify `result.json` plus the
    recorded hashes.
 
+PERUN's current pages disagree about the exact `results_job_<job-id>` parent,
+so check both the submit directory and HOME after the first successful job.
+
 Submit the fixed grid only after the prepared path is readable from a compute
-The dedicated launcher reads that path from the shared checkout. `%4` is a concurrency cap, not a
+node. If PROJECT storage is not directly visible inside allocations, copy the
+complete prepared directory into an `inputs/` directory in the clean checkout
+before submission and pass that repository-relative `result.json` path instead.
+PERUN will then stage it with each task. `%4` is a concurrency cap, not a
 scientific parameter; lower it if the project has fewer than four concurrent
 GPUs:
 
@@ -177,10 +183,10 @@ Array mapping is deterministic:
 | 4-7 | S7-1 | 0.2, 0.3, 0.4, 0.5 |
 | 8-11 | S7-2 | 0.2, 0.3, 0.4, 0.5 |
 
-Each task writes to its own scratch
-`$RESULTS_DIR/swiglu-7/<strategy>-target-<target>-run-001` directory and stages
-it to `results_job_<job-id>/swiglu-7/...` beside the checkout. Move verified
-stage-out directories to their canonical PROJECT/local locations afterward.
+Each task writes to its own `$RESULTS_DIR/swiglu-7/<strategy>-target-<target>-run-001`
+directory. Do not direct these checkpoint-heavy outputs to slow persistent NFS
+during training. Move verified stage-out directories to their canonical
+PROJECT/local locations afterward.
 
 For an interrupted trajectory, place its complete output directory inside the
 next submitted checkout (or another path that is staged into that job) and use

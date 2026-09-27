@@ -5,7 +5,7 @@ type: architecture
 category: infrastructure
 status: active
 created: 2026-09-11
-modified: 2026-09-26
+modified: 2026-09-27
 authorship:
   created_by: collaborative
 curation:
@@ -121,15 +121,13 @@ job file. Current workflows use one GPU and one Python process per job. Do not
 request multiple GPUs unless the invoked Python workflow explicitly implements
 distributed execution.
 
-Submit from the repository root so repository-relative paths resolve correctly.
-The generic launchers expect Perun's automatic staging. The dedicated
-SwiGLU-7 launcher runs code from the shared PROJECT checkout while placing its
-work and live output below `/mnt/scratch/$USER`; it then synchronizes durable
-output beside the submitted checkout.
+Submit from the repository root. Perun documents that its prolog stages the
+directory from which `sbatch` is invoked. Use repository-relative configuration
+and output paths so the workflow remains valid in the staged copy.
 
 ## Automatic scratch and storage
 
-The generic maintained jobs explicitly run:
+The maintained jobs explicitly run:
 
 ```bash
 source .activate_scratch
@@ -141,12 +139,11 @@ helper changes the working directory to the staged copy and defines scratch
 environment variables. The epilog then synchronizes new or modified results
 out of scratch and cleans the job area.
 
-Three live SwiGLU-7 submissions from a PROJECT checkout did not receive the
-documented helper or scratch variables. The dedicated SwiGLU-7 launcher therefore
-does not use this implicit contract. It creates a unique directory below
-`/mnt/scratch/$USER/mlp-replacement/`, writes work and results there, and uses
-`rsync` on process exit to create `results_job_<job-id>/` beside the checkout.
-It retains scratch if synchronization fails.
+Jobs 91205 and 91278 did not receive the documented helper, and job 91277 did
+not receive the complete documented scratch variables. The maintained launcher
+retains the official automatic-scratch contract; manual scratch creation and
+direct large PROJECT output are not accepted substitutes. Further submissions
+are blocked until Perun support confirms why the prolog did not initialize.
 
 The staging guide says hidden directories such as `.git/` and `.venv/`, Python
 cache directories, and existing `.out` or `.err` files are excluded. A Python
@@ -303,9 +300,7 @@ optional `--resume`:
   unless a later scientific design explicitly requires serialization.
 
 The local and Perun launchers call the same Python module. They differ only in
-environment setup, resource declarations, and default work/output paths. The
-dedicated Perun launcher owns explicit scratch creation and stage-out because
-the automatic helper was absent in the observed PROJECT-directory jobs.
+environment setup, resource declarations, and default work/output paths.
 
 ## First-session checklist
 

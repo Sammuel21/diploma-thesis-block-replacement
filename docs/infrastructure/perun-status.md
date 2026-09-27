@@ -5,7 +5,7 @@ type: report
 category: infrastructure
 status: active
 created: 2026-09-25
-modified: 2026-09-26
+modified: 2026-09-27
 authorship:
   created_by: collaborative
 curation:
@@ -25,7 +25,7 @@ instructions belong in the [Perun infrastructure guide](perun.md). Every
 submitted job must first receive an append-only entry in the [Perun experiment
 log](perun-log.md); this page is then updated from that evidence.
 
-Snapshot date: **2026-09-26**. `Available` means demonstrated for this project
+Snapshot date: **2026-09-27**. `Available` means demonstrated for this project
 account, not merely documented as a cluster feature. Account names, QoS values,
 usernames, credentials, and secret-bearing paths are not recorded.
 
@@ -38,11 +38,11 @@ usernames, credentials, and secret-bearing paths are not recorded.
 | Project allocation and concurrency limits | Partially verified | QoS exposes 8,424 allocated GPU-hours and no explicit per-user concurrent-GPU limit; scheduler availability still applies. |
 | GPU partition | Available | Three jobs received one GPU on `gpu_long`; all failed during launcher startup before Python. |
 | Persistent HOME/PROJECT storage | Available | HOME and the active 1 TB PROJECT allocation were observed with `perunfsusage`. |
-| Automatic scratch and result synchronization | Unavailable in observed submissions | Jobs 91205, 91277, and 91278 received neither a usable `.activate_scratch` helper nor the complete documented variables. SwiGLU-7 now uses explicit `/mnt/scratch` paths and stage-out; that correction is not yet run. |
+| Automatic scratch and result synchronization | Blocked | Jobs 91205 and 91278 received no `.activate_scratch` helper; job 91277 lacked `RESULTS_DIR`. The launcher retains the documented automatic-scratch contract pending Perun support. |
 | Python/CUDA environment | Login-node verified | Python 3.12, PyTorch 2.11.0+cu128, Transformers 5.14.1, Datasets 5.0.0, and lm-eval 0.4.13 import successfully when the Conda library directory leads `LD_LIBRARY_PATH`. Compute-node execution remains unobserved. |
 | Model and dataset availability | Unknown | The pinned SmolLM2 revision, tokenizer, C4 inputs, WikiText inputs, and evaluation datasets must be readable from a compute job. |
 | SwiGLU-7 runner | Ready by static inspection | Preparation now builds its own allocation curves, fitted starts, 1B-token stream, monitoring data, evaluation protocol, and dense references. It declares no prior-experiment artifact inputs. |
-| SwiGLU-7 PERUN job | Corrected, awaiting execution | `swiglu_7.sbatch` now bypasses the missing automatic helper, owns explicit per-job scratch/stage-out, and retains the fixed preparation plus task `0-11` mapping. |
+| SwiGLU-7 PERUN job | Blocked by scratch initialization | `swiglu_7.sbatch` follows the documented `source .activate_scratch` contract and retains the fixed preparation plus task `0-11` mapping. Do not resubmit until the missing helper is resolved. |
 | SwiGLU-7 prerequisite artifacts | None | No SwiGLU-1 through SwiGLU-6 runtime artifact is required. The pinned model and datasets must still be available from the compute allocation. |
 | Recorded Perun execution | Three startup failures | Jobs 91205, 91277, and 91278 each failed after one second before Python started. |
 
@@ -95,8 +95,8 @@ trajectory.
 | CPU | 8 CPUs per task | Unmeasured |
 | Host memory | 128 GB | Unmeasured; sized for S7-1 checkpoint and Adam-state assembly |
 | Wall time | 48 hours per job | Within the documented `gpu_long` ceiling; estimated above the 8-24 hour trajectory bands, but unmeasured |
-| Temporary work | `/mnt/scratch/$USER/mlp-replacement/job-<job-id>/` | Explicitly launcher-managed; corrected path not yet exercised |
-| Durable job output | `results_job_<job-id>/swiglu-7/<run-id>` beside the PROJECT checkout | Explicit `rsync` stage-out implemented; not yet exercised |
+| Temporary work | `$TMPDIR/mlp-replacement/swiglu-7-<job-id>-<task>` | Requires automatic scratch initialization |
+| Durable job output | `$RESULTS_DIR/swiglu-7/<run-id>`, then persistent stage-out | Automatic stage-out remains unobserved |
 | Output reserve | Trainable state, optimizer state, and final bundle estimate, plus 15% | Exact bytes depend on strategy and target |
 | Prepared data | About 16-20 GB durable plus 15-20 GB temporary fitting state | Estimate from configured tensor extents; unmeasured |
 | Planned allocation cost | 124-266 H200 GPU-hours for preparation plus all 12 runs | Estimate from recorded RTX 4090 SwiGLU-5/6 timings and the changed 8K workload; not consumption |
@@ -115,8 +115,11 @@ scientific contract.
 - Which Python, PyTorch, CUDA, Transformers, Datasets, and `lm_eval` versions
   work on an allocated H200?
 - Can compute nodes read the required model, cache, and dataset locations?
-- Can the dedicated launcher create and use its explicit `/mnt/scratch` path?
-- Does its explicit `rsync` stage-out preserve outputs after unsuccessful jobs?
+- Why did the documented prolog fail to create `.activate_scratch` for jobs
+  91205 and 91278?
+- Is the compute-node failure to resolve the numeric user ID related to scratch
+  initialization?
+- Where does automatic stage-out place `results_job_<job-id>` for this account?
 - Are the current memory and wall-time requests sufficient for each SwiGLU-7
   retraining scope?
 
