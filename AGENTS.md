@@ -12,6 +12,14 @@
   because files are available; perform those operations when I request them.
 - give praise where praise is due
 
+## Git authority
+- Agents must never create, amend, squash, sign, or otherwise produce Git
+  commits. Leave all approved file changes uncommitted for my review.
+- Agents must never push branches, commits, tags, or other refs to a remote.
+  Only I may perform `git commit` and `git push` operations.
+- When committing or pushing is the next step, report the changed files and
+  provide the commands for me to run instead of executing them.
+
 ## Objective judgment
 - Treat my proposed approach and expected outcome as hypotheses to evaluate,
   not conclusions to validate. Serve the underlying goal without agreeing
