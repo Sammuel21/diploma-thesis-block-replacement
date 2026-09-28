@@ -19,7 +19,7 @@ workflows/
 ## Infrastructure prerequisite
 
 Before designing or modifying a workflow intended for TUKE Perun, read the
-canonical [Perun infrastructure guide](../docs/infrastructure/perun.md). It
+canonical [Perun infrastructure guide](../docs/infrastructure/perun/perun.md). It
 records the submission, storage, environment, scratch, artifact, and validation
 requirements that migrated workflows must respect. Scoped implementation-agent
 instructions are in [`AGENTS.md`](AGENTS.md).

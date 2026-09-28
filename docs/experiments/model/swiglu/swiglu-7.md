@@ -5,7 +5,7 @@ type: experiment
 category: experiments/model/swiglu
 status: active
 created: 2026-09-24
-modified: 2026-09-27
+modified: 2026-09-28
 authorship:
   created_by: collaborative
 curation:
@@ -106,7 +106,18 @@ separate explicit choice under the repository instructions.
 
 Use a clean checkout and submit from its repository root. The environment must
 provide a CUDA-enabled PyTorch build that supports H200, Transformers,
-Datasets, NumPy, `lm_eval==0.4.13`, `safetensors`, and `psutil`. The exact
+Datasets, NumPy, `lm_eval==0.4.13` with its Hugging Face backend,
+`accelerate>=0.26.0`, `safetensors`, and `psutil`. A clean environment can
+install the pinned harness backend with:
+
+```bash
+python -m pip install 'lm_eval[hf]==0.4.13'
+```
+
+Importing top-level `lm_eval` is not a sufficient check because `accelerate`
+is an optional dependency loaded by the `HFLM` evaluation adapter. The
+[pinned harness metadata](https://github.com/EleutherAI/lm-evaluation-harness/blob/v0.4.13/pyproject.toml)
+declares `accelerate>=0.26.0` in its `hf` extra. The exact
 SmolLM2, C4, WikiText, and benchmark-dataset revisions are pinned in the
 configuration. Compute
 nodes must be able to download those revisions or read a pre-populated
@@ -120,6 +131,7 @@ Set the project-specific values only in the shell:
 export PERUN_ACCOUNT="your-project-account"
 export PERUN_QOS="your-project-qos"
 export PERUN_PROJECT="/mnt/project/$PERUN_ACCOUNT"
+export PERUN_LOG_DIR="$PERUN_PROJECT/perun-job-logs"
 
 scontrol show assoc_mgr users="$USER" accounts="$PERUN_ACCOUNT" flags=assoc
 scontrol show assoc_mgr qos="$PERUN_QOS" flags=qos
@@ -128,14 +140,16 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate mlp-replacement
 export MLP_REPLACEMENT_PYTHON="$(command -v python)"
 export HF_HOME="$PERUN_PROJECT/huggingface-cache"
-mkdir -p "$HF_HOME"
+mkdir -p "$HF_HOME" "$PERUN_LOG_DIR"
 ```
 
 Confirm the selected interpreter before allocating a long job:
 
 ```bash
 "$MLP_REPLACEMENT_PYTHON" -c \
-  'import torch, transformers, datasets, lm_eval, safetensors, psutil; print(torch.__version__, torch.version.cuda)'
+  'from importlib.metadata import version; from packaging.version import Version; import torch, transformers, datasets, lm_eval, safetensors, psutil; from lm_eval.models.huggingface import HFLM; accelerate_version = version("accelerate"); assert Version(accelerate_version) >= Version("0.26.0"); print(torch.__version__, torch.version.cuda, "accelerate", accelerate_version)'
+
+"$MLP_REPLACEMENT_PYTHON" -m pip check
 ```
 
 ## Deploy
@@ -144,18 +158,21 @@ Submit one preparation job:
 
 ```bash
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+  --output="$PERUN_LOG_DIR/%x_%j.out" \
+  --error="$PERUN_LOG_DIR/%x_%j.err" \
   workflows/jobs/perun/swiglu_7.sbatch prepare
 ```
 
-The job uses one H200, eight CPUs, 128 GB RAM, and a 48-hour limit within
-PERUN's documented [`gpu_long` four-day ceiling](https://wiki.perun.tuke.sk/slurm/partitions/).
+The job uses one H200, eight CPUs, 128 GB RAM, and the documented 48-hour
+[`gpu_short` ceiling](https://wiki.perun.tuke.sk/slurm/partitions/). The limit
+applies independently to each array task.
 The launcher manually copies the checkout to a unique directory below
 `/mnt/scratch/$USER`, runs there, then copies and verifies durable preparation
 data at `$PERUN_PROJECT/perun-results/swiglu-7/prepare-001`. PERUN support
 confirmed that automatic scratch activation and synchronization are not
 currently available. After a successful preparation:
 
-1. inspect the scheduler `.out` and `.err` files in the repository;
+1. inspect the scheduler `.out` and `.err` files in `$PERUN_LOG_DIR`;
 2. inspect PROJECT `result.json` and `run.json`;
 3. confirm `result.json` reports `status: completed`; and
 4. retain the complete `prepare-001` directory and its internal structure.
@@ -169,6 +186,8 @@ concurrently; scheduler availability can still keep some tasks pending:
 export S7_PREPARED="$PERUN_PROJECT/perun-results/swiglu-7/prepare-001/result.json"
 
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=0-11%12 \
+  --output="$PERUN_LOG_DIR/%x_%A_%a.out" \
+  --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
   workflows/jobs/perun/swiglu_7.sbatch train "$S7_PREPARED"
 ```
 
@@ -193,6 +212,8 @@ Resume preparation with:
 
 ```bash
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+  --output="$PERUN_LOG_DIR/%x_%j.out" \
+  --error="$PERUN_LOG_DIR/%x_%j.err" \
   workflows/jobs/perun/swiglu_7.sbatch prepare --resume
 ```
 
@@ -202,6 +223,8 @@ original array index, for example task 6 (S7-1 at target 0.4):
 
 ```bash
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=6 \
+  --output="$PERUN_LOG_DIR/%x_%A_%a.out" \
+  --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
   workflows/jobs/perun/swiglu_7.sbatch train --resume "$S7_PREPARED"
 ```
 
@@ -250,6 +273,6 @@ temporary fit-state space. The largest training output reserve is expected to
 be roughly 45-55 GB before the successful checkpoint is removed.
 
 Record every job, including failures and cancellations, in the
-[PERUN experiment log](../../../infrastructure/perun-log.md), then update the
-[PERUN project status](../../../infrastructure/perun-status.md) from measured
+[PERUN experiment log](../../../infrastructure/perun/perun-log.md), then update the
+[PERUN project status](../../../infrastructure/perun/perun-status.md) from measured
 elapsed time, MaxRSS, peak GPU memory, and output bytes.

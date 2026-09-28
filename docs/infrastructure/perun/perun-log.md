@@ -2,10 +2,10 @@
 metadata_version: 1
 title: TUKE Perun Experiment Log
 type: report
-category: infrastructure
+category: infrastructure/perun
 status: active
 created: 2026-09-25
-modified: 2026-09-27
+modified: 2026-09-28
 authorship:
   created_by: collaborative
 curation:
@@ -100,7 +100,7 @@ Entries are appended below in submission order.
 - Outputs: no structured artifact; scheduler logs archived in PROJECT storage
 - Continuation: not resumable; no checkpoint
 - Verification: `scontrol show job` and scheduler stderr inspected
-- Experiment document: [SwiGLU-7](../experiments/model/swiglu/swiglu-7.md)
+- Experiment document: [SwiGLU-7](../../experiments/model/swiglu/swiglu-7.md)
 - Notes: `.activate_scratch` was absent from the PROJECT submission directory.
 
 ## [2026-09-26 19:47 UTC] 91277 | SwiGLU-7 preparation startup
@@ -114,7 +114,7 @@ Entries are appended below in submission order.
 - Outputs: no structured artifact; scheduler logs archived in PROJECT storage
 - Continuation: not resumable; no checkpoint
 - Verification: `scontrol show job` and scheduler stderr inspected
-- Experiment document: [SwiGLU-7](../experiments/model/swiglu/swiglu-7.md)
+- Experiment document: [SwiGLU-7](../../experiments/model/swiglu/swiglu-7.md)
 - Notes: the automatic helper was removed for this attempt; `RESULTS_DIR` remained undefined. The login shell also reported that the numeric user ID could not be resolved on the compute node.
 
 ## [2026-09-26 19:59 UTC] 91278 | SwiGLU-7 preparation startup
@@ -128,7 +128,7 @@ Entries are appended below in submission order.
 - Outputs: no structured artifact; scheduler logs retained in PROJECT storage
 - Continuation: not resumable; no checkpoint
 - Verification: `scontrol show job`, scheduler stderr, account identity, Slurm prolog configuration, and expected scratch paths inspected
-- Experiment document: [SwiGLU-7](../experiments/model/swiglu/swiglu-7.md)
+- Experiment document: [SwiGLU-7](../../experiments/model/swiglu/swiglu-7.md)
 - Notes: login shell plus `source .activate_scratch` still found no helper. No documented progress log or surviving per-job scratch directory was observed.
 
 ## [2026-09-27 11:51 cluster time] 91634 | Automatic-scratch CPU probe
@@ -142,7 +142,7 @@ Entries are appended below in submission order.
 - Outputs: no structured result; scheduler logs retained in PROJECT checkout
 - Continuation: not resumable; no checkpoint
 - Verification: `scontrol show job`, scheduler stdout, and scheduler stderr inspected
-- Experiment document: [SwiGLU-7](../experiments/model/swiglu/swiglu-7.md)
+- Experiment document: [SwiGLU-7](../../experiments/model/swiglu/swiglu-7.md)
 - Notes: `.activate_scratch` was absent. PERUN support later confirmed that the helper is unavailable and staging must be manual.
 
 ## [2026-09-27 time unrecorded] 91981 | Manual PROJECT-SCRATCH pipeline probe
@@ -156,5 +156,33 @@ Entries are appended below in submission order.
 - Outputs: one small text record in PROJECT `perun-results/job_91981/`; exact bytes unrecorded; scheduler logs in the PROJECT checkout
 - Continuation: not resumable; no checkpoint
 - Verification: result reported `status=ok`; persistent PROJECT file was read successfully; marker-protected job SCRATCH was absent after verified stage-out
-- Experiment document: [SwiGLU-7](../experiments/model/swiglu/swiglu-7.md)
+- Experiment document: [SwiGLU-7](../../experiments/model/swiglu/swiglu-7.md)
 - Notes: Demonstrated manual checkout staging, execution from SCRATCH, explicit PROJECT stage-out, verification, and scoped cleanup without a GPU allocation.
+
+## [2026-09-27 23:49 cluster time] 91995 | SwiGLU-7 preparation
+
+- Outcome: FAILED; exit code Unknown because the controller record expired; reason `ModuleNotFoundError: No module named 'accelerate'`
+- Submission: `workflows.runs.model.swiglu.swiglu_7`; preparation; identity `prepare-001`
+- Provenance: commit Unknown; config `workflows/configs/model/swiglu/swiglu-7.json`; hashes retained in the structured artifact
+- Allocation: `gpu_long`; 1 node (`gpu01`); 1 NVIDIA H200; 8 CPUs; 128 GB requested memory; 48-hour limit
+- Consumption: queue Unknown; elapsed Unknown; requested GPU-hour ceiling 48; allocation GPU-hours Unknown; CPU core-hours Unknown; MaxRSS Unknown; peak GPU memory Unknown
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
+- Outputs: durable bytes Unknown; PROJECT stage-out; `result.json` and `run.json` under `perun-results/swiglu-7/prepare-001/`; scheduler logs `swiglu-7_91995.out` and `swiglu-7_91995.err`
+- Continuation: resumable; completed preparation artifacts were retained; no optimizer checkpoint applies to this stage
+- Verification: structured status was `failed`; persistent output was reported; the PROJECT lock was absent after verified stage-out
+- Experiment document: [SwiGLU-7](../../experiments/model/swiglu/swiglu-7.md)
+- Notes: PyTorch 2.11.0+cu128 ran on an H200 and the model and datasets loaded. Width curves completed before the first `HFLM` benchmark import exposed the missing optional dependency. Workflow telemetry reported 41.81 GiB peak process RAM. Install `accelerate>=0.26.0`, verify the exact `HFLM` import, and use `prepare --resume`.
+
+## [2026-09-28 09:49 cluster time] 92265 | SwiGLU-7 preparation resume
+
+- Outcome: COMPLETED; exit code Unknown because the controller record expired; reason none
+- Submission: `workflows.runs.model.swiglu.swiglu_7`; preparation with `--resume`; identity `prepare-001`
+- Provenance: commit Unknown; config `workflows/configs/model/swiglu/swiglu-7.json`; hashes retained in the structured artifact
+- Allocation: `gpu_long`; 1 node (`gpu02`); 1 NVIDIA H200; 8 CPUs; 128 GB requested memory; 48-hour limit
+- Consumption: queue Unknown; elapsed Unknown; requested GPU-hour ceiling 48; allocation GPU-hours Unknown; CPU core-hours Unknown; MaxRSS Unknown; peak GPU memory Unknown
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
+- Outputs: durable bytes Unknown; PROJECT `perun-results/swiglu-7/prepare-001/`; scheduler logs `swiglu-7_92265.out` and `swiglu-7_92265.err`
+- Continuation: completed; no preparation resume remains necessary
+- Verification: structured status `completed`; structured error `None`; PROJECT lock absent after verified stage-out
+- Experiment document: [SwiGLU-7](../../experiments/model/swiglu/swiglu-7.md)
+- Notes: The resumed job reused prior preparation artifacts, imported the `HFLM` backend successfully, completed the pinned dense benchmark evaluations, and finalized the shared preparation artifact.

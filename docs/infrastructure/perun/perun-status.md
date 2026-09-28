@@ -2,10 +2,10 @@
 metadata_version: 1
 title: TUKE Perun Project Status
 type: report
-category: infrastructure
+category: infrastructure/perun
 status: active
 created: 2026-09-25
-modified: 2026-09-27
+modified: 2026-09-28
 authorship:
   created_by: collaborative
 curation:
@@ -25,7 +25,7 @@ instructions belong in the [Perun infrastructure guide](perun.md). Every
 submitted job must first receive an append-only entry in the [Perun experiment
 log](perun-log.md); this page is then updated from that evidence.
 
-Snapshot date: **2026-09-27**. `Available` means demonstrated for this project
+Snapshot date: **2026-09-28**. `Available` means demonstrated for this project
 account, not merely documented as a cluster feature. Account names, QoS values,
 usernames, credentials, and secret-bearing paths are not recorded.
 
@@ -34,17 +34,17 @@ usernames, credentials, and secret-bearing paths are not recorded.
 | Requirement | Status | Current evidence or missing item |
 | --- | --- | --- |
 | VPN, SSH key, and login access | Available | Interactive access to `login01` observed. |
-| Active Slurm association | Available | The project account and QoS accepted three GPU submissions. |
+| Active Slurm association | Available | The project account and QoS accepted five GPU submissions. |
 | Project allocation and concurrency limits | Partially verified | QoS exposes 8,424 allocated GPU-hours and no explicit per-user concurrent-GPU limit; scheduler availability still applies. |
-| GPU partition | Available | Three jobs received one GPU on `gpu_long`; all failed during launcher startup before Python. |
+| GPU partition | Available | Jobs 91995 and 92265 ran PyTorch on NVIDIA H200 GPUs on `gpu_long`; training is configured for `gpu_short`. |
 | Persistent HOME/PROJECT storage | Available | HOME and the active 1 TB PROJECT allocation were observed with `perunfsusage`. |
 | Manual scratch and PROJECT stage-out | Available | PERUN support confirmed the manual contract; CPU probe 91981 copied PROJECT to SCRATCH, ran there, copied and verified its result in PROJECT, and cleaned only its job directory. |
-| Python/CUDA environment | Login-node verified | Python 3.12, PyTorch 2.11.0+cu128, Transformers 5.14.1, Datasets 5.0.0, and lm-eval 0.4.13 import successfully when the Conda library directory leads `LD_LIBRARY_PATH`. Compute-node execution remains unobserved. |
-| Model and dataset availability | Unknown | The pinned SmolLM2 revision, tokenizer, C4 inputs, WikiText inputs, and evaluation datasets must be readable from a compute job. |
-| SwiGLU-7 runner | Ready by static inspection | Preparation now builds its own allocation curves, fitted starts, 1B-token stream, monitoring data, evaluation protocol, and dense references. It declares no prior-experiment artifact inputs. |
-| SwiGLU-7 PERUN job | Ready by static inspection | `swiglu_7.sbatch` implements the demonstrated manual staging contract, fixed task `0-11` mapping, persistent PROJECT outputs, locking, verified stage-out, and resume. GPU execution remains unobserved. |
+| Python/CUDA environment | Available | Job 92265 verified Python 3.12, PyTorch 2.11.0+cu128 on an H200 and completed the exact `HFLM` evaluation path after `accelerate` installation. |
+| Model and dataset availability | Available for preparation | Job 92265 loaded the pinned model, tokenizer, recovery/evaluation data, and benchmark datasets and completed dense evaluation. |
+| SwiGLU-7 runner | Preparation completed | Job 92265 completed and validated the independent `prepare-001` artifact. Training remains unmeasured. |
+| SwiGLU-7 PERUN job | Preparation path validated | Manual staging, resume, execution, PROJECT stage-out, lock removal, and structured completion worked in job 92265. The 12-task training path remains unmeasured. |
 | SwiGLU-7 prerequisite artifacts | None | No SwiGLU-1 through SwiGLU-6 runtime artifact is required. The pinned model and datasets must still be available from the compute allocation. |
-| Recorded Perun execution | Manual pipeline verified | Three GPU startup failures and one CPU automatic-helper probe failure preceded successful manual CPU probe 91981. No SwiGLU-7 Python stage has run yet. |
+| Recorded Perun execution | Preparation completed | After the earlier infrastructure and dependency failures, resume job 92265 completed SwiGLU-7 preparation and dense evaluation. |
 
 ## Available capacity
 
@@ -53,10 +53,10 @@ the project. Replace `Unknown` only with live, non-sensitive evidence.
 
 | Resource | Cluster-documented capacity | Project-available capacity | Evidence date |
 | --- | --- | --- | --- |
-| GPU hardware | NVIDIA H200; up to 8 GPUs per GPU node | One GPU allocated per failed startup job; type not directly observed | 2026-09-26 |
-| GPU partitions | `gpu_short` up to 2 days; `gpu_long` up to 4 days | `gpu_long` accepted three submissions | 2026-09-26 |
+| GPU hardware | NVIDIA H200; up to 8 GPUs per GPU node | One NVIDIA H200 observed directly in job 91995 | 2026-09-28 |
+| GPU partitions | `gpu_short` up to 2 days; `gpu_long` up to 4 days | `gpu_long` accepted five submissions; `gpu_short` training submission remains unmeasured | 2026-09-28 |
 | Concurrent jobs/GPUs | Cluster and QoS dependent | Unknown | Not observed |
-| CPU allocation | Partition and QoS dependent | Unknown | Not observed |
+| CPU allocation | Partition and QoS dependent | 8 CPUs allocated with preparation job 91995; 1 CPU with probe 91981 | 2026-09-28 |
 | HOME storage | 500 GB documented per user | 500 GB allocation; about 665 MB used when inspected | 2026-09-26 |
 | PROJECT storage | Project-specific | 1 TB allocation; writable | 2026-09-27 |
 | SCRATCH storage | Temporary; no fixed quota currently documented | User root provisioned and writable; manual job child verified | 2026-09-27 |
@@ -71,16 +71,16 @@ are tracked separately and are not reported as consumption.
 
 | Measure | Recorded total |
 | --- | ---: |
-| Submitted jobs | 5 |
-| Successful jobs | 1 |
-| Failed, canceled, timed-out, or OOM jobs | 4 |
-| Requested GPU-hour ceiling | 144 |
-| Allocation GPU-hours consumed | 0.000833 |
-| CPU core-hours consumed | At least 0.006667; probe 91981 elapsed unavailable |
-| Elapsed wall time | At least 3 seconds; probe 91981 elapsed unavailable |
-| Maximum observed host memory | Not observed |
+| Submitted jobs | 7 |
+| Successful jobs | 2 |
+| Failed, canceled, timed-out, or OOM jobs | 5 |
+| Requested GPU-hour ceiling | 240 |
+| Allocation GPU-hours consumed | At least 0.000833; jobs 91995 and 92265 elapsed unavailable |
+| CPU core-hours consumed | At least 0.006667; jobs 91981, 91995, and 92265 elapsed unavailable |
+| Elapsed wall time | At least 3 seconds; jobs 91981, 91995, and 92265 elapsed unavailable |
+| Maximum observed host memory | 41.81 GiB process peak during preparation job 91995 |
 | Maximum observed GPU memory | Not observed |
-| Durable output bytes | One small probe text file; exact bytes unrecorded |
+| Durable output bytes | One small probe record plus failed preparation artifacts; exact bytes unrecorded |
 
 ## SwiGLU-7 plan
 
@@ -91,14 +91,14 @@ trajectory.
 
 | Resource | Planned request or location | Current status |
 | --- | --- | --- |
-| GPU | 1 H200-class GPU via `gpu_long` | One-GPU allocations accepted; Python/CUDA execution still unverified |
+| GPU | 1 H200-class GPU via `gpu_short` | Python/CUDA execution verified on one H200; training placement remains unmeasured |
 | CPU | 8 CPUs per task | Unmeasured |
 | Host memory | 128 GB | Unmeasured; sized for S7-1 checkpoint and Adam-state assembly |
-| Wall time | 48 hours per job | Within the documented `gpu_long` ceiling; estimated above the 8-24 hour trajectory bands, but unmeasured |
+| Wall time | 48 hours per task | Equal to the documented `gpu_short` ceiling; estimated above the 8-24 hour trajectory bands, but unmeasured |
 | Temporary work | `/mnt/scratch/$USER/job_<job-key>/tmp/mlp-replacement/...` | Manual directory contract verified by CPU probe |
 | Durable job output | `PROJECT/perun-results/swiglu-7/<run-id>` | Launcher performs and verifies manual stage-out |
 | Output reserve | Trainable state, optimizer state, and final bundle estimate, plus 15% | Exact bytes depend on strategy and target |
-| Prepared data | About 16-20 GB durable plus 15-20 GB temporary fitting state | Estimate from configured tensor extents; unmeasured |
+| Prepared data | About 16-20 GB durable plus 15-20 GB temporary fitting state | `prepare-001` completed; exact durable bytes unrecorded |
 | Planned allocation cost | 124-266 H200 GPU-hours for preparation plus all 12 runs | Estimate from recorded RTX 4090 SwiGLU-5/6 timings and the changed 8K workload; not consumption |
 | Expected VRAM | S7-0 25-50 GB; S7-1 35-70 GB; S7-2 30-60 GB | Planning bands only; H200 supplies 141 GB HBM |
 
@@ -107,14 +107,11 @@ array concurrency cap permits all 12 one-GPU tasks to run simultaneously and
 gives an estimated 12-24 hours of training-grid compute after preparation,
 excluding queue time. Scheduler availability may start fewer than 12 tasks at
 once. See the [SwiGLU-7 experiment
-guide](../experiments/model/swiglu/swiglu-7.md) for the estimate basis and
+guide](../../experiments/model/swiglu/swiglu-7.md) for the estimate basis and
 scientific contract.
 
 ## Open questions
 
-- Which Python, PyTorch, CUDA, Transformers, Datasets, and `lm_eval` versions
-  work on an allocated H200?
-- Can compute nodes read the required model, cache, and dataset locations?
 - Is the compute-node failure to resolve the numeric user ID related to scratch
   initialization?
 - Are the current memory and wall-time requests sufficient for each SwiGLU-7

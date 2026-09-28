@@ -7,7 +7,7 @@
 - Before modifying a maintained workflow, read
   [`../docs/agents/maintained-code-and-workflows.md`](../docs/agents/maintained-code-and-workflows.md).
 - Before proposing or modifying a workflow intended to execute on TUKE Perun,
-  read [`../docs/infrastructure/perun.md`](../docs/infrastructure/perun.md).
+  read [`../docs/infrastructure/perun/perun.md`](../docs/infrastructure/perun/perun.md).
 - Before modifying a Perun Slurm file, also read
   [`jobs/perun/README.md`](jobs/perun/README.md).
 

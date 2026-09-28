@@ -57,12 +57,17 @@ Markdown files in this directory follow the
 
 ## Infrastructure
 
-- [TUKE Perun workflow infrastructure](infrastructure/perun.md) records the
+- [TUKE Perun workflow infrastructure](infrastructure/perun/perun.md) records the
   stable access, Slurm, storage, environment, scratch, and artifact contracts
   for unattended Perun workflows.
-- [TUKE Perun project status](infrastructure/perun-status.md) tracks current
+- [TUKE Perun deployment template](infrastructure/perun/perun-deployment.md)
+  provides a workflow-neutral blueprint for setup, submission, monitoring,
+  result retrieval, failure capture, and cleanup verification.
+- [TUKE Perun command cheat sheet](infrastructure/perun/perun-cheatsheet.md)
+  collects short commands for routine cluster operation and troubleshooting.
+- [TUKE Perun project status](infrastructure/perun/perun-status.md) tracks current
   readiness, available capacity, cumulative consumption, and open questions.
-- [TUKE Perun experiment log](infrastructure/perun-log.md) is the append-only
+- [TUKE Perun experiment log](infrastructure/perun/perun-log.md) is the append-only
   record of submitted jobs, allocations, outcomes, resource measurements, and
   artifact locations.
 

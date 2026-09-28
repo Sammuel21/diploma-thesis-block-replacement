@@ -71,6 +71,22 @@ class ExecutorContracts(unittest.TestCase):
         self.assertIn("rsync -a --delete --exclude='*.tmp'", source)
         self.assertIn("OUTPUT_READY_FOR_STAGEOUT", source)
 
+    def test_perun_swiglu7_checks_exact_evaluation_backend(self):
+        source = PERUN_SWIGLU_7.read_text(encoding="utf-8")
+        self.assertIn("from lm_eval.models.huggingface import HFLM", source)
+        self.assertIn('Version(accelerate_version) >= Version("0.26.0")', source)
+
+    def test_perun_swiglu7_maps_twelve_independent_short_partition_tasks(self):
+        source = PERUN_SWIGLU_7.read_text(encoding="utf-8")
+        self.assertIn("#SBATCH --partition=gpu_short", source)
+        self.assertIn("#SBATCH --gres=gpu:1", source)
+        self.assertIn("#SBATCH --time=48:00:00", source)
+        self.assertIn("TASK_ID < 0 || TASK_ID > 11", source)
+        self.assertIn("STRATEGIES=(S7-0 S7-1 S7-2)", source)
+        self.assertIn("TARGETS=(0.2 0.3 0.4 0.5)", source)
+        self.assertIn('STRATEGY="${STRATEGIES[$((TASK_ID / 4))]}"', source)
+        self.assertIn('TARGET="${TARGETS[$((TASK_ID % 4))]}"', source)
+
     def test_local_directory_contract_uses_bounded_defaults(self):
         source = LOCAL.read_text(encoding="utf-8")
         self.assertIn('WORK_DIR="data/work/${WORKFLOW_NAME}/${RUN_ID}"', source)

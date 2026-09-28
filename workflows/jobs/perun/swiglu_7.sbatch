@@ -3,7 +3,7 @@
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
 # Supply --account and --qos to sbatch; see README.md.
-#SBATCH --partition=gpu_long
+#SBATCH --partition=gpu_short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -174,7 +174,7 @@ if [[ -z "${CUDA_VISIBLE_DEVICES:-}" ]]; then
     exit 2
 fi
 "$PYTHON_BIN" -c \
-    'import torch, transformers, datasets, lm_eval, safetensors, psutil; assert torch.cuda.is_available(), "PyTorch cannot access CUDA"; print("environment preflight: OK", torch.__version__, torch.version.cuda, torch.cuda.get_device_name(0), flush=True)'
+    'from importlib.metadata import version; from packaging.version import Version; import torch, transformers, datasets, lm_eval, safetensors, psutil; from lm_eval.models.huggingface import HFLM; accelerate_version = version("accelerate"); assert Version(accelerate_version) >= Version("0.26.0"), f"accelerate>=0.26.0 is required, found {accelerate_version}"; assert torch.cuda.is_available(), "PyTorch cannot access CUDA"; print("environment preflight: OK", torch.__version__, torch.version.cuda, torch.cuda.get_device_name(0), "accelerate", accelerate_version, flush=True)'
 
 mkdir -p "$PROJECT_RESULTS_ROOT"
 test -w "$PROJECT_RESULTS_ROOT"

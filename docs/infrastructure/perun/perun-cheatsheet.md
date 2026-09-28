@@ -2,10 +2,10 @@
 metadata_version: 1
 title: TUKE Perun Command Cheat Sheet
 type: reference
-category: infrastructure
+category: infrastructure/perun
 status: active
 created: 2026-09-27
-modified: 2026-09-27
+modified: 2026-09-28
 authorship:
   created_by: collaborative
 curation:
@@ -43,6 +43,7 @@ export PERUN_ACCOUNT="your-project-account"
 export PERUN_QOS="your-project-qos"
 export PERUN_PROJECT="/mnt/project/$PERUN_ACCOUNT"
 export PERUN_SCRATCH="/mnt/scratch/$USER"
+export PERUN_LOG_DIR="$PERUN_PROJECT/perun-job-logs"
 
 cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
 
@@ -56,7 +57,7 @@ esac
 
 export MLP_REPLACEMENT_PYTHON="$(command -v python)"
 export HF_HOME="$PERUN_PROJECT/huggingface-cache"
-mkdir -p "$HF_HOME"
+mkdir -p "$HF_HOME" "$PERUN_LOG_DIR"
 
 pwd
 python --version
@@ -147,6 +148,8 @@ Submit and capture the job ID:
 SUBMISSION=$(sbatch --parsable \
   --account="$PERUN_ACCOUNT" \
   --qos="$PERUN_QOS" \
+  --output="$PERUN_LOG_DIR/%x_%j.out" \
+  --error="$PERUN_LOG_DIR/%x_%j.err" \
   "$JOB_FILE")
 
 export JOB_ID="${SUBMISSION%%;*}"
@@ -176,13 +179,13 @@ scontrol show job "$JOB_ID"
 Follow standard output:
 
 ```bash
-tail -f "${JOB_NAME}_${JOB_ID}.out"
+tail -f "$PERUN_LOG_DIR/${JOB_NAME}_${JOB_ID}.out"
 ```
 
 Follow standard error:
 
 ```bash
-tail -f "${JOB_NAME}_${JOB_ID}.err"
+tail -f "$PERUN_LOG_DIR/${JOB_NAME}_${JOB_ID}.err"
 ```
 
 Use `Ctrl+C` to stop following a log. This does not cancel the job.
@@ -192,8 +195,8 @@ Use `Ctrl+C` to stop following a log. This does not cancel the job.
 Read the final logs:
 
 ```bash
-tail -n 100 "${JOB_NAME}_${JOB_ID}.out"
-tail -n 100 "${JOB_NAME}_${JOB_ID}.err"
+tail -n 100 "$PERUN_LOG_DIR/${JOB_NAME}_${JOB_ID}.out"
+tail -n 100 "$PERUN_LOG_DIR/${JOB_NAME}_${JOB_ID}.err"
 ```
 
 Inspect the persistent result directory:
@@ -239,6 +242,8 @@ Submit preparation from the repository root:
 PREP_SUBMISSION=$(sbatch --parsable \
   --account="$PERUN_ACCOUNT" \
   --qos="$PERUN_QOS" \
+  --output="$PERUN_LOG_DIR/%x_%j.out" \
+  --error="$PERUN_LOG_DIR/%x_%j.err" \
   workflows/jobs/perun/swiglu_7.sbatch prepare)
 
 export PREP_JOB="${PREP_SUBMISSION%%;*}"
@@ -259,6 +264,8 @@ TRAIN_SUBMISSION=$(sbatch --parsable \
   --account="$PERUN_ACCOUNT" \
   --qos="$PERUN_QOS" \
   --array=0-11%12 \
+  --output="$PERUN_LOG_DIR/%x_%A_%a.out" \
+  --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
   workflows/jobs/perun/swiglu_7.sbatch train "$S7_PREPARED")
 
 export TRAIN_ARRAY="${TRAIN_SUBMISSION%%;*}"
@@ -269,6 +276,8 @@ Resume preparation:
 
 ```bash
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+  --output="$PERUN_LOG_DIR/%x_%j.out" \
+  --error="$PERUN_LOG_DIR/%x_%j.err" \
   workflows/jobs/perun/swiglu_7.sbatch prepare --resume
 ```
 
@@ -276,6 +285,8 @@ Resume one failed array task, for example task 6:
 
 ```bash
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=6 \
+  --output="$PERUN_LOG_DIR/%x_%A_%a.out" \
+  --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
   workflows/jobs/perun/swiglu_7.sbatch train --resume "$S7_PREPARED"
 ```
 
@@ -286,8 +297,8 @@ find "$PERUN_PROJECT/perun-results/swiglu-7" \
   -maxdepth 3 \( -name 'result.json' -o -name 'run.json' \) -print
 ```
 
-The scheduler logs remain in the repository as
-`swiglu-7_<job-id>.out` and `swiglu-7_<job-id>.err`.
+Scheduler logs are stored below `$PERUN_LOG_DIR`. Single-job names use
+`%x_%j`; array-task names use `%x_%A_%a`.
 
 ## 11. Manual staging inside a job
 
@@ -331,7 +342,7 @@ python --version
 Check required packages:
 
 ```bash
-python -c 'from importlib.metadata import version; import torch, transformers, datasets, lm_eval, huggingface_hub, safetensors, psutil; print("torch:", torch.__version__, "CUDA:", torch.version.cuda); print("transformers:", transformers.__version__); print("datasets:", datasets.__version__); print("lm_eval:", version("lm_eval")); print("imports: OK")'
+python -c 'from importlib.metadata import version; from packaging.version import Version; import torch, transformers, datasets, lm_eval, huggingface_hub, safetensors, psutil; from lm_eval.models.huggingface import HFLM; accelerate_version = version("accelerate"); assert Version(accelerate_version) >= Version("0.26.0"); print("torch:", torch.__version__, "CUDA:", torch.version.cuda); print("transformers:", transformers.__version__); print("datasets:", datasets.__version__); print("lm_eval:", version("lm_eval")); print("accelerate:", accelerate_version); print("HFLM import: OK")'
 
 python -m pip check
 ```
@@ -351,6 +362,7 @@ Print important paths without printing tokens:
 ```bash
 echo "PERUN_PROJECT=${PERUN_PROJECT:-<unset>}"
 echo "PERUN_SCRATCH=${PERUN_SCRATCH:-<unset>}"
+echo "PERUN_LOG_DIR=${PERUN_LOG_DIR:-<unset>}"
 echo "CONDA_PREFIX=${CONDA_PREFIX:-<unset>}"
 echo "MLP_REPLACEMENT_PYTHON=${MLP_REPLACEMENT_PYTHON:-<unset>}"
 echo "HF_HOME=${HF_HOME:-<unset>}"
@@ -360,8 +372,8 @@ Capture a failed job before its controller record expires:
 
 ```bash
 scontrol show job "$JOB_ID"
-cat "${JOB_NAME}_${JOB_ID}.out"
-cat "${JOB_NAME}_${JOB_ID}.err"
+cat "$PERUN_LOG_DIR/${JOB_NAME}_${JOB_ID}.out"
+cat "$PERUN_LOG_DIR/${JOB_NAME}_${JOB_ID}.err"
 ```
 
 For job history or official consumption statistics, contact PERUN support.
@@ -374,6 +386,7 @@ do not delete it until `result.json` has been copied to PROJECT and verified.
 ## References
 
 - [Project PERUN guide](perun.md)
+- [Production deployment template](perun-deployment.md)
 - [Current project status](perun-status.md)
 - [Experiment log](perun-log.md)
 - [Official storage guide](https://wiki.perun.tuke.sk/perun/System_overview/storage/)

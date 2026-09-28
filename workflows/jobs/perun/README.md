@@ -2,7 +2,7 @@
 
 These files adapt the maintained Python runner to TUKE Perun's Slurm execution
 environment. Before changing or using them, read the canonical
-[Perun infrastructure guide](../../../docs/infrastructure/perun.md). That guide
+[Perun infrastructure guide](../../../docs/infrastructure/perun/perun.md). That guide
 owns the broader access, storage, environment, scratch, artifact, and
 validation assumptions. This README explains only the tracked job files.
 
@@ -25,7 +25,7 @@ starting values, not measured requirements. Options passed to `sbatch` may
 override them.
 
 `swiglu_7.sbatch` requests one GPU, eight CPUs, 128 GB RAM, and 48 hours on
-`gpu_long`. It is the only supported PERUN launcher for SwiGLU-7 new runs and
+`gpu_short`. It is the only supported PERUN launcher for SwiGLU-7 new runs and
 resumes.
 
 ## Manual scratch probe
@@ -65,7 +65,25 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate mlp-replacement
 export MLP_REPLACEMENT_PYTHON="$(command -v python)"
 export HF_HOME="/mnt/project/$PERUN_ACCOUNT/huggingface-cache"
-mkdir -p "$HF_HOME"
+export PERUN_LOG_DIR="/mnt/project/$PERUN_ACCOUNT/perun-job-logs"
+mkdir -p "$HF_HOME" "$PERUN_LOG_DIR"
+```
+
+SwiGLU-7 uses the Hugging Face model adapter from the pinned evaluation
+harness. In a clean environment, install that backend rather than only the
+base package:
+
+```bash
+python -m pip install 'lm_eval[hf]==0.4.13'
+```
+
+Before submission, verify the exact lazy-loaded adapter import. A successful
+top-level `import lm_eval` does not prove that its optional `accelerate`
+dependency is installed:
+
+```bash
+python -c 'from importlib.metadata import version; from packaging.version import Version; from lm_eval.models.huggingface import HFLM; accelerate_version = version("accelerate"); assert Version(accelerate_version) >= Version("0.26.0"); print("HFLM: OK; accelerate:", accelerate_version)'
+python -m pip check
 ```
 
 The job files request export of the submission environment. They intentionally
@@ -198,6 +216,8 @@ Prepare once with the dedicated job:
 
 ```bash
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+  --output="$PERUN_LOG_DIR/%x_%j.out" \
+  --error="$PERUN_LOG_DIR/%x_%j.err" \
   workflows/jobs/perun/swiglu_7.sbatch prepare
 ```
 
@@ -211,6 +231,8 @@ export S7_PREPARED="$PERUN_PROJECT/perun-results/swiglu-7/prepare-001/result.jso
 
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
   --array=0-11%12 \
+  --output="$PERUN_LOG_DIR/%x_%A_%a.out" \
+  --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
   workflows/jobs/perun/swiglu_7.sbatch train "$S7_PREPARED"
 ```
 
@@ -224,9 +246,13 @@ output:
 
 ```bash
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+  --output="$PERUN_LOG_DIR/%x_%j.out" \
+  --error="$PERUN_LOG_DIR/%x_%j.err" \
   workflows/jobs/perun/swiglu_7.sbatch prepare --resume
 
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=5 \
+  --output="$PERUN_LOG_DIR/%x_%A_%a.out" \
+  --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
   workflows/jobs/perun/swiglu_7.sbatch train --resume "$S7_PREPARED"
 ```
 
@@ -243,8 +269,9 @@ result handling.
 
 ## Results and logs
 
-Slurm writes `swiglu-7_<job-id>.out` and `.err` in the repository from which
-the job was submitted. Each identity-named PROJECT output contains the
+The documented submission commands override the tracked fallback paths and
+write single-job logs as `%x_%j` and array-task logs as `%x_%A_%a` below
+`$PERUN_LOG_DIR`. Each identity-named PROJECT output contains the
 structured `result.json` and `run.json`; completed training outputs also retain
 raw evaluation records and the final `model/` bundle. Incomplete training
 outputs retain one verified checkpoint. These files are copied to PROJECT, not

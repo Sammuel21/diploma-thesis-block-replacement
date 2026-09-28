@@ -2,10 +2,10 @@
 metadata_version: 1
 title: TUKE Perun Workflow Infrastructure
 type: architecture
-category: infrastructure
+category: infrastructure/perun
 status: active
 created: 2026-09-11
-modified: 2026-09-27
+modified: 2026-09-28
 authorship:
   created_by: collaborative
 curation:
@@ -31,7 +31,9 @@ It records three different kinds of information:
 Current project readiness, available capacity, and cumulative use belong in
 the [Perun status](perun-status.md). Individual submitted jobs and their
 measured allocations belong in the append-only [Perun experiment
-log](perun-log.md).
+log](perun-log.md). Copyable production commands belong in the [Perun
+deployment template](perun-deployment.md); short operational commands belong
+in the [Perun cheat sheet](perun-cheatsheet.md).
 
 The official documentation was last checked on 2026-09-27. Perun policies and
 available software can change, so recheck the linked pages before changing
@@ -110,10 +112,15 @@ allocate one.
 
 The maintained Perun files live under `workflows/jobs/perun/`. Their `#SBATCH`
 directives establish default resources, while project-specific account and QoS
-values are supplied to `sbatch`:
+values and the persistent scheduler-log directory are supplied to `sbatch`:
 
 ```bash
+export PERUN_LOG_DIR="$PERUN_PROJECT/perun-job-logs"
+mkdir -p "$PERUN_LOG_DIR"
+
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+  --output="$PERUN_LOG_DIR/%x_%j.out" \
+  --error="$PERUN_LOG_DIR/%x_%j.err" \
   workflows/jobs/perun/scratch_probe.sbatch
 ```
 
@@ -199,6 +206,8 @@ Before relying on an environment for a long job, validate:
 
 - the NVIDIA driver and CUDA versions exposed to jobs;
 - compatibility of the selected PyTorch build with the H200 nodes;
+- the exact `from lm_eval.models.huggingface import HFLM` import used by
+  evaluation, including the optional `accelerate>=0.26.0` dependency;
 - outbound network access from compute nodes; and
 - whether Hugging Face models and datasets must be downloaded on a login node
   and consumed from a pre-populated cache.
@@ -208,6 +217,11 @@ log](perun-log.md), then update [Perun status](perun-status.md) before the rest
 of a grid is submitted. Authentication tokens, if required, must be
 provided through the user environment or an approved secret mechanism and
 must never be stored in a JSON configuration or job file.
+
+For the pinned harness, a clean environment should install the Hugging Face
+backend extra with `python -m pip install 'lm_eval[hf]==0.4.13'`. A top-level
+`import lm_eval` and a clean `pip check` do not validate optional backend
+dependencies that were never installed.
 
 ## Repository workflow requirements
 
@@ -259,8 +273,10 @@ submit directory, including untracked data not covered by its exclusions, so a
 checkout containing a complete local results archive wastes staging time and
 scratch capacity. Keep large runtime data outside the checkout.
 
-Slurm `.out` and `.err` files remain operational logs. They are useful for
-diagnosis but do not replace the structured artifact. Future workflows that
+Slurm `.out` and `.err` files remain operational logs. Submission commands
+place them below PROJECT `perun-job-logs/`; tracked relative `#SBATCH` paths
+remain a fallback. Logs are useful for diagnosis but do not replace the
+structured artifact. Future workflows that
 produce checkpoints, plot data, or larger tables must give those artifacts
 unique paths and document whether they are required for reproducibility or
 only convenient for analysis.
