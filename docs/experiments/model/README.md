@@ -5,7 +5,7 @@ type: index
 category: experiments/model
 status: active
 created: 2026-09-10
-modified: 2026-09-21
+modified: 2026-09-29
 authorship:
   created_by: collaborative
 curation:
@@ -29,7 +29,7 @@ and interpretation of each pipeline.
 | --- | --- | --- |
 | [Compression baseline](baseline/compression-baseline.md) | Do the improved calibration and initialization methods help under a simple fixed replacement pattern? | Notebook artifacts present; Python runner not yet executed |
 | [Block interaction](interaction/block-interaction.md) | How do locally fitted replacements interact across adjacent windows and block pairs? | Notebook artifact present; no Python runner |
-| [Homogeneous SwiGLU experiments](swiglu/README.md) | What quality did model-wide SwiGLU replacement achieve, and why? See the [results overview](swiglu/swiglu-results.md) or [chronological progression](swiglu/swiglu-progression.md). | SwiGLU-1–5 artifacts present; SwiGLU-5 search and both 100M confirmations completed |
+| [Homogeneous SwiGLU experiments](swiglu/README.md) | What quality did model-wide SwiGLU replacement achieve, and why? See the [results overview](swiglu/swiglu-results.md) or [chronological progression](swiglu/swiglu-progression.md). | Concluded through SwiGLU-7; all 12 native-8K production runs completed |
 
 Reusable definitions belong under [methodology](../../methodology/). Results
 and run metadata belong in JSON artifacts. The Python migrations require an

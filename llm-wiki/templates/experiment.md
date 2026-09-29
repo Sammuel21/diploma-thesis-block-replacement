@@ -48,6 +48,14 @@ superseded_by: []
 
 ## Direct Results
 
+## Compute and Deployment
+
+### Pre-run Resource Plan
+
+### Measured Resource Use
+
+### Estimate Variance
+
 ## Interpretation
 
 **Empirical finding.**

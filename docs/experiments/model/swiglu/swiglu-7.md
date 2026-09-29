@@ -5,19 +5,38 @@ type: experiment
 category: experiments/model/swiglu
 status: active
 created: 2026-09-24
-modified: 2026-09-28
+modified: 2026-09-29
 authorship:
   created_by: collaborative
 curation:
   status: unreviewed
   reviewed_by: null
   reviewed_on: null
+sources:
+  notebooks:
+    - notebooks/model/swiglu/swiglu-7.ipynb
+  artifacts:
+    - data/results/workflows/model/swiglu-7/prepare-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-0-target-0.2-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-0-target-0.3-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-0-target-0.4-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-0-target-0.5-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-1-target-0.2-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-1-target-0.3-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-1-target-0.4-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-1-target-0.5-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-2-target-0.2-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-2-target-0.3-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-2-target-0.4-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-2-target-0.5-run-001/result.json
 ---
 
 # SwiGLU-7 - Retraining-Scope Analysis
 
-Implementation and PERUN launch support are present. No SwiGLU-7 scientific
-result has been produced yet.
+The shared preparation and all 12 production runs completed successfully on
+PERUN. Every run reached one billion recovery tokens, completed the frozen
+WikiText and zero-shot evaluation, validated its inference bundle, and removed
+its optimizer checkpoint after finalization.
 
 SwiGLU-7 asks whether broader retraining improves compressed-model quality. It
 is a fixed production comparison, not another candidate search.
@@ -71,6 +90,57 @@ parameters and optimizer state. Production sequence length and effective batch
 are both 8,192 tokens. The exact 100M and 1B segment boundaries use final
 partial sequences of 256 and 2,304 tokens instead of repeating stream data.
 
+## Results
+
+The fixed comparison favors replacement-only recovery. S7-0 has the lowest
+final validation KL at three of four targets and the lowest perplexity in 17 of
+the 24 split, context, and target comparisons. S7-1 never wins a likelihood
+comparison. S7-2 wins seven, mainly by small margins at the heaviest removal.
+
+| Target | Strategy | Trainable fraction | KL at 1B | Test PPL at 8,192 | Five-task macro |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 0% | Dense reference | — | 0 by definition | **6.9331** | **67.141%** |
+| 20% | S7-0 replacement only | 22.30% | **0.060933** | **7.5553** | 63.953% |
+| 20% | S7-1 transformer body | 93.24% | 0.077076 | 7.6578 | 64.169% |
+| 20% | S7-2 MLP, RMSNorm, attention LoRA | 66.36% | 0.068545 | 7.6601 | **64.440%** |
+| 30% | S7-0 replacement only | 34.30% | **0.085868** | **7.8683** | 62.115% |
+| 30% | S7-1 transformer body | 92.70% | 0.100083 | 8.1236 | 62.271% |
+| 30% | S7-2 MLP, RMSNorm, attention LoRA | 63.67% | 0.089550 | 7.9139 | **62.394%** |
+| 40% | S7-0 replacement only | 36.50% | **0.116199** | **8.3096** | 60.131% |
+| 40% | S7-1 transformer body | 92.06% | 0.127408 | 8.3522 | **60.197%** |
+| 40% | S7-2 MLP, RMSNorm, attention LoRA | 60.52% | 0.124680 | 8.3351 | 60.132% |
+| 50% | S7-0 replacement only | 39.13% | 0.153541 | 8.8551 | 58.489% |
+| 50% | S7-1 transformer body | 91.31% | **0.152586** | 8.9214 | **58.679%** |
+| 50% | S7-2 MLP, RMSNorm, attention LoRA | 56.76% | 0.154480 | **8.8428** | 58.555% |
+
+The downstream differences between scopes are small and mixed. S7-1 wins the
+macro average at 40% and 50%; S7-2 wins at 20% and 30%. The largest gain over
+S7-0 is 0.49 percentage points. These are single-seed trajectories, and the
+paired bootstrap intervals compare each model with dense rather than comparing
+the three S7 scopes with each other. They are therefore secondary evidence and
+do not outweigh the consistent likelihood result.
+
+All 12 runs improved between 100M and 1B tokens. For S7-0, final KL fell by
+19.9%, 23.7%, 27.3%, and 28.6% across the 20%, 30%, 40%, and 50% targets.
+Long recovery remains most valuable when compression damage is larger.
+
+The broader scopes used more compute and memory without establishing a quality
+advantage:
+
+| Strategy | Mean trainable fraction | Four-run H200 time | Peak RAM | Peak VRAM |
+| --- | ---: | ---: | ---: | ---: |
+| S7-0 replacement only | 33.06% | **42.57 h** | **8.88 GiB** | **33.52 GiB** |
+| S7-1 transformer body | 92.33% | 51.56 h | 22.57 GiB | 51.71 GiB |
+| S7-2 MLP, RMSNorm, attention LoRA | 61.83% | 52.65 h | 13.82 GiB | 48.06 GiB |
+
+Preparation took 10.21 H200 hours. Total measured allocation for preparation
+and the 12 runs was 156.99 H200 hours.
+
+The production decision is to retain replacement-only recovery as the default
+for homogeneous SwiGLU compression. The experiment does not prove that broader
+adaptation can never help; it shows that these two broader scopes do not justify
+their extra cost under the tested one-billion-token protocol.
+
 ## Outputs and evaluation
 
 The shared preparation creates:
@@ -89,10 +159,9 @@ kept while a run is incomplete and removed only after successful result and
 bundle validation. Output-owned paths are relative, so a complete output
 directory can be relocated and resumed.
 
-The analysis notebook is load-only. It still expects the superseded
-SwiGLU-6-derived preparation fields and must be updated to the independent
-SwiGLU-7 schema before results are analyzed; notebook editing requires a
-separate explicit choice under the repository instructions.
+The analysis notebook is load-only. It reads the completed independent
+SwiGLU-7 preparation and production artifacts, with SwiGLU-5 and SwiGLU-6 used
+only for labeled historical comparisons.
 
 ## Files
 
@@ -240,39 +309,25 @@ the owner file, manually complete the SCRATCH-to-PROJECT copy, compare
 missing scratch directory after a hard node loss means recovery is limited to
 the last already verified PROJECT copy.
 
-## Planning cost
+## Measured execution cost
 
-These are capacity-planning estimates, not measured H200 results. The closest
-local evidence is the completed 128-token SwiGLU-6 replacement-only recovery:
-one billion tokens took 104,611 seconds (29.1 hours) at 20% and 108,010 seconds
-(30.0 hours) at 50% on an RTX 4090. SwiGLU-7 uses a faster H200 but adds much
-more expensive 8K attention and, for S7-1/S7-2, broader gradient computation.
+The original estimate was 124 to 266 H200 hours for preparation and the full
+grid. The observed total was 156.99 H200 hours, including 10.21 hours for
+preparation. Individual production runs took 10.25 to 13.89 allocated hours,
+well within the 48-hour job limit.
 
-| Work | Estimated one-H200 allocation time |
-| --- | ---: |
-| Shared preparation | 4-10 GPU-hours |
-| One S7-0 trajectory, including final evaluation | 8-18 GPU-hours |
-| One S7-1 trajectory, including final evaluation | 12-24 GPU-hours |
-| One S7-2 trajectory, including final evaluation | 10-22 GPU-hours |
-| Entire preparation plus 12-run grid | **124-266 GPU-hours** |
+The largest measured resource use was 22.57 GiB host RAM and 51.71 GiB HBM.
+One H200 was sufficient for every scope. All successful runs removed their
+optimizer checkpoints after result and bundle validation, so durable output is
+limited to the final inference bundle and structured records.
 
-With 12 concurrent GPUs, the training grid's compute portion is roughly 12-24
-hours after queueing; serial execution is roughly 5-11 days. The tracked
-48-hour request gives each task substantial headroom. The requested ceiling
-for all 13 jobs is 624 GPU-hours, but only elapsed allocation time counts as
-consumption.
+The repository copy under `data/results/workflows/model/swiglu-7/` is reduced
+for analysis. It contains result and run records, scheduler logs, provenance,
+and bundle metadata. The complete model weights and raw evaluation records
+remain in PERUN PROJECT; their recorded hashes are preserved in the local
+metadata.
 
-The [official NVIDIA H200 specifications](https://www.nvidia.com/en-us/data-center/h200/)
-state 141 GB HBM and 4.8 TB/s bandwidth. One full H200 is
-therefore the appropriate initial request. Planning bands are approximately
-25-50 GB VRAM for S7-0, 35-70 GB for S7-1, and 30-60 GB for S7-2; these include
-wide uncertainty for 8K activations and must be replaced by measured peaks.
-The 128 GB host-memory request is mainly for FP32 checkpoint assembly and Adam
-state. Preparation needs approximately 16-20 GB durable space plus 15-20 GB
-temporary fit-state space. The largest training output reserve is expected to
-be roughly 45-55 GB before the successful checkpoint is removed.
-
-Record every job, including failures and cancellations, in the
-[PERUN experiment log](../../../infrastructure/perun/perun-log.md), then update the
-[PERUN project status](../../../infrastructure/perun/perun-status.md) from measured
-elapsed time, MaxRSS, peak GPU memory, and output bytes.
+Record any future reproduction or failure in the
+[PERUN experiment log](../../../infrastructure/perun/perun-log.md). The
+[PERUN project status](../../../infrastructure/perun/perun-status.md) contains
+the broader environment and capacity record.

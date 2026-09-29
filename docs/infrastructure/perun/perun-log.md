@@ -5,7 +5,7 @@ type: report
 category: infrastructure/perun
 status: active
 created: 2026-09-25
-modified: 2026-09-28
+modified: 2026-09-29
 authorship:
   created_by: collaborative
 curation:
@@ -34,6 +34,8 @@ material, or secret-bearing paths.
 
 Each entry records:
 
+- the pre-run estimate, its evidence basis and confidence, and a link to the
+  experiment's resource plan;
 - submission timestamp, Slurm job ID, state, exit code, and optional failure
   reason;
 - experiment/workflow, stage, strategy, target, run identity, Git commit, and
@@ -72,6 +74,7 @@ after stage-out completes.
 ```markdown
 ## [YYYY-MM-DD HH:MM UTC] <job-id> | <workflow and run identity>
 
+- Plan: <estimate basis/confidence>; expected elapsed <value>; expected GPU-hours <value>; expected CPU core-hours <value>; RAM/VRAM <values>; SCRATCH/PROJECT/output <values>
 - Outcome: <state>; exit code <code>; reason <reason or none>
 - Submission: <workflow/module>; <stage>; <strategy/target if applicable>
 - Provenance: commit <hash>; config <path and SHA-256>; input/prepared SHA-256 <hash>
@@ -81,6 +84,7 @@ after stage-out completes.
 - Outputs: <durable bytes>; <HOME/PROJECT/stage-out category>; `result.json` <path/hash>; `run.json` <path/hash>; logs <paths>
 - Continuation: <not resumable/resumable/completed>; checkpoint <path/hash or none>
 - Verification: <artifact/hash/stage-out checks performed>
+- Variance: <actual-versus-plan differences, cause if known, and implication for the next request>
 - Experiment document: <repository-relative link>
 - Notes: <resource-planning or operational observation>
 ```

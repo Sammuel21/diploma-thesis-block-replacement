@@ -765,3 +765,16 @@ This file is append-only. Entries use the format:
   source-summary or scientific finding was added.
 - Dataset revisions and installed harness source hashes will be recorded by
   the SwiGLU-6 protocol-freezing stage. Scientific execution remains pending.
+
+## [2026-09-29] update | Require Perun resource planning and accounting
+
+- Added a dedicated pre-run and post-run resource contract for every experiment
+  executed on TUKE Perun.
+- Routed repository, workflow, and notebook agents to the contract only when
+  Perun planning, execution, accounting, or reporting is in scope.
+- Extended the experiment template and Perun job-log template with expected
+  GPU-hours, CPU core-hours, RAM, VRAM, storage, measured use, and
+  actual-versus-plan variance.
+- Kept requested ceilings, expected consumption, scheduler allocations,
+  workflow timing, and observed utilization separate so future estimates can
+  be calibrated without presenting proxies as measurements.

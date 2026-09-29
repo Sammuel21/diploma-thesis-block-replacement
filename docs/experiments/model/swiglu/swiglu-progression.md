@@ -5,7 +5,7 @@ type: experiment-synthesis
 category: experiments/model/swiglu
 status: active
 created: 2026-09-20
-modified: 2026-09-21
+modified: 2026-09-29
 authorship:
   created_by: collaborative
 curation:
@@ -19,6 +19,8 @@ sources:
     - notebooks/model/swiglu/swiglu-3.ipynb
     - notebooks/model/swiglu/swiglu-4.ipynb
     - notebooks/model/swiglu/swiglu-5.ipynb
+    - notebooks/model/swiglu/swiglu-6.ipynb
+    - notebooks/model/swiglu/swiglu-7.ipynb
   artifacts:
     - data/results/notebook-model-study/swiglu-compression.json
     - data/results/notebook-model-study/swiglu-compression-optimized.json
@@ -28,6 +30,22 @@ sources:
     - data/results/workflows/model/swiglu-5/search/run-001.json
     - data/results/workflows/model/swiglu-5/confirmation/run-001-target-0.2.json
     - data/results/workflows/model/swiglu-5/confirmation/run-001-target-0.5.json
+    - data/results/workflows/model/swiglu-6/recovery-001-target-0.2.json
+    - data/results/workflows/model/swiglu-6/recovery-001-target-0.5.json
+    - data/results/workflows/model/swiglu-6/evaluation-001.json
+    - data/results/workflows/model/swiglu-7/prepare-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-0-target-0.2-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-0-target-0.3-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-0-target-0.4-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-0-target-0.5-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-1-target-0.2-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-1-target-0.3-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-1-target-0.4-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-1-target-0.5-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-2-target-0.2-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-2-target-0.3-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-2-target-0.4-run-001/result.json
+    - data/results/workflows/model/swiglu-7/S7-2-target-0.5-run-001/result.json
 ---
 
 # Homogeneous SwiGLU Experimental Progression
@@ -44,9 +62,11 @@ workflow pages remain the authoritative method descriptions:
 - [SwiGLU-2](swiglu-2.md);
 - [SwiGLU-3](swiglu-3.md);
 - [SwiGLU-4](swiglu-4.md); and
-- [SwiGLU-5](swiglu-5.md).
+- [SwiGLU-5](swiglu-5.md);
+- [SwiGLU-6](swiglu-6.md); and
+- [SwiGLU-7](swiglu-7.md).
 
-All five experiments use the pinned `HuggingFaceTB/SmolLM2-1.7B` model. Layers
+All seven experiments use the pinned `HuggingFaceTB/SmolLM2-1.7B` model. Layers
 0 and 23 are protected, while layers 1 through 22 are eligible for homogeneous
 SwiGLU replacement. The dense WikiText-2 validation reference is loss 2.66997
 and perplexity 14.4396.
@@ -60,7 +80,7 @@ evaluation split.
 
 ## Executive conclusion
 
-The experimental progression moved through five distinct bottlenecks:
+The experimental progression moved through seven distinct questions:
 
 ```text
 feasible local replacement
@@ -68,9 +88,11 @@ feasible local replacement
   -> sufficient global-recovery budget
   -> efficient recovery configuration
   -> discrete, globally optimized layer widths
+  -> one-billion-token recovery and final evaluation
+  -> replacement-only versus broader retraining
 ```
 
-The final evidence supports four main conclusions:
+The final evidence supports six main conclusions:
 
 1. **Teacher-derived initialization made homogeneous replacement viable.**
    Increasing calibration data helped, but random initialization still left a
@@ -86,6 +108,16 @@ The final evidence supports four main conclusions:
    allocation, not output reconstruction, RMSNorm, or LoRA.** It preserved
    some sensitive MLPs at full width and concentrated compression in tolerant
    layers. This improved both short-budget and 100M-token results.
+5. **One billion recovery tokens continue to help.** SwiGLU-6 reduced fixed KL
+   from 100M to 1B by 15.98% at 20% removal and 27.06% at 50% removal. Full
+   held-out evaluation still showed a dense gap, so additional training repairs
+   compression damage without making the compressed topology equivalent to the
+   teacher.
+6. **Broader retraining is not the supported default.** In SwiGLU-7,
+   replacement-only recovery won three of four final-KL comparisons and 17 of
+   24 likelihood comparisons while using the least compute and memory. Full
+   transformer-body and attention-LoRA variants produced only small, mixed task
+   gains under one seed.
 
 At 100M tokens, the confirmed discrete-allocation model improves on SwiGLU-3:
 
@@ -108,6 +140,8 @@ that this is not dense-equivalent recovery.
 | SwiGLU-3 | How do sparsity and recovery tokens affect quality? | 393,216-pair local fits and four 100M-token trajectories | Recovery remained useful through long budgets, but was expensive and left a dense gap | Improve the recovery recipe before changing structure again |
 | SwiGLU-4 | Which optimizer, objective, and trainable scope recover best? | LR/schedule/objective, RMSNorm, and LoRA tournament | Constant `3e-5`, T=1 KL, replacement-only recovery was the best efficient recipe | Hold recovery fixed and improve model construction |
 | SwiGLU-5 | Can initialization, allocation, or composition improve the quality frontier? | Output reconstruction, discrete width curves, composition-aware refit, efficient search and confirmation | Discrete allocation won; confirmed gains persisted to 100M | Use discrete allocation as the homogeneous baseline and move future novelty to heterogeneous operators or stronger allocation models |
+| SwiGLU-6 | Does recovery remain useful beyond 100M tokens, and what quality remains on full held-out evaluation? | Continued fixed 20% and 50% models to 1B and evaluated complete WikiText and five zero-shot tasks | Both targets improved through 1B, but neither reached dense quality | Test native-8K recovery and whether broader trainable scope can close the gap |
+| SwiGLU-7 | Does full-body or LoRA-assisted retraining outperform replacement-only recovery? | Fresh independent width fitting, native-8K recovery, four targets, and three trainable scopes | Replacement-only gave the strongest likelihood frontier at the lowest resource cost | Close the homogeneous family and retain S7-0 as the control for new experiment classes |
 
 ## SwiGLU-1: establishing feasibility
 
@@ -384,6 +418,56 @@ approximately 19 GiB cache after use. `torch.compile` was not used because the
 host lacked a discoverable C compiler; the eager path supplied the recorded
 results.
 
+## SwiGLU-6: extending recovery to one billion tokens
+
+SwiGLU-6 kept the selected SwiGLU-5 discrete allocations fixed and continued
+the 20% and 50% models from their inherited 5M states to exactly one billion
+tokens. The recovery protocol remained sequence length 128, constant `3e-5`,
+and replacement-only teacher KL. The experiment also introduced complete
+WikiText-2 validation and test evaluation, paired zero-shot task comparisons,
+and measured BF16 deployment footprints.
+
+| Target | KL at 100M | KL at 1B | Prefix PPL at 100M | Prefix PPL at 1B | Test PPL at 2,048 | Task macro |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 20% | 0.074664 | **0.062734** | 15.9491 | **15.5993** | 7.9687 | 64.392% |
+| 50% | 0.194910 | **0.142176** | 20.5286 | **18.4678** | 9.4992 | 59.221% |
+
+The extra 900M tokens improved both targets. Relative to 100M, the full task
+macro rose by 1.13 percentage points at 20% and 2.67 points at 50%. Late KL
+fluctuations showed that the final checkpoint is not always the numerically
+best monitoring checkpoint, but the fixed 1B endpoint remained the correct
+unbiased production comparison.
+
+SwiGLU-6 also made the practical trade-off explicit. The 20% eligible-MLP
+target removes 12.94% of all model parameters; the 50% target removes 32.35%.
+Their BF16 inference bundles are approximately 2.78 GiB and 2.16 GiB, compared
+with 3.19 GiB for dense.
+
+## SwiGLU-7: testing native-8K retraining scope
+
+SwiGLU-7 rebuilt the width curves and token-zero starts independently, then ran
+12 one-billion-token trajectories: four removal targets for replacement-only
+recovery, full transformer-body recovery, and full MLP plus RMSNorm recovery
+with rank-16 attention LoRA. Recovery sequence length and effective batch were
+both 8,192 tokens.
+
+| Strategy | Final KL wins | Likelihood wins | Macro wins | Four-run H200 time | Mean trainable fraction |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| **S7-0 replacement only** | **3/4** | **17/24** | 0/4 | **42.57 h** | **33.06%** |
+| S7-1 transformer body | 1/4 | 0/24 | 2/4 | 51.56 h | 92.33% |
+| S7-2 MLP, RMSNorm, attention LoRA | 0/4 | 7/24 | 2/4 | 52.65 h | 61.83% |
+
+The broad scopes did not establish a likelihood advantage. Their task-macro
+gains were at most 0.49 percentage points over S7-0, changed winner with the
+removal target, and have neither direct between-strategy intervals nor
+training-seed replication. S7-0 therefore remains the supported default.
+
+The independent preparation exactly reproduced the historical 20% and 50%
+width profiles, validating the standalone construction path. SwiGLU-6 and
+SwiGLU-7 are not a controlled sequence-length comparison because S7 also
+refitted the starting operators and changed batching. Cross-generation metric
+differences must not be attributed to 8K recovery alone.
+
 ## Family-level interpretation
 
 ### What actually improved quality
@@ -395,8 +479,8 @@ The evidence ranks the investigated mechanisms approximately as follows:
 3. width allocation based on measured replacement damage;
 4. the constant `3e-5` recovery configuration;
 5. larger local calibration budgets; and
-6. output reconstruction, RMSNorm, or LoRA, which were neutral, inconsistent,
-   or inefficient in the tested forms.
+6. output reconstruction, RMSNorm, attention LoRA, and full-body recovery,
+   which were neutral, inconsistent, or inefficient in the tested forms.
 
 This ordering is qualitative because the interventions were not all evaluated
 in one factorial experiment. The controlled comparisons inside each workflow,
@@ -415,6 +499,12 @@ The trajectories show that more tokens generally improve PPL, but not at a
 constant rate and not monotonically for fixed validation KL. Token count is
 therefore a budget, not a guarantee of proportional improvement.
 
+SwiGLU-6 keeps the earlier 128-token geometry and reaches 1B through many small
+updates. SwiGLU-7 uses 8,192-token sequences and an 8,192-token effective batch,
+so one billion tokens correspond to far fewer optimizer updates with much
+longer attention contexts. Equal token counts across these experiments are not
+equal optimization trajectories.
+
 ### Recommended homogeneous baseline
 
 For subsequent homogeneous SwiGLU work, the evidence-backed baseline is:
@@ -424,8 +514,15 @@ For subsequent homogeneous SwiGLU work, the evidence-backed baseline is:
   demonstrates a material integrated-model gain;
 - constant `3e-5`, pure T=1 teacher KL, zero weight decay;
 - replacement-only fused AdamW;
-- 2,048 effective tokens per update with profiled microbatch geometry; and
-- both fixed teacher KL and WikiText perplexity for selection and reporting.
+- native 8,192-token recovery sequences for the pinned model's full-context
+  production protocol;
+- an effective batch selected for the available hardware; and
+- fixed teacher KL, full-corpus WikiText perplexity, and the frozen task suite
+  for reporting.
+
+The 8,192-token choice is the completed production protocol, not evidence that
+8K is intrinsically better than 128-token recovery. That causal comparison was
+not run.
 
 At 20% removal, the combined reconstruction candidate remains the literal 5M
 winner, but its margin is too small and its 100M behavior is unconfirmed. The
@@ -437,14 +534,16 @@ The family does not establish universal behavior across models or datasets.
 The main limitations are:
 
 - one model revision and one experiment seed;
-- a small fixed WikiText validation evaluation of 24 batches / 6,096 predicted
-  tokens;
+- early selection decisions that use a small 24-batch WikiText prefix, although
+  SwiGLU-6 and SwiGLU-7 add complete validation and test evaluation;
 - homogeneous SwiGLU replacements only;
 - no statistical confidence intervals across independent runs;
 - one historical 20% winner-selection defect, explicitly bounded above;
 - direct SwiGLU-3 versus SwiGLU-5 comparisons that intentionally combine a
   structural change with the recovery and systems improvements established in
   SwiGLU-4 and SwiGLU-5; and
+- no controlled isolation of sequence length between SwiGLU-6 and SwiGLU-7;
+- no measured serving throughput or latency; and
 - substantial remaining distance from dense quality, especially at 50%
   eligible-MLP removal.
 
@@ -470,7 +569,11 @@ Budgets must remain visible because these are not all equal-compute rows.
 | SwiGLU-5 discrete allocation | 10M | 23.0215 | Discrete layer widths plus tuned recovery |
 | SwiGLU-3 | 100M | 22.0908 | Original allocation, long budget |
 | SwiGLU-5 discrete allocation | 100M | **20.5286** | Discrete widths, tuned and accelerated recovery |
+| SwiGLU-6 discrete allocation | 1B | **18.4678** | Same selected topology with tenfold recovery budget |
 
 This progression shows genuine cumulative improvement, but it also identifies
 the unresolved scientific boundary: at 32.35% whole-model parameter removal,
-the best homogeneous result still has a 6.0891 PPL gap to the dense model.
+the best comparable historical-prefix result still has a 4.0282 PPL gap to the
+dense reference. In the independent native-8K S7-0 run, the full test PPL is
+8.8551 versus 6.9331 for dense. These are separate evaluation protocols and are
+reported separately rather than merged into one trend line.

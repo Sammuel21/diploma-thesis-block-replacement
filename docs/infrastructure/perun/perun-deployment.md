@@ -5,7 +5,7 @@ type: procedure
 category: infrastructure/perun
 status: active
 created: 2026-09-28
-modified: 2026-09-28
+modified: 2026-09-29
 authorship:
   created_by: collaborative
 curation:
@@ -78,6 +78,12 @@ Add positional arguments only when the job requires them:
 ```bash
 JOB_ARGS=("first-argument" "second-argument")
 ```
+
+Before submission, record the task count, concurrency, resources per task,
+expected elapsed time, expected GPU-hours and CPU core-hours, RAM/VRAM, and
+SCRATCH/PROJECT/output storage in the experiment document. Use the
+[PERUN resource contract](perun-resources.md); do not substitute requested
+wall-time ceilings for expected consumption.
 
 ## 4. Validate before submission
 
@@ -233,6 +239,7 @@ delete SCRATCH as a routine cleanup step.
 ## References
 
 - [PERUN operating contract](perun.md)
+- [PERUN resource planning and accounting](perun-resources.md)
 - [PERUN command cheat sheet](perun-cheatsheet.md)
 - [Current PERUN status](perun-status.md)
 - [PERUN experiment log](perun-log.md)

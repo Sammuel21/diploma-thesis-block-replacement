@@ -6,6 +6,9 @@
   the repository-root `AGENTS.md`.
 - Before modifying a notebook, read
   [`../docs/agents/notebook-implementation.md`](../docs/agents/notebook-implementation.md).
+- When reporting an experiment executed on TUKE Perun, also read
+  [`../docs/infrastructure/perun/perun-resources.md`](../docs/infrastructure/perun/perun-resources.md)
+  and include its compact post-run compute and storage analysis.
 - Treat `notebooks/mvp/` as a frozen historical path. Do not modernize it while
   changing a maintained notebook.
 

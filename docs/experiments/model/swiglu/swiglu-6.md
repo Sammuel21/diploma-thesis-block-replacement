@@ -5,22 +5,48 @@ type: experiment
 category: experiments/model/swiglu
 status: active
 created: 2026-09-21
-modified: 2026-09-22
+modified: 2026-09-29
 authorship:
   created_by: collaborative
 curation:
   status: unreviewed
   reviewed_by: null
   reviewed_on: null
+sources:
+  notebooks:
+    - notebooks/model/swiglu/swiglu-6.ipynb
+  artifacts:
+    - data/results/workflows/model/swiglu-6/prepare-001.json
+    - data/results/workflows/model/swiglu-6/protocol-001.json
+    - data/results/workflows/model/swiglu-6/recovery-001-target-0.2.json
+    - data/results/workflows/model/swiglu-6/recovery-001-target-0.5.json
+    - data/results/workflows/model/swiglu-6/evaluation-001.json
 ---
 
 # SwiGLU-6 — Long Recovery and Final Evaluation
 
-Implementation is present; no SwiGLU-6 scientific results have been produced.
-This family completes the homogeneous chapter through longer recovery, final
-held-out evaluation, and comparable deployment accounting. Earlier runners,
-configurations, notebooks, and results remain unchanged. All commands below run
-from the repository root and write to a new `swiglu-6/` directory.
+Both one-billion-token recoveries and the frozen final evaluation completed on
+the RTX 4090 host. SwiGLU-6 establishes the long-recovery result, full held-out
+evaluation, and comparable deployment accounting for the selected 20% and 50%
+SwiGLU-5 allocations.
+
+## Results
+
+| Target | KL at 100M | KL at 1B | Prefix PPL at 100M | Prefix PPL at 1B | Test PPL at 2,048 | Task macro |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 20% | 0.074664 | **0.062734** | 15.9491 | **15.5993** | 7.9687 | 64.392% |
+| 50% | 0.194910 | **0.142176** | 20.5286 | **18.4678** | 9.4992 | 59.221% |
+
+From 100M to 1B tokens, fixed validation KL fell by 15.98% at 20%
+eligible-MLP removal and 27.06% at 50%. The complete task macro improved by
+1.13 and 2.67 percentage points relative to the corresponding 100M endpoints.
+Neither topology reached dense quality.
+
+The 20% topology contains 1.490B parameters, removes 12.94% of the complete
+model, and occupies approximately 2.78 GiB in BF16. The 50% topology contains
+1.158B parameters, removes 32.35% of the complete model, and occupies
+approximately 2.16 GiB. These are weight-footprint results; latency and
+throughput were not measured.
 
 ## Fixed scientific contract
 
@@ -310,13 +336,13 @@ full-corpus/context tables, paired task differences, and quality/footprint views
 Open it after `evaluation-001.json` is complete. Preserve the protocol, configs,
 source checkout, JSON files, task samples, and asset trees alongside results.
 
-## Verification status
+## Completion status
 
-Local checks cover Python/config/notebook parsing, continuation boundary
-arithmetic, complete rolling-target coverage, and checkpoint descriptor integrity.
-No GPU training, model export/reload, harness inference, or long-budget recovery has
-been executed in the implementation environment. Those integration checks remain
-part of the intended run above; no reduced-budget workflow has been added.
+Preparation, protocol freezing, both one-billion-token recoveries, BF16 bundle
+export and reload, full WikiText evaluation, and the five-task harness suite
+completed successfully. The structured artifacts record completed status and
+the report notebook reproduces their tables and figures without loading a model
+or dataset.
 
 Benchmark references: [WikiText](https://arxiv.org/abs/1609.07843),
 [PIQA](https://arxiv.org/abs/1911.11641), [ARC](https://arxiv.org/abs/1803.05457),

@@ -80,6 +80,10 @@
   `llm-wiki/SCHEMA.md` before modifying maintained wiki content; a read-only
   query starts from `llm-wiki/wiki/index.md` and only loads the schema sections
   needed for the requested operation.
+- For TUKE Perun deployment, resource planning, allocation accounting, or
+  experiment reporting, read `docs/infrastructure/perun/perun.md` and
+  `docs/infrastructure/perun/perun-resources.md` before estimating or
+  recording resource use.
 - Treat scoped instructions as additions to these global approval and quality
   rules, not permission to bypass them.
 - Route reusable recovery and allocation behavior to `src/mlp_replacement/`;

@@ -8,6 +8,8 @@
   [`../docs/agents/maintained-code-and-workflows.md`](../docs/agents/maintained-code-and-workflows.md).
 - Before proposing or modifying a workflow intended to execute on TUKE Perun,
   read [`../docs/infrastructure/perun/perun.md`](../docs/infrastructure/perun/perun.md).
+- Before estimating, requesting, or reporting Perun resources, also read
+  [`../docs/infrastructure/perun/perun-resources.md`](../docs/infrastructure/perun/perun-resources.md).
 - Before modifying a Perun Slurm file, also read
   [`jobs/perun/README.md`](jobs/perun/README.md).
 
@@ -71,6 +73,9 @@
   explicitly implements distributed execution.
 - Preserve unique structured artifacts and failure information for unattended
   runs.
+- Record a pre-run estimate and post-run measurements under the Perun resource
+  contract. Keep requested ceilings, expected consumption, scheduler-measured
+  allocation, workflow timing, and observed utilization distinct.
 - Treat resource values as measured configuration, not permanent cluster facts.
 - Preserve unresolved infrastructure uncertainty and validate it with current
   official documentation or measurements from the intended scientific job.
