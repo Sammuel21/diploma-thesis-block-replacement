@@ -43,6 +43,12 @@ v0.4.13 references are now individually registered in
 [`raw/sources.yml`](../raw/sources.yml) for SwiGLU-6 evaluation. They remain
 `registered`; no paper ingestion or source-summary pages were added.
 
+TorchAO 0.17.0, its compatibility table, MSLK 1.1.0+cu128, TorchAO serialization,
+and PyTorch benchmarking references are registered in the same registry for
+[Quantization-1](../../docs/experiments/model/baseline/quantization-1.md).
+Selected APIs were checked; all five entries remain `registered`. Scientific
+backend validation and experiment execution are pending.
+
 ## Concepts
 
 - [[concept-replacement-error-propagation|Replacement error propagation]]:
@@ -146,7 +152,7 @@ historical archive remains available at `docs/prototype/mvp/`.
 - Schema version: 1.1
 - Last structural lint: 2026-09-18 (implementation standards and agent routing)
 - Orphan pages: none detected
-- Registered source collections: 3
-- Registered individual sources: 5
+- Registered source collections: 5
+- Registered individual sources: 16
 - Ingested individual sources: 4
 - Sources in review: 1

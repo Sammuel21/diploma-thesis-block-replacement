@@ -29,6 +29,8 @@ production architecture.
 ## Navigation
 
 - [Human documentation index](docs/README.md)
+- [Quantization-1 MLP baseline](docs/experiments/model/baseline/quantization-1.md)
+- [Heterogeneous operator experiment area](docs/experiments/model/heterogenous/README.md)
 - [MVP archive](docs/prototype/mvp/README.md)
 - [LLM-wiki orientation](llm-wiki/README.md)
 - [LLM-wiki schema](llm-wiki/SCHEMA.md)

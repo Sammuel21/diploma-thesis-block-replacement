@@ -5,7 +5,7 @@ type: index
 category: documentation
 status: active
 created: 2026-07-17
-modified: 2026-09-25
+modified: 2026-10-02
 authorship:
   created_by: unknown
 curation:
@@ -76,6 +76,10 @@ Markdown files in this directory follow the
 - [Model compression experiments](experiments/model/README.md) explain the
   executable compression baseline, SwiGLU allocation, and allocation-search
   pipelines.
+- [Heterogeneous operator experiments](experiments/model/heterogenous/README.md)
+  reserve the documentation area for the next model-level experiment class.
+- [Quantization-1](experiments/model/baseline/quantization-1.md) defines the
+  MLP-only INT8/INT4 baseline, optional QAT, and common quality/runtime reports.
 - [Block experiments](experiments/block/README.md) explain the isolated
   operator-fitting and singleton-replacement studies.
 

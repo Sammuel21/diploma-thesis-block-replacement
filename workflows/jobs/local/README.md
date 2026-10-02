@@ -5,6 +5,15 @@ darthmachinus. Scientific configuration and execution remain under
 `workflows/configs/` and `workflows/runs/`; this directory owns only process
 launch and local path defaults.
 
+[`heterogenous/`](heterogenous/README.md) reserves launchers for the
+heterogeneous operator class. It contains directory scaffolding only and adds
+no workflow to the current launcher allow-list.
+
+[quantization_1.sh](quantization_1.sh) is the dedicated Quantization-1 launcher.
+It forwards `prepare`, `run`, `evaluate`, and `report` and uses a separate
+baseline environment selected by `MLP_REPLACEMENT_PYTHON`. See the
+[experiment guide](../../../docs/experiments/model/baseline/quantization-1.md).
+
 Run an allow-listed model workflow from any directory inside the checkout:
 
 ```bash

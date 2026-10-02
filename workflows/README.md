@@ -60,6 +60,18 @@ layout under [`configs/model/`](configs/model/). See the
 [`runs/model` README](runs/model/README.md) for stage, dependency, artifact,
 and validation details.
 
+[Quantization-1](../docs/experiments/model/baseline/quantization-1.md) adds a
+separate model baseline with `prepare`, `run`, `evaluate`, and `report` commands.
+Its dedicated [environment pins](environments/quantization-1-requirements.txt)
+and local/Perun launchers preserve the shared SwiGLU environment and historical
+workflows. INT4 QAT requires an explicit positive token budget.
+
+The heterogeneous operator class has reserved directories under
+[`runs/model/heterogenous/`](runs/model/heterogenous/README.md) and
+[`configs/model/heterogenous/`](configs/model/heterogenous/README.md), with
+matching local and Perun launcher areas. These contain directory scaffolding
+only; no heterogeneous workflow is executable yet.
+
 SwiGLU-5's context, fitting, candidate construction, recovery adaptation,
 search, and confirmation are separated under `runs/model/swiglu/swiglu5/`.
 The original CLI modules and `swiglu_5.py` compatibility imports remain available.

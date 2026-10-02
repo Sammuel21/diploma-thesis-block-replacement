@@ -1,5 +1,5 @@
 schema_version: 1
-updated: 2026-09-21
+updated: 2026-10-02
 path_base: repository-root
 
 collections:
@@ -62,3 +62,18 @@ collections:
     mutability: immutable-snapshot
     ingestion_policy: selective-with-source-verification
     notes: Bibliographic registration for implemented evaluation; no source ingestion is implied.
+
+  - id: quantization-references
+    title: Pinned quantization software and official runtime documentation
+    locations:
+      - https://github.com/pytorch/ao
+      - https://github.com/meta-pytorch/MSLK
+      - https://download.pytorch.org/whl/cu128/mslk/
+      - https://docs.pytorch.org
+    storage: remote
+    origin: external-other
+    evidence_kinds: [software, official-documentation]
+    priority: supporting
+    mutability: mixed
+    ingestion_policy: selective-with-source-verification
+    notes: Quantization-1 backend registration; pinned source APIs and selected documentation locators checked, without full source ingestion.

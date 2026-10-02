@@ -5,6 +5,12 @@ __pycache__/
 .ipynb_checkpoints/
 local/
 
+# Track the heterogeneous local-launcher scaffold without exposing other local files.
+!/workflows/jobs/local/
+/workflows/jobs/local/*
+!/workflows/jobs/local/heterogenous/
+!/workflows/jobs/local/quantization_1.sh
+
 # Data is local by default. The small MVP evidence logs are an explicit
 # reproducibility exception and are versioned with the prototype archive.
 /data/*

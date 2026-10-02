@@ -5,7 +5,7 @@ type: index
 category: experiments/model
 status: active
 created: 2026-09-10
-modified: 2026-09-29
+modified: 2026-10-02
 authorship:
   created_by: collaborative
 curation:
@@ -28,8 +28,10 @@ and interpretation of each pipeline.
 | Workflow | Main question | Status |
 | --- | --- | --- |
 | [Compression baseline](baseline/compression-baseline.md) | Do the improved calibration and initialization methods help under a simple fixed replacement pattern? | Notebook artifacts present; Python runner not yet executed |
+| [Quantization-1](baseline/quantization-1.md) | How does MLP-only INT8/INT4 quantization compare with architectural editing in quality, actual bytes, speed, and recovery cost? | Implemented; full GPU scientific validation pending |
 | [Block interaction](interaction/block-interaction.md) | How do locally fitted replacements interact across adjacent windows and block pairs? | Notebook artifact present; no Python runner |
 | [Homogeneous SwiGLU experiments](swiglu/README.md) | What quality did model-wide SwiGLU replacement achieve, and why? See the [results overview](swiglu/swiglu-results.md) or [chronological progression](swiglu/swiglu-progression.md). | Concluded through SwiGLU-7; all 12 native-8K production runs completed |
+| [Heterogeneous operator experiments](heterogenous/README.md) | How should different replacement operator families and capacities be allocated across MLP blocks? | Directory scaffold only; experiments not implemented |
 
 Reusable definitions belong under [methodology](../../methodology/). Results
 and run metadata belong in JSON artifacts. The Python migrations require an

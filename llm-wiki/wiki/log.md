@@ -778,3 +778,17 @@ This file is append-only. Entries use the format:
 - Kept requested ceilings, expected consumption, scheduler allocations,
   workflow timing, and observed utilization separate so future estimates can
   be calibrated without presenting proxies as measurements.
+
+## [2026-10-02] register | Quantization-1 backend references
+
+- Registered TorchAO 0.17.0 source APIs, its official compatibility table,
+  MSLK 1.1.0+cu128 compatibility/wheels, TorchAO serialization, and PyTorch
+  benchmarking guidance for the approved MLP-only quantization baseline.
+- Added the remote quantization-reference collection and index navigation.
+  Locators, pinned versions, and mutable-document access dates are recorded.
+- Checked the selected weight-only and QAT prepare/convert APIs, serialization,
+  and timing guidance. All five entries remain `registered`; no full source
+  ingestion, source-summary page, or scientific finding was added.
+- The experiment guide distinguishes library methods from project-defined
+  scope, recovery budget, evaluation data, and generation measurements.
+  Full GPU scientific validation remains pending.

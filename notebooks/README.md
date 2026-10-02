@@ -77,9 +77,11 @@ SwiGLU replacements.
 
 ## `model/`: integrated model experiments
 
-Model-level notebooks are grouped into `baseline/`, `interaction/`, and
-`swiglu/`. The homogeneous SwiGLU progression, including the load-only
-SwiGLU-5 report, lives under [`model/swiglu/`](model/swiglu/).
+Model-level notebooks are grouped into `baseline/`, `interaction/`, `swiglu/`,
+and `heterogenous/`. The homogeneous SwiGLU progression, including the load-only
+SwiGLU-5 report, lives under [`model/swiglu/`](model/swiglu/). The
+[`model/heterogenous/`](model/heterogenous/README.md) area is reserved for future
+heterogeneous operator experiments and reports.
 
 ## `mvp/`: frozen historical prototype
 

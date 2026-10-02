@@ -1,5 +1,5 @@
 schema_version: 1
-updated: 2026-09-21
+updated: 2026-10-02
 
 # Individual sources are added here only when deliberately registered for
 # ingestion. Collection membership alone does not mean a source was reviewed.
@@ -208,3 +208,94 @@ sources:
     added: 2026-09-21
     ingestion_status: registered
     notes: SwiGLU-6 pinned software release; selected adapter APIs checked, no full source ingestion. Runtime protocol records installed Python and task YAML SHA-256 hashes.
+
+  - id: src-torchao-0-17-0
+    title: TorchAO v0.17.0 quantization and QAT implementation
+    collection_id: quantization-references
+    origin: external-other
+    evidence_kind: software
+    priority: supporting
+    authors: [PyTorch contributors]
+    year: 2026
+    canonical_url: https://github.com/pytorch/ao/tree/v0.17.0
+    sha256: null
+    added: 2026-10-02
+    ingestion_status: registered
+    notes: >-
+      Pinned version 0.17.0. Selected locators checked: torchao/quantization/quant_api.py,
+      Int8WeightOnlyConfig and Int4WeightOnlyConfig v2 handlers; quantize_/workflows,
+      Int8Tensor and Int4Tensor; qat/api.py, QATConfig prepare/convert;
+      qat/fake_quantize_config.py, INT4 config inference; qat/fake_quantizer.py,
+      Int4WeightFakeQuantizer. These are library methods, not project inventions.
+      Full source ingestion was not performed.
+
+  - id: src-torchao-compatibility
+    title: TorchAO release compatibility table
+    collection_id: quantization-references
+    origin: external-other
+    evidence_kind: official-documentation
+    priority: supporting
+    authors: [PyTorch contributors]
+    year: null
+    canonical_url: https://github.com/pytorch/ao/issues/2919
+    sha256: null
+    added: 2026-10-02
+    ingestion_status: registered
+    notes: >-
+      Mutable official project table, accessed 2026-10-02. Locator: 0.17.0
+      compatibility row for PyTorch 2.11.0 and Python 3.10-3.14.
+      Publication year is unspecified. Selected compatibility check only.
+
+  - id: src-mslk-1-1-0
+    title: MSLK 1.1.0 release compatibility and CUDA 12.8 wheels
+    collection_id: quantization-references
+    origin: external-other
+    evidence_kind: software
+    priority: supporting
+    authors: [Meta PyTorch contributors]
+    year: 2026
+    canonical_url: https://github.com/meta-pytorch/MSLK#release-compatibility-table
+    sha256: null
+    added: 2026-10-02
+    ingestion_status: registered
+    notes: >-
+      Pin 1.1.0+cu128. Locators: release compatibility table, 1.1.0 row with
+      PyTorch 2.11.0; official wheel index https://download.pytorch.org/whl/cu128/mslk/,
+      mslk-1.1.0+cu128 cp312 Linux x86_64 wheel. README/index are mutable;
+      accessed 2026-10-02. Kernel execution on the experiment GPU remains pending.
+
+  - id: src-torchao-serialization-0-17
+    title: TorchAO tensor-subclass serialization guide
+    collection_id: quantization-references
+    origin: external-other
+    evidence_kind: official-documentation
+    priority: supporting
+    authors: [PyTorch contributors]
+    year: null
+    canonical_url: https://docs.pytorch.org/ao/stable/eager_tutorials/serialization.html
+    sha256: null
+    added: 2026-10-02
+    ingestion_status: registered
+    notes: >-
+      Locators: state_dict torch.save/torch.load flow and assign=True reload.
+      The stable documentation displayed version 0.17 when checked on
+      2026-10-02; the URL is mutable. Runtime is pinned to TorchAO 0.17.0.
+      Publication year is unspecified. Selected API check only.
+
+  - id: src-pytorch-benchmarking-guide
+    title: PyTorch benchmark recipe
+    collection_id: quantization-references
+    origin: external-other
+    evidence_kind: official-documentation
+    priority: supporting
+    authors: [PyTorch contributors]
+    year: null
+    canonical_url: https://docs.pytorch.org/tutorials/recipes/recipes/benchmark.html
+    sha256: null
+    added: 2026-10-02
+    ingestion_status: registered
+    notes: >-
+      Locators: warm-up and accelerator synchronization when timing CUDA work.
+      Mutable documentation accessed 2026-10-02; publication year unspecified.
+      Exact generation workloads, repetitions, metrics, and comparison
+      denominators are project-defined experiment choices.

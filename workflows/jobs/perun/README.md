@@ -6,6 +6,10 @@ environment. Before changing or using them, read the canonical
 owns the broader access, storage, environment, scratch, artifact, and
 validation assumptions. This README explains only the tracked job files.
 
+[`heterogenous/`](heterogenous/README.md) reserves launchers for the
+heterogeneous operator class. It contains directory scaffolding only; no
+Slurm job or resource request is defined yet.
+
 ## Files
 
 | File | Purpose |
@@ -268,6 +272,14 @@ for prerequisites, resume commands, allocation mapping, estimated cost, and
 result handling.
 
 ## Results and logs
+
+[quantization_1.sbatch](quantization_1.sbatch) submits one explicitly selected
+Quantization-1 prepare/run/evaluate job. It stages supplied inputs, locks the
+chosen output, and verifies durable stage-out before scratch cleanup. It uses
+the separate pinned quantization environment and does not rely on
+`.rsyncignore`. See the
+[Quantization-1 guide](../../../docs/experiments/model/baseline/quantization-1.md)
+for submission, resource-planning, and resume requirements.
 
 The documented submission commands override the tracked fallback paths and
 write single-job logs as `%x_%j` and array-task logs as `%x_%A_%a` below

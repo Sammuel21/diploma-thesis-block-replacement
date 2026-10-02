@@ -8,6 +8,8 @@ the directory studies block interactions and sensitivity to multi-block replacem
   end-to-end compression baseline.
 - `interaction/block-interaction.ipynb` studies how replacement errors interact across
   multiple blocks.
+- [`heterogenous/`](heterogenous/README.md) reserves notebooks and reports for
+  heterogeneous operator experiments; no notebook is implemented yet.
 - `swiglu/swiglu.ipynb` develops the initial model-level strategies based on SwiGLU
   compression.
 - `swiglu/swiglu-2.ipynb` compares importance signals, allocation temperatures,

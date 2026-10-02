@@ -5,6 +5,11 @@ notebooks under `notebooks/model/`. They run the scientific computation and
 write notebook-compatible JSON; notebooks remain the explanatory and analysis
 frontend.
 
+[`heterogenous/`](heterogenous/README.md) is reserved for the heterogeneous
+operator experiment class. It currently contains a README only, with no
+executable runner. Its configurations belong under
+`workflows/configs/model/heterogenous/`.
+
 ## Implementation ownership
 
 The `swiglu/swiglu5/` package separates experiment context and source validation
@@ -49,6 +54,7 @@ tolerances unchanged.
 | Notebook | Python module | Configuration | Default stage |
 | --- | --- | --- | --- |
 | `baseline/compression-baseline.ipynb` | `workflows.runs.model.baseline.compression` | `workflows/configs/model/baseline/compression.json` | optimized |
+| No notebook | `workflows.runs.model.baseline.quantization` | `workflows/configs/model/baseline/quantization-1.json` | explicit prepare/run/evaluate/report |
 | `swiglu/swiglu.ipynb` | `workflows.runs.model.swiglu.swiglu_initial` | `workflows/configs/model/swiglu/swiglu-initial.json` | optimized |
 | `swiglu/swiglu-2.ipynb` | `workflows.runs.model.swiglu.swiglu_2_allocation` | `workflows/configs/model/swiglu/swiglu-2-allocation.json` | complete search |
 | `swiglu/swiglu-3.ipynb` | `workflows.runs.model.swiglu.swiglu_3_calibration_recovery` | `workflows/configs/model/swiglu/swiglu-3-calibration-recovery.json` | calibration, sparsity, and recovery |
@@ -97,6 +103,13 @@ SwiGLU-7 instead has `prepare` and `train` subcommands and accepts
 requires one prepared `result.json`, one strategy ID, and one target. The local
 and Perun launchers supply the two storage directories without changing the
 scientific configuration.
+
+Quantization-1 uses the same directory contract with distinct outputs for the
+dense control, INT8 PTQ, INT4 PTQ, and optional explicitly budgeted INT4 QAT.
+`run` exports and reloads its bundle before the complete evaluation;
+`evaluate` accepts supplied architectural bundles without modifying them.
+See the [experiment guide](../../../docs/experiments/model/baseline/quantization-1.md)
+for commands, environment pins, comparison rules, and validation status.
 
 An output path is never overwritten. Historical science artifacts have sibling
 `*.run.json` sidecars. SwiGLU-7 keeps `result.json` and `run.json` together in
