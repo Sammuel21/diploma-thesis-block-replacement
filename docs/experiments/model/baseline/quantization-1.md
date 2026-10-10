@@ -50,6 +50,11 @@ has no Quantization-1 job.
   tokens do not mean equal compute or total preparation cost.
 - **Not measurements:** run-time estimates discussed during implementation
   were extrapolated from SwiGLU artifacts, not measured for Quantization-1.
+- **Planned change (decided 2026-10-10):** the 8K KL evaluation moves from
+  `quantization.py` into shared code in `src/` so that
+  [SwiGLU-8](../swiglu/swiglu-8.md) uses the identical measurement. Behavior
+  must stay identical, and the move happens before Quantization-1's first run.
+  See the [decision log](../../../agents/decisions.md).
 
 ## What is compared
 
