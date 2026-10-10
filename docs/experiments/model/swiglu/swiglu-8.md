@@ -5,7 +5,7 @@ type: experiment-workflow
 category: experiments/model/swiglu
 status: draft
 created: 2026-10-10
-modified: 2026-10-10
+modified: 2026-10-11
 authorship:
   created_by: collaborative
 curation:
@@ -22,10 +22,11 @@ reference_artifacts:
 
 # SwiGLU-8 - Local-Fitting Attribution and Homogeneous Control Spectrum
 
-**Status:** design settled on 2026-10-10. Not implemented, no runs. The binding
-decisions are recorded in the [shared decision log](../../../agents/decisions.md);
-this page explains them. If this page and the log disagree, the log wins until
-the conflict is raised with the researcher.
+**Status:** design settled on 2026-10-10; implemented on 2026-10-11 (see
+[Implementation](#implementation)). No runs yet. The binding decisions are
+recorded in the [shared decision log](../../../agents/decisions.md); this page
+explains them. If this page and the log disagree, the log wins until the
+conflict is raised with the researcher.
 
 ## Questions
 
@@ -241,10 +242,97 @@ not billing:
 | Part B, 16 runs to 100M (two arms at eight targets) at about 1.2-1.5 hours each, plus about 15 minutes of final evaluation per run | 23-28 |
 | **Total** | **about 28-40** |
 
-The formal pre-run plan required by
-[PERUN resource accounting](../../../infrastructure/perun/perun-resources.md)
-is completed during implementation planning, before any submission, and
-compared with measured use afterward.
+### Pre-run resource plan
+
+Recorded 2026-10-11 under
+[PERUN resource accounting](../../../infrastructure/perun/perun-resources.md),
+before any submission, and to be compared with measured use afterward. The
+evidence is SwiGLU-7's measured workflow timing: S7-0 trained 100M tokens in
+3,541-3,775 s, final evaluation took 805-846 s, and peak usage was 8.9 GiB RAM
+and 33.5 GiB VRAM. Confidence is medium. The main uncertainty is how many
+epochs the 512- and 1024-wide fits and the low-learning-rate recipes need.
+
+| Stage | Tasks | Request per task | Expected elapsed | Expected GPU-h | Ceiling GPU-h | CPU core-h | Peak RAM / VRAM | Storage |
+| --- | ---: | --- | --- | ---: | ---: | ---: | --- | --- |
+| A: `block-check` | 1 | gpu_short, 1 H200, 8 CPU, 128 GB, 8 h | 1.5-3 h | 1.5-3 | 8 | 12-24 | ≤ 50 GB / ≤ 40 GB | PROJECT < 0.1 GB; SCRATCH ~20 GB |
+| A2: stage 2 (only if triggered) | 1 | same, 6 h | 1-2 h | 1-2 | 6 | 8-16 | same | same |
+| B0: `prepare` | 1 | gpu_short, 1 H200, 8 CPU, 128 GB, 24 h | 3-6 h (recipe unchanged); 4-8 h (refit) | 3-8 | 24 | 24-64 | ≤ 60 GB / ≤ 40 GB | PROJECT ~25 GB (16 FP32 starts and 0.5 GB data); SCRATCH ~40 GB |
+| B1: `train` | 16 (tasks 0-3, then 4-15) | gpu_short, 1 H200, 8 CPU, 128 GB, 6 h | 1.2-1.5 h each | 20-24 | 96 | 160-190 | 8.9 GiB / 33.5 GiB (S7-0) | PROJECT ~38 GB (bundles and benchmarks); SCRATCH ≤ 20 GB per task |
+| **Total** | 19-20 | | Critical path ~1-2 days plus queue and review gates | **about 26-37** | 128-134 | 200-290 | | PROJECT ~63 GB new |
+
+Before each submission, check `perunfsusage` against the 1 TB PROJECT
+allocation and the totals in
+[perun-status.md](../../../infrastructure/perun/perun-status.md). After each
+job, add a [perun-log.md](../../../infrastructure/perun/perun-log.md) entry
+with `scontrol` facts while they are available, update the status totals, and
+keep workflow timing separate from scheduler allocation.
+
+## Implementation
+
+Implemented on 2026-10-11 without any run. Runner:
+[`swiglu_8.py`](../../../../workflows/runs/model/swiglu/swiglu_8.py).
+Configuration:
+[`swiglu-8.json`](../../../../workflows/configs/model/swiglu/swiglu-8.json).
+PERUN job: [`swiglu_8.sbatch`](../../../../workflows/jobs/perun/swiglu_8.sbatch),
+with commands in the [PERUN job README](../../../../workflows/jobs/perun/README.md#swiglu-8-workflow).
+The configuration validates every block it shares with SwiGLU-7 and
+Quantization-1 against their versioned configurations. It also pins the
+SwiGLU-7 source artifacts by sha256.
+
+| Command | Does | Output |
+| --- | --- | --- |
+| `block-check` | Part A: the 54 fits, unfitted slices, single-block KL at 128 and 8K, NMSE on both validation sets, the adoption decision, and the stage-2 indicator | `block-check-001/` |
+| `prepare` | Part B: neuron rankings, curve extension or refit, allocation, start fits, and the 16 token-zero starts; it refuses unless `part_b` names the block check's adopted recipe and its sha256 | `prepare-001/` |
+| `train --arm --target` | S7-0 recovery to 100M, monitoring at 0/10/25/50/75/100M, the full SwiGLU-7 final evaluation, and the 8K KL of the reloaded BF16 bundle | `{fitted,slice}-target-{t}-run-001/` |
+
+**Shared code.**
+- The 8K KL lives in `src/mlp_replacement/evaluation/teacher_kl.py`, shared with
+  Quantization-1.
+- `fit_operator_fp32_detailed` accepts a cosine schedule, decayed once per
+  epoch over the 64-epoch budget.
+- `refit_down_projection_least_squares` solves the FP64 normal equations
+  without regularization.
+- `sample_partitioned_windows` can report each window's source record.
+- SwiGLU-7's `persist` and `evaluate_final_model` take the workflow name from
+  the artifact, so SwiGLU-7's own outputs are unchanged.
+
+**Data.**
+- The 8K fitting streams use shard-0 records after the last 8K-KL document and
+  skip every record that supplied a 128-token window. A byte check confirms
+  that the indexed shard reproduces the KL stream.
+- The block check also reports how many 128-token windows came from 8K-KL
+  documents. That overlap already existed in SwiGLU-7.
+- The selection never depends on the recipe; the 8K recipe reuses the
+  128-token ranking.
+
+**Acceptance checks.** These are the decided tolerances (relative difference
+r). A failed check stops the stage, which records the values first.
+
+| ID | Check | Reference | Tolerance |
+| --- | --- | --- | --- |
+| A1 | Slice NMSE before fitting at the six combinations | SwiGLU-7 `initial_local_nmse` | r ≤ 1e-4 |
+| A2 | Current-recipe fitted NMSE and MSE | SwiGLU-7 `local_nmse`, `local_mse` | r ≤ 1e-3 |
+| A3 | Current-recipe single-block KL at 128 tokens | SwiGLU-7 curve `raw_teacher_kl` | r ≤ 1e-3 |
+| B1 | Fitted arm at 20-50%, token-0 monitoring KL and PPL | S7-0 history | r ≤ 1e-4 |
+| B2 | Same runs, KL at 10-100M and PPL at 10/25/50/100M | S7-0 history | r ≤ 1e-3 |
+| P1 | Slice NMSE at all 135 SwiGLU-7 fit points | SwiGLU-7 `initial_local_nmse` | r ≤ 1e-4 |
+| P2 | Fitted start operators at 20-50% (recipe unchanged) | SwiGLU-7 `local_nmse`, `local_mse` | r ≤ 1e-3 |
+| P3 | Dense teacher PPL and task accuracy | SwiGLU-7 dense evaluation | PPL r ≤ 1e-4; accuracy identical |
+| P4 | 100M recovery stream | SwiGLU-7's first 100M tokens | identical sha256 |
+| P5 | Teacher-against-itself 8K KL; KL stream equal in both stages | 0; block-check stream | ≤ 1e-6 absolute; identical sha256 |
+
+A1-A3 and B1-B2 are required by the decision log. P1-P5 are cheap additions
+that catch a wrong selection, wrong data, or a changed environment before the
+expensive stages run. B1, B2, and P2 apply only while the current recipe is
+kept.
+
+**Not yet verified.** Contract tests cover the configuration, the adoption
+rule, the acceptance comparisons, the selection fingerprint, the 8K data
+disjointness, the cosine schedule, the least-squares refit, and the job
+mapping. Offline, the allocation code rebuilds SwiGLU-7's 20-50% widths
+exactly from its recorded curves. GPU execution, real data streams, and
+the acceptance checks themselves have not run; the first real stages are
+also the first execution test.
 
 ## Sources and attribution
 

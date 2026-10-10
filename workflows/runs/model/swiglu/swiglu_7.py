@@ -245,13 +245,14 @@ def relative_output(output_dir, path):
 
 
 def persist(output_dir, artifact, stage, progress=None):
+    # The artifact names its own workflow so SwiGLU-8 can reuse these stages.
     artifact["updated_at_utc"] = utc_now()
     write_json_atomic(output_dir / "result.json", artifact)
     write_json_atomic(
         output_dir / "run.json",
         {
-            "schema_version": SCHEMA_VERSION,
-            "workflow": WORKFLOW,
+            "schema_version": artifact["schema_version"],
+            "workflow": artifact["workflow"],
             "command": artifact["command"],
             "status": artifact["status"],
             "stage": stage,
@@ -377,7 +378,7 @@ def local_preparation_data(settings, tokenizer):
     return build_local_data(context)
 
 
-def prepare_monitoring_evaluation(settings, output_dir, artifact, tokenizer):
+def prepare_monitoring_evaluation(settings, output_dir, artifact, tokenizer, local_data=None):
     import torch
 
     existing = artifact["results"].get("monitoring_evaluation")
@@ -386,7 +387,8 @@ def prepare_monitoring_evaluation(settings, output_dir, artifact, tokenizer):
         if file_digest(path) != existing["sha256"]:
             raise ValueError("Prepared local evaluation batches changed")
         return None
-    local_data = local_preparation_data(settings, tokenizer)
+    if local_data is None:
+        local_data = local_preparation_data(settings, tokenizer)
     path = output_dir / "prepared" / "local-evaluation-batches.pt"
     save_tensor_atomic(
         path,
@@ -1434,6 +1436,7 @@ def evaluate_final_model(
     allocation,
     adapters,
     run_fingerprint,
+    measure_module="workflows.runs.model.swiglu.swiglu_7",
 ):
     import numpy as np
     import torch
@@ -1486,10 +1489,9 @@ def evaluate_final_model(
             bundle_path,
             replacements,
             {
-                "workflow": WORKFLOW,
+                "workflow": artifact["workflow"],
                 "run_fingerprint": run_fingerprint,
-                "strategy": artifact["identity"]["strategy"],
-                "target": artifact["identity"]["target"],
+                **artifact["identity"],
                 "lora_merged": merged,
             },
         )
@@ -1525,7 +1527,7 @@ def evaluate_final_model(
             [
                 sys.executable,
                 "-m",
-                "workflows.runs.model.swiglu.swiglu_7",
+                measure_module,
                 "measure-bundle",
                 "--bundle",
                 str(bundle_path),

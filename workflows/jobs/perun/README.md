@@ -20,6 +20,7 @@ Slurm job or resource request is defined yet.
 | `run_array.sbatch` | Maps a manifest of JSON configurations onto independent one-GPU Slurm array tasks. It does not distribute one experiment across GPUs. |
 | `run_model.sbatch` | Runs the historical allow-listed model-wide workflows that still depend on the unavailable automatic-scratch helper. It is not the SwiGLU-7 launcher. |
 | `swiglu_7.sbatch` | Runs the independent SwiGLU-7 preparation or maps array tasks `0-11` onto its fixed three-scope/four-target grid. |
+| `swiglu_8.sbatch` | Runs the SwiGLU-8 block check or preparation, or maps array tasks `0-15` onto its two arms at eight targets. |
 
 `smoke.sbatch` defaults to `gpu_short`, 48 GB of CPU memory, and one hour. The
 generic and array launchers default to `gpu_long`, 64 GB, and 72 hours.
@@ -270,6 +271,40 @@ earlier 128-token runtime without accounting for 8K attention.
 See the [SwiGLU-7 experiment guide](../../../docs/experiments/model/swiglu/swiglu-7.md)
 for prerequisites, resume commands, allocation mapping, estimated cost, and
 result handling.
+
+## SwiGLU-8 workflow
+
+`swiglu_8.sbatch` uses the SwiGLU-7 lock, scratch, and verified stage-out
+contract with Quantization-1's explicit code staging, so it does not depend on
+`.rsyncignore`. Outputs go to `PROJECT/perun-results/swiglu-8/<run-id>`. Every
+stage reads its pinned SwiGLU-7 sources read-only from
+`PROJECT/perun-results/swiglu-7/`. Each submission needs the researcher's go;
+pass the stage's planned `--time` from the
+[SwiGLU-8 resource plan](../../../docs/experiments/model/swiglu/swiglu-8.md#pre-run-resource-plan).
+
+```bash
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=08:00:00 \
+  --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+  workflows/jobs/perun/swiglu_8.sbatch block-check
+
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=24:00:00 \
+  --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+  workflows/jobs/perun/swiglu_8.sbatch prepare \
+  "$PERUN_PROJECT/perun-results/swiglu-8/block-check-001/result.json"
+
+export S8_PREPARED="$PERUN_PROJECT/perun-results/swiglu-8/prepare-001/result.json"
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=0-3 \
+  --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+  workflows/jobs/perun/swiglu_8.sbatch train "$S8_PREPARED"
+```
+
+Preparation requires `part_b` in the configuration to name the adopted recipe
+and the sha256 of the accepted block check. Tasks `0-7` are the fitted arm and
+`8-15` the slice-only arm, each at targets 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75,
+and 0.8. Submit tasks `0-3` first (the fitted 20-50% reproduction check), then
+`--array=4-15`. A training task stages the shared prepared inputs and only its
+own start file. Resume one task with `train --resume "$S8_PREPARED"` and the
+same `--array` index.
 
 ## Results and logs
 

@@ -249,7 +249,7 @@ def prepare(directory, artifact, log, settings):
     import numpy as np
     from datasets import load_dataset
     from transformers import AutoTokenizer
-    from mlp_replacement.data_streams import build_finite_stream
+    from mlp_replacement.evaluation.teacher_kl import TEACHER_KL_PROTOCOL, build_teacher_kl_stream
 
     persist(directory, artifact, log, "prepare")
     for package in ("transformers", "datasets"):
@@ -265,7 +265,7 @@ def prepare(directory, artifact, log, settings):
     prepared = artifact["results"].setdefault("prepared", {
         "configuration_fingerprint": content_digest(preparation_settings(settings)),
         "harness_source_hashes": harness_files(), "corpora": {},
-        "kl_protocol": "teacher-kl-t1-all-valid-positions-c4-shard0-24x8192-v1",
+        "kl_protocol": TEACHER_KL_PROTOCOL,
     })
     if prepared["harness_source_hashes"] != harness_files():
         raise ValueError("Harness source changed during preparation resume")
@@ -302,11 +302,8 @@ def prepare(directory, artifact, log, settings):
         else:
             if path.exists():
                 raise ValueError("Interrupted KL stream lacks its descriptor; inspect it before retry")
-            records = load_dataset(source["path"], data_files=source["data_file"],
-                                   revision=source["revision"], split=source["split"], streaming=True)
-            record = build_finite_stream(records, tokenizer, path,
-                                         settings["data"]["kl_sequences"] * settings["data"]["sequence_length"],
-                                         text_column=source["text_column"])
+            record = build_teacher_kl_stream(source, tokenizer, path, settings["data"]["kl_sequences"],
+                                             settings["data"]["sequence_length"])
             record["path"] = str(path.relative_to(directory))
             write_json_atomic(record_path, record)
         prepared["kl_stream"] = record
@@ -318,28 +315,11 @@ def prepare(directory, artifact, log, settings):
 
 
 def evaluate_online_kl(student, teacher, prepared_root, prepared, settings):
-    import torch
-    from mlp_replacement.compression.recovery import online_distillation_loss
-    from mlp_replacement.data import PackedTokenCache
+    from mlp_replacement.evaluation.teacher_kl import evaluate_teacher_kl
 
     record = prepared["kl_stream"]
-    cache = PackedTokenCache(contained_path(prepared_root, record["path"]), record["token_count"],
-                             settings["data"]["sequence_length"], record["sha256"])
-    total = 0.0
-    count = 0
-    student.eval()
-    teacher.eval()
-    with torch.inference_mode():
-        for offset in range(0, cache.token_count, cache.sequence_length):
-            loss, tokens = online_distillation_loss(student, teacher,
-                                                    cache.batch(offset, cache.sequence_length, 1),
-                                                    1.0, "cuda", torch.bfloat16)
-            total += float(loss.item()) * tokens
-            count += tokens
-    if count != record["token_count"] or not math.isfinite(total):
-        raise ValueError("KL coverage/finite-loss contract failed")
-    return {"kl": total / count, "valid_positions": count,
-            "protocol": prepared["kl_protocol"], "stream_sha256": record["sha256"]}
+    return evaluate_teacher_kl(student, teacher, contained_path(prepared_root, record["path"]), record,
+                               settings["data"]["sequence_length"], prepared["kl_protocol"])
 
 
 def cpu_tree(value):

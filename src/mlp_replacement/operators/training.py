@@ -384,8 +384,15 @@ def fit_operator_fp32_detailed(module, training_pairs, validation_pairs, config,
         weight_decay=config.weight_decay,
         foreach=False,
     )
-    if config.scheduler != "constant":
-        raise ValueError("Detailed SwiGLU fitting requires a constant schedule")
+    if config.scheduler not in {"constant", "cosine"}:
+        raise ValueError("Detailed SwiGLU fitting requires a constant or cosine schedule")
+    # Cosine decays once per epoch over the maximum epoch budget, as in fit_operator.
+    scheduler = None
+    if config.scheduler == "cosine":
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=config.epochs,
+        )
 
     initial = evaluate_operator(module, validation_pairs, device, config.batch_size)
     best_validation = initial.mse
@@ -437,6 +444,8 @@ def fit_operator_fp32_detailed(module, training_pairs, validation_pairs, config,
             stale_epochs = 0
         else:
             stale_epochs += 1
+        if scheduler is not None:
+            scheduler.step()
         if (
             config.early_stopping_patience is not None
             and stale_epochs >= config.early_stopping_patience
@@ -453,6 +462,53 @@ def fit_operator_fp32_detailed(module, training_pairs, validation_pairs, config,
         best_validation_mse=best_validation,
         updates=updates,
     )
+
+
+def refit_down_projection_least_squares(module, training_pairs, device, batch_size):
+    """Replace a SwiGLU down projection by its ordinary least-squares optimum.
+
+    The gate and up projections stay fixed. The normal equations accumulate in
+    FP64 over every calibration pair and are solved without regularization.
+    """
+
+    if not isinstance(module, GatedMLPReplacement):
+        raise TypeError("Least-squares refitting requires a GatedMLPReplacement")
+    if module.down_projection.bias is not None:
+        raise ValueError("Least-squares refitting supports a bias-free down projection")
+    if batch_size < 1:
+        raise ValueError("batch_size must be positive")
+    if training_pairs.hidden_size != module.down_projection.out_features:
+        raise ValueError("Calibration pairs and replacement hidden sizes differ")
+    module = module.to(device=device, dtype=torch.float32)
+    width = module.bottleneck_size
+    gram = torch.zeros(width, width, dtype=torch.float64, device=device)
+    cross = torch.zeros(width, training_pairs.hidden_size, dtype=torch.float64, device=device)
+    module.eval()
+    with torch.no_grad():
+        for start in range(0, training_pairs.num_tokens, batch_size):
+            inputs = training_pairs.inputs[start : start + batch_size].to(
+                device=device, dtype=torch.float32
+            )
+            targets = training_pairs.targets[start : start + batch_size].to(
+                device=device, dtype=torch.float64
+            )
+            hidden = (
+                module.activation(module.gate_projection(inputs))
+                * module.up_projection(inputs)
+            ).double()
+            gram += hidden.T @ hidden
+            cross += hidden.T @ targets
+        factor, info = torch.linalg.cholesky_ex(gram)
+        if int(info.item()) != 0:
+            raise RuntimeError("Least-squares Gram matrix is not positive definite")
+        weight = torch.cholesky_solve(cross, factor)
+        module.down_projection.weight.copy_(weight.T.to(torch.float32))
+        eigenvalues = torch.linalg.eigvalsh(gram)
+    return {
+        "solver": "fp64-cholesky-normal-equations",
+        "calibration_pairs": int(training_pairs.num_tokens),
+        "gram_condition_number": float(eigenvalues[-1] / eigenvalues[0]),
+    }
 
 
 def fit_replacement_operator(

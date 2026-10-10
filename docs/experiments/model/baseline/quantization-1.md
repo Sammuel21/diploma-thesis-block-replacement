@@ -50,11 +50,16 @@ has no Quantization-1 job.
   tokens do not mean equal compute or total preparation cost.
 - **Not measurements:** run-time estimates discussed during implementation
   were extrapolated from SwiGLU artifacts, not measured for Quantization-1.
-- **Planned change (decided 2026-10-10):** the 8K KL evaluation moves from
-  `quantization.py` into shared code in `src/` so that
-  [SwiGLU-8](../swiglu/swiglu-8.md) uses the identical measurement. Behavior
-  must stay identical, and the move happens before Quantization-1's first run.
-  See the [decision log](../../../agents/decisions.md).
+- **Shared 8K KL (decided 2026-10-10, moved 2026-10-11):** the KL stream
+  builder and evaluator now live in
+  [`teacher_kl.py`](../../../../src/mlp_replacement/evaluation/teacher_kl.py),
+  so that [SwiGLU-8](../swiglu/swiglu-8.md) uses the identical measurement.
+  `quantization.py` keeps its call sites, descriptor, and `kl_protocol` field.
+  The moved code is unchanged except for one added check: both models must use
+  SDPA attention, which every Quantization-1 loader already selects. Contract
+  tests cover the stream definition, the zero KL of the teacher against itself,
+  and the runner's argument plumbing. No GPU run has exercised it yet. See the
+  [decision log](../../../agents/decisions.md).
 
 ## What is compared
 

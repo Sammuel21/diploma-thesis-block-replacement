@@ -262,8 +262,12 @@ def validate_swiglu3_contract(settings, source):
     }
 
 
-def build_local_data(context):
-    """Recreate the frozen SwiGLU-3 local-data partition contract."""
+def build_local_data(context, record_indices=None):
+    """Recreate the frozen SwiGLU-3 local-data partition contract.
+
+    A supplied ``record_indices`` list receives the source record of every
+    sampled window in partition order.
+    """
 
     values = context.settings["data"]
     sequence_length = int(values["sequence_length"])
@@ -303,6 +307,7 @@ def build_local_data(context):
         sequence_length,
         int(context.settings["seed"]),
         source.text_column,
+        record_indices=record_indices,
     )
     calibration_sequences = (
         windows["calibration"]

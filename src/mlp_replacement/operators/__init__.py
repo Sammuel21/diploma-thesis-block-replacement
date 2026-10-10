@@ -21,6 +21,7 @@ from .training import (
     fit_replacement_operator,
     fit_ridge_linear,
     initialize_gated_mlp_with_output_reconstruction,
+    refit_down_projection_least_squares,
 )
 
 __all__ = [
@@ -41,5 +42,6 @@ __all__ = [
     "initialize_low_rank_from_linear",
     "initialize_low_rank_from_svd",
     "linear_svd",
+    "refit_down_projection_least_squares",
     "swiglu_neuron_importance_scores",
 ]

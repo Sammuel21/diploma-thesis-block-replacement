@@ -5,7 +5,7 @@ type: decision-log
 category: agents/decisions
 status: active
 created: 2026-10-10
-modified: 2026-10-10
+modified: 2026-10-11
 authorship:
   created_by: collaborative
 curation:
@@ -75,3 +75,8 @@ log only links to them.
 | 2026-10-10 | SwiGLU-8 acceptance checks: in Part A, the current recipe must reproduce SwiGLU-7's recorded local-fit error at the same layer and width; in Part B, while the recipe is unchanged, the fitted runs at 20-50% must reproduce SwiGLU-7's monitoring values over the first 100M tokens. Both must match within a tolerance stated in the implementation plan; if either fails, work stops for investigation. | SwiGLU-8 grilling session |
 | 2026-10-10 | Quantization-1's 8K KL evaluation moves from its runner into shared code in `src/` and is used by both Quantization-1 and SwiGLU-8. Its behavior must stay identical; the move happens before either experiment runs. | SwiGLU-8 grilling session |
 | 2026-10-10 | SwiGLU-8 has no repeat (noise-floor) run. Both arms use seed 21 and the identical ordered recovery token stream, so the comparison is paired; the "about 2%" interpretation threshold is reported as a judgment call. | SwiGLU-8 grilling session |
+| 2026-10-11 | Each SwiGLU-8 target is judged by Quantization-1's 8K KL at 100M, using the gap g = (slice − fitted) / fitted. The monitoring-KL trajectory judges whether the gap is shrinking; it counts as stable if it changes by less than 1 percentage point from 50M to 100M. WikiText 8K PPL and task macro accuracy are secondary. | SwiGLU-8 implementation planning |
+| 2026-10-11 | A SwiGLU-8 Part A recipe is adopted only if three things hold. Its mean 8K single-block KL reduction across the six combinations must exceed 5%. That reduction must also exceed the mean seed-to-seed variation; the reference is the mean of the two current-recipe seeds. No combination may be more than 5% worse at 128 or at 8K. If several qualify, the largest 8K reduction wins, and only a tested recipe can be adopted. | SwiGLU-8 implementation planning |
+| 2026-10-11 | The SwiGLU-8 8K-context recipe stops early on one held-out 8,192-token sequence. Its calibration and validation documents don't overlap the 8K KL evaluation stream or any 128-token partition. | SwiGLU-8 implementation planning |
+| 2026-10-11 | For SwiGLU-8 work until the refactor session, "green suite" means no regressions: new and touched tests pass, and no previously passing test fails. The six failures present on 2026-10-11 are left to the refactor. | SwiGLU-8 implementation planning |
+| 2026-10-11 | SwiGLU-8 acceptance tolerances, as relative differences: 1e-4 for the slice NMSE and token-0 monitoring values, and 1e-3 for the fitted local error, the 128-token single-block KL, and the monitoring values at 10–100M. The 100M recovery stream must match SwiGLU-7's first 100M tokens exactly. | SwiGLU-8 implementation planning |

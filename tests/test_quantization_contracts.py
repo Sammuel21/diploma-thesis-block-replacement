@@ -246,6 +246,20 @@ class QuantizationArtifactContracts(unittest.TestCase):
 
 @unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is not installed in the local inspection environment")
 class QuantizationTensorContracts(unittest.TestCase):
+    def test_online_kl_delegates_to_the_shared_protocol(self):
+        from mlp_replacement.artifacts import contained_path
+        from mlp_replacement.evaluation import teacher_kl
+
+        settings = runner.load_settings(runner.DEFAULT_CONFIG)
+        record = {"path": "prepared/kl.int32", "token_count": 196608, "sha256": "digest"}
+        prepared = {"kl_protocol": teacher_kl.TEACHER_KL_PROTOCOL, "kl_stream": record}
+        with tempfile.TemporaryDirectory() as temporary, \
+             patch.object(teacher_kl, "evaluate_teacher_kl", return_value={"kl": 0.5}) as shared:
+            result = runner.evaluate_online_kl("student", "teacher", temporary, prepared, settings)
+            shared.assert_called_once_with("student", "teacher", contained_path(temporary, record["path"]),
+                                           record, 8192, teacher_kl.TEACHER_KL_PROTOCOL)
+        self.assertEqual(result, {"kl": 0.5})
+
     def test_frozen_weights_and_shared_storage(self):
         import torch
         import torch.nn as nn

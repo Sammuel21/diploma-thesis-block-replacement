@@ -44,8 +44,20 @@ def tokenize_text(tokenizer, text):
     return encoded.input_ids.squeeze(0)
 
 
-def sample_partitioned_windows(records, tokenizer, partition_sizes, sequence_length, seed, text_column="text"):
-    """Sample document-disjoint token windows and divide them by pipeline purpose."""
+def sample_partitioned_windows(
+    records,
+    tokenizer,
+    partition_sizes,
+    sequence_length,
+    seed,
+    text_column="text",
+    record_indices=None,
+):
+    """Sample document-disjoint token windows and divide them by pipeline purpose.
+
+    A supplied ``record_indices`` list receives each window's source record
+    index in sampling order, which is also the partition order.
+    """
 
     total = sum(partition_sizes.values())
     if total == 0:
@@ -75,6 +87,8 @@ def sample_partitioned_windows(records, tokenizer, partition_sizes, sequence_len
         end = start + sequence_length
         used_records.add(record_index)
         sampled.append(ids[start:end].clone())
+        if record_indices is not None:
+            record_indices.append(record_index)
 
     if len(sampled) != total:
         raise RuntimeError(
