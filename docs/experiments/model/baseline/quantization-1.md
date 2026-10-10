@@ -5,7 +5,7 @@ type: experiment-workflow
 category: experiments/model/baseline
 status: active
 created: 2026-10-02
-modified: 2026-10-02
+modified: 2026-10-10
 authorship:
   created_by: llm
 curation:
@@ -23,6 +23,33 @@ family. Existing SwiGLU configurations, runners, and results are preserved.
 **Implementation status:** implemented; scientific execution and GPU backend
 validation are pending. No numerical quality, memory, or speed benefit is
 claimed from code inspection.
+
+## Status and open issues
+
+Recorded 2026-10-10 from the implementing session's handoff and a repository
+check. No Quantization-1 file has changed since commit `791517a`
+(2026-10-02), and the [Perun log](../../../infrastructure/perun/perun-log.md)
+has no Quantization-1 job.
+
+- **Checked:** eight contract tests passed. Two tensor-dependent tests were
+  skipped because that environment lacked PyTorch. Python and Bash syntax
+  checks passed, and backend compatibility and APIs were inspected.
+- **Not yet executed:** the Perun environment install, any GPU job, INT8/INT4
+  conversion, packed serialization round trips, kernel execution, memory
+  needs, generation timing, and QAT training or resume. The first full run is
+  therefore also the first backend validation. INT4 is the most likely failure
+  point because it depends on the MSLK kernel.
+- **Open: runtime comparability.** The runtime fingerprint includes the
+  physical GPU UUID. Variants run as separate jobs on different H200s would
+  likely be marked speed-incompatible. Decide before running whether to match
+  on GPU model, driver, and software instead, or to measure all variants'
+  speed in one job. Speed is an optional measurement in the project's
+  evaluation scope.
+- **Open: QAT budget.** One billion tokens was discussed as a budget
+  comparable with SwiGLU recovery but was not selected or enabled. Equal
+  tokens do not mean equal compute or total preparation cost.
+- **Not measurements:** run-time estimates discussed during implementation
+  were extrapolated from SwiGLU artifacts, not measured for Quantization-1.
 
 ## What is compared
 

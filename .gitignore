@@ -40,4 +40,5 @@ llm-wiki/*.canvas
 
 # LLM
 .agents
+.claude
 plans/

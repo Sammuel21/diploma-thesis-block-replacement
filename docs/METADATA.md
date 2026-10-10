@@ -5,7 +5,7 @@ type: metadata-reference
 category: documentation
 status: active
 created: 2026-09-11
-modified: 2026-09-11
+modified: 2026-10-10
 authorship:
   created_by: collaborative
 curation:
@@ -86,6 +86,7 @@ Document types currently used by the repository are:
 - `architecture`
 - `metadata-reference`
 - `research-note`
+- `decision-log`
 
 Lifecycle status is one of:
 

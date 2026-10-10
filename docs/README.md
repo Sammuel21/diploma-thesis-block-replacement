@@ -5,7 +5,7 @@ type: index
 category: documentation
 status: active
 created: 2026-07-17
-modified: 2026-10-02
+modified: 2026-10-10
 authorship:
   created_by: unknown
 curation:
@@ -35,6 +35,12 @@ Markdown files in this directory follow the
 - [Maintained code and workflow implementation standard](agents/maintained-code-and-workflows.md)
   defines source-package boundaries, portable execution, artifact and resume
   reliability, proportional verification, and implementation-model suitability.
+- [Grilling protocol](agents/grilling.md) defines the on-request question
+  rounds used to stress-test plans, adapted with credit from Matt Pocock's
+  `grilling` skill.
+- [Shared decision log](agents/decisions.md) records settled researcher and
+  supervisor decisions that every agent reads before planning or
+  implementation.
 
 ## Knowledge-base documentation
 

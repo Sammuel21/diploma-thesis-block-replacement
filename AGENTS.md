@@ -84,6 +84,7 @@
   experiment reporting, read `docs/infrastructure/perun/perun.md` and
   `docs/infrastructure/perun/perun-resources.md` before estimating or
   recording resource use.
+- When I ask to grill or stress-test a plan, follow `docs/agents/grilling.md`.
 - Treat scoped instructions as additions to these global approval and quality
   rules, not permission to bypass them.
 - Route reusable recovery and allocation behavior to `src/mlp_replacement/`;
@@ -91,6 +92,25 @@
   `workflows/runs/model/swiglu/`.
 - Keep this root file as a navigation and governance map; detailed wiki rules
   belong in `llm-wiki/SCHEMA.md`.
+
+## Shared decisions
+- Read `docs/agents/decisions.md` before planning, steering, or implementation
+  work. Treat its entries as binding until I change them, and do not
+  re-propose rejected options without new evidence.
+- Propose new entries when a decision settles; add them only with my approval.
+- If an entry conflicts with another document, point out the conflict and ask;
+  do not silently choose one.
+
+## Communication
+- Lead with a short plain-language answer, then the details. Avoid jargon or
+  define it.
+- State what was actually done: commands or scripts run, files read, or
+  reasoning only. Use "tested" or "verified" only for checks that actually
+  executed.
+- Before substantial work, such as experiment design, plans, or GPU-spending
+  runs, restate the goal, key assumptions, and up to five blocking questions
+  with recommended answers, then wait for my confirmation. Skip this for small
+  tasks.
 
 ## Knowledge-maintenance advisory
 - Recommend a targeted wiki update when work introduces or changes thesis

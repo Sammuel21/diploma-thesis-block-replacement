@@ -5,7 +5,7 @@ type: report
 category: infrastructure/perun
 status: active
 created: 2026-09-25
-modified: 2026-09-28
+modified: 2026-10-10
 authorship:
   created_by: collaborative
 curation:
@@ -81,6 +81,17 @@ are tracked separately and are not reported as consumption.
 | Maximum observed host memory | 41.81 GiB process peak during preparation job 91995 |
 | Maximum observed GPU memory | Not observed |
 | Durable output bytes | One small probe record plus failed preparation artifacts; exact bytes unrecorded |
+
+The rows above are calculated from [perun-log.md](perun-log.md), which does
+not yet contain the 12 SwiGLU-7 training jobs. The two figures below were
+added on 2026-10-10 from other sources and are not included in the totals
+above. They have not been reconciled with each other or with job-level
+scheduler records.
+
+| Measure | Value | Source and class |
+| --- | ---: | --- |
+| Project GPU-hours consumed, PERUN dashboard | About 150 | Researcher-reported dashboard value on 2026-10-10; project-level billing total |
+| SwiGLU-7 preparation plus 12 runs, workflow timing | 156.99 H200-hours | Preparation 10.21 hours plus the 12 runs, from the [SwiGLU-7 report](../../experiments/model/swiglu/swiglu-7.md) and its result artifacts; workflow-timing proxy, not scheduler allocation |
 
 ## SwiGLU-7 plan
 
