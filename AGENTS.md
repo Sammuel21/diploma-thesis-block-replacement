@@ -92,6 +92,17 @@
 - Keep this root file as a navigation and governance map; detailed wiki rules
   belong in `llm-wiki/SCHEMA.md`.
 
+## Knowledge-maintenance advisory
+- Recommend a targeted wiki update when work introduces or changes thesis
+  methodology, relies on a new prior-work method needing attribution, resolves
+  a meaningful contradiction, or completes findings that change the working
+  baseline. Identify the missing knowledge and affected pages briefly.
+- Do not recommend a full wiki lint after routine code, formatting, or minor
+  documentation edits. Keep detailed results in reports/artifacts; the wiki
+  retains compact conclusions, methodology boundaries, and evidence links.
+- This is an advisory trigger, not permission to ingest sources or edit the
+  wiki automatically. Obtain approval unless the current request includes it.
+
 ## Implementation-agent routing
 - Do not delegate implementation automatically. If the user has not selected a
   model and delegation would be useful, state the task's implementation-risk

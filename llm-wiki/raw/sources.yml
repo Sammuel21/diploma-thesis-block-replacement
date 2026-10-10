@@ -299,3 +299,22 @@ sources:
       Mutable documentation accessed 2026-10-02; publication year unspecified.
       Exact generation workloads, repetitions, metrics, and comparison
       denominators are project-defined experiment choices.
+
+  - id: src-lora-2021
+    title: "LoRA: Low-Rank Adaptation of Large Language Models"
+    collection_id: recovery-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Edward J. Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen]
+    year: 2021
+    canonical_url: https://arxiv.org/abs/2106.09685v2
+    sha256: null
+    added: 2026-10-02
+    ingestion_status: registered
+    notes: >-
+      Original LoRA method, 2021 preprint version 2 (ICLR 2022 publication).
+      Sections 4.1-4.2 checked for frozen base weights, low-rank updates,
+      initialization, scaling, and attention placement. Project rank, selected
+      projections, and joint MLP/RMSNorm updates are experiment choices, not
+      prescriptions from this paper. No full paper ingestion was performed.

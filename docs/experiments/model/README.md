@@ -25,6 +25,9 @@ choices live under
 documents explain the research question, stage order, configuration choices,
 and interpretation of each pipeline.
 
+The [baseline index](baseline/README.md) connects the baseline documentation,
+notebooks, configurations, and runners.
+
 | Workflow | Main question | Status |
 | --- | --- | --- |
 | [Compression baseline](baseline/compression-baseline.md) | Do the improved calibration and initialization methods help under a simple fixed replacement pattern? | Notebook artifacts present; Python runner not yet executed |

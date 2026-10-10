@@ -792,3 +792,56 @@ This file is append-only. Entries use the format:
 - The experiment guide distinguishes library methods from project-defined
   scope, recovery budget, evaluation data, and generation measurements.
   Full GPU scientific validation remains pending.
+
+## [2026-10-02] register | Original LoRA recovery reference
+
+- Registered the original LoRA preprint v2 in a remote recovery-reference
+  collection for explicit attribution of the implemented attention adapters.
+- Checked Sections 4.1-4.2 for frozen base weights, low-rank updates,
+  initialization/scaling, and attention placement. The entry remains
+  `registered`; no full paper ingestion or source summary was performed.
+
+## [2026-10-02] update | Completed homogeneous SwiGLU knowledge boundary
+
+- Added one compact SwiGLU-1 through SwiGLU-7 synthesis and one reusable
+  discrete-width allocation definition, linking existing reports, notebooks,
+  configurations, code, and original artifacts rather than copying results.
+- Checked the earlier JSON records, SwiGLU-5 actual 5M evaluations and C2
+  confirmations, SwiGLU-6 recovery/evaluation, and all 12 completed 1B-token
+  SwiGLU-7 runs. Preserved the historical 20% selection-label defect, protocol
+  differences, single-seed limits, and reduced-export reproduction boundary.
+- Distinguished prior-work methods from project choices: the RMS-activation
+  contribution score is not Minitron's exact rule; the output-aware fit is not
+  MoDeGPT's Nyström solver; summed singleton KL is a project surrogate using
+  standard algorithms, not a composition law or an established novelty claim.
+- Corrected the Grafting PixArt LoRA locator in the recovery comparison to
+  Appendix D.2/Table D.1, and separated S7-1 transformer-body updates from
+  full-model fine-tuning. Checked original MoDeGPT/Grafting PDFs and relevant
+  original Minitron/LoRA sections.
+- Refreshed initial-design and implementation pages, index summaries, and
+  reciprocal links. Preserved generic singleton findings and the separate
+  implemented-but-unexecuted Quantization-1 baseline; did not certify the
+  generic automatic-scratch launcher from the dedicated manual-scratch run.
+- Added a selective root-agent advisory for material methodology, citation,
+  contradiction, or completed-finding changes. It does not authorize automatic
+  wiki edits or demand lint after routine code changes.
+- No scientific code, notebook, result artifact, historical log entry, or
+  unrelated worktree change was modified. Changes remain uncommitted.
+
+## [2026-10-02] lint | Wiki structure and focused SwiGLU provenance
+
+- Checked all 30 maintained pages, 17 source records, and six
+  collections: metadata, controlled values, source locators, page IDs,
+  repository links, index coverage, and reciprocal relationships pass.
+  No orphan pages, broken links, or duplicate YAML keys were found.
+- Verified the four registered local source-file hashes and checked the
+  changed files for whitespace errors. Scientific claim review was focused
+  on the homogeneous SwiGLU family, not a fresh audit of every wiki topic.
+- Remaining evidence boundaries: Quantization-1 scientific GPU execution and
+  the pending source supplement are not completed; training-seed robustness
+  and literature novelty have not been established.
+- Two report-wording follow-ups remain outside this wiki-only update:
+  `docs/experiments/model/swiglu/swiglu-7.md` labels removal targets as retained
+  budgets and labels workflow-timestamp runtime proxies as measured allocation
+  hours. The new wiki pages distinguish both correctly; no resource-accounting
+  measurement or report edit is implied by this lint.

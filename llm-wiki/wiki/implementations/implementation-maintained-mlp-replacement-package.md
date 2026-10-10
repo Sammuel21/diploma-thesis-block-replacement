@@ -1,11 +1,11 @@
 ---
 id: implementation-maintained-mlp-replacement-package
 title: Maintained MLP Replacement Package
-summary: Separates maintained scientific code, experiment runners, and executor-specific job definitions.
+summary: Maps reusable scientific code to maintained runners, completed homogeneous SwiGLU execution, and executor-specific jobs without generalizing their validation.
 type: implementation
 status: draft
 created: 2026-08-28
-updated: 2026-09-10
+updated: 2026-10-02
 
 authorship:
   created_by: collaborative
@@ -14,10 +14,10 @@ authorship:
     - llm
 
 epistemic:
-  role: decision
+  role: mixed
   confidence: high
   verification:
-    - unverified
+    - experiment-backed
 
 scope:
   topics:
@@ -42,6 +42,8 @@ sources: []
 related:
   - "[[decision-working-experiment-code-standards]]"
   - "[[experiment-initial-block-compression-study]]"
+  - "[[method-discrete-width-curve-allocation]]"
+  - "[[synthesis-homogeneous-swiglu-findings]]"
 supersedes: []
 superseded_by: []
 ---
@@ -74,13 +76,13 @@ not a scientific claim about the superiority of this organization.
 
 ## Architecture and Responsibilities
 
-| Area | Current modules | Responsibility |
+| Area | Representative modules | Responsibility |
 | --- | --- | --- |
 | `operators/` | `modules.py`, `training.py`, `baselines.py` | Replacement architectures, local fitting, and reusable single-block operator baselines |
-| `compression/` | `selection.py`, `surgery.py`, `recovery.py`, `workflows.py` | Layer policy, model mutation, replacement-only KL recovery, and end-to-end replacement workflows |
+| `compression/` | `allocation.py`, `selection.py`, `surgery.py`, `recovery.py`, `continuation.py`, `reconstruction.py`, `teacher_cache.py`, `adapters.py`, `quantization.py` | Width budgets, model mutation, recovery/checkpoint contracts, state reconstruction, teacher targets, LoRA, and library-backed quantization |
 | `analysis/` | `activations.py`, `screening.py`, `sensitivity.py`, `interactions.py` | Activation geometry, BI-style screening, isolated replacement sensitivity, and multi-block interaction helpers |
-| `evaluation/` | `operator.py`, `language_model.py`, `footprint.py`, `benchmarks.py` | Local reconstruction metrics, loss/PPL, structural and serialized footprint, and optional downstream benchmarks |
-| Package root | `config.py`, `data.py`, `model.py`, `capture.py`, `runlog.py` | Shared configuration, datasets, model discovery/loading, activation capture, and JSON run records |
+| `evaluation/` | `operator.py`, `language_model.py`, `footprint.py`, `final_quality.py`, `bundles.py`, `mixed_precision.py`, `generation.py`, `quantized_bundles.py` | Local fidelity, pinned likelihood/tasks, footprint, inference bundles, dtype handling, and controlled generation measurements |
+| Package root | `config.py`, `data.py`, `data_streams.py`, `model.py`, `capture.py`, `artifacts.py`, `runlog.py` | Configuration, finite streams, model loading, activation capture, artifact hashes, and JSON run records |
 
 `analysis/interactions.py` is preserved as provisional interaction-analysis
 support, but no maintained caller currently depends on it.
@@ -94,9 +96,16 @@ The maintained flow is:
 3. `compression/selection.py` resolves the selected layer indices.
 4. `capture.py` and `operators/training.py` fit local replacement operators.
 5. `compression/surgery.py` integrates the fitted modules.
-6. `compression/recovery.py` performs replacement-only teacher-logit recovery.
+6. Recovery helpers and the selected runner apply the declared teacher-logit
+   objective, trainable scope, stream, and checkpoint protocol.
 7. `evaluation/` records quality and footprint outcomes.
-8. `compression/workflows.py` coordinates these operations for maintained runs.
+8. Maintained workflow runners coordinate experiment-specific phases; the
+   older `compression/workflows.py` also provides reusable replacement flows.
+
+These are responsibilities, not one universal job sequence. Curve-based
+allocation fits candidate widths before choosing the joint topology.
+SwiGLU-7's shared preparation plus training array is experiment-specific;
+future jobs need not inherit that split.
 
 Notebooks remain responsible for research narrative, configuration choices,
 visualization, and experiment-specific result tables. Shared domain operations
@@ -111,6 +120,11 @@ top-level `workflows/` orchestration layer.
   [`workflows/runs/run_experiment.py`](../../../workflows/runs/run_experiment.py)
 - TUKE Perun submission files:
   [`workflows/jobs/perun/`](../../../workflows/jobs/perun/)
+- Homogeneous experiment runners:
+  [`workflows/runs/model/swiglu/`](../../../workflows/runs/model/swiglu/)
+- Completed independent SwiGLU-7 runner and dedicated job:
+  [`swiglu_7.py`](../../../workflows/runs/model/swiglu/swiglu_7.py),
+  [`swiglu_7.sbatch`](../../../workflows/jobs/perun/swiglu_7.sbatch)
 - Block notebooks: [`notebooks/block/`](../../../notebooks/block/)
 - Model notebooks: [`notebooks/model/`](../../../notebooks/model/)
 
@@ -120,19 +134,25 @@ implemented by this structural migration.
 
 ## Version and Maturity
 
-The package and its workflow layer are working research software. The
-`workflows/` migration relocates the existing single-experiment process entry
-point and adds Perun submission policy without intentionally changing the
-scientific workflow. The interfaces may still evolve as multi-block
-compression and allocation experiments become concrete.
+The package and workflow layer remain working research software. The original
+migration established responsibility boundaries; later maintained runners
+implemented the homogeneous SwiGLU progression. SwiGLU-7 has completed
+production execution on PERUN. Quantization-1 code is present, but its
+scientific GPU validation/run remains pending. These maturity statements do
+not certify every module or launcher.
 
 ## Validation
 
-The source-package migration was checked for import and notebook-link
-resolution. The workflow relocation is checked for runner import, configuration
-parsing, shell syntax when a Bash interpreter is available, and repository
-links. These checks do not constitute an experiment rerun or empirical
-validation of compression quality.
+Historical source/workflow migration checks concerned imports, configuration,
+shell syntax, and repository links, not scientific correctness.
+
+**Observed execution evidence, checked 2026-10-02.** The preserved SwiGLU-7
+preparation and all 12 production records are completed, including final
+evaluation. [[synthesis-homogeneous-swiglu-findings]] links their artifacts and
+limits. The dedicated job stages code/inputs to manual SCRATCH, runs there,
+and stages durable outputs to PROJECT. This evidence establishes that this
+workflow executed; it is not an independent reproduction or validation of all
+failure/restart paths.
 
 ## Limitations
 
@@ -140,10 +160,12 @@ validation of compression quality.
   public API.
 - Notebook imports remain coupled to maintained module paths and must be linted
   when modules move.
-- The Perun launchers currently execute only the maintained configuration-driven
-  runner; notebook-specific SwiGLU workflow parity is not yet implemented.
-- Package and workflow organization do not solve experiment caching, large
-  artifact design, or model-checkpoint persistence.
+- The dedicated SwiGLU-7 job uses the verified manual-scratch contract. The
+  generic `run_model.sbatch` still depends on `.activate_scratch`; its deployment
+  readiness must not be inferred from the completed dedicated job.
+- Exact continuation needs complete durable states, not the reduced analysis
+  export. Hard node loss or an uncatchable kill can bypass final stage-out;
+  directory/lock recovery remains a separate operational concern.
 - `analysis/interactions.py` remains provisional until the multi-block study
   adopts or replaces it.
 
@@ -155,6 +177,8 @@ validation of compression quality.
   recovery, and evaluation components.
 - [[experiment-swiglu-operator-design-progression]] uses the generic operator
   definitions and isolated sensitivity evaluation.
+- [[synthesis-homogeneous-swiglu-findings]] records completed model-level
+  allocation/recovery studies using maintained runners and the dedicated job.
 
 ## Relationships
 
@@ -163,8 +187,16 @@ validation of compression quality.
 - [[experiment-initial-block-compression-study]] provides the current
   experiments whose reusable operations motivated these responsibility
   boundaries.
+- [[method-discrete-width-curve-allocation]] is implemented by
+  `compression/allocation.py`; experiment-specific fitting and orchestration
+  remain in the SwiGLU runners.
+- [[synthesis-homogeneous-swiglu-findings]] records the bounded production
+  evidence and routes to detailed reports without duplicating them here.
 
 ## Sources
 
 No registered literature source is cited. This page records a project software
-architecture decision and observed repository structure.
+architecture decision and observed repository structure, inspected 2026-10-02.
+The linked family synthesis supplies the original experiment evidence and
+literature attribution; implementation presence alone is not a scientific
+finding.

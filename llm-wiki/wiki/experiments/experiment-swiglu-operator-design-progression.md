@@ -1,11 +1,11 @@
 ---
 id: experiment-swiglu-operator-design-progression
 title: SwiGLU Operator-Design Progression
-summary: Records an artifact-backed full-depth comparison of generic whole-MLP substitutes and the planned progression toward teacher-tailored SwiGLU compression.
+summary: Preserves the generic singleton operator comparison, links completed homogeneous SwiGLU findings, and separates remaining branch/topology proposals.
 type: experiment
 status: draft
 created: 2026-08-11
-updated: 2026-09-19
+updated: 2026-10-02
 
 authorship:
   created_by: collaborative
@@ -52,7 +52,7 @@ sources:
     relation: contextualizes
     note: "Prior work on forward-only activation importance for width components."
   - source_id: src-modegpt-2025
-    locator: "Sections 3.1-3.2; Algorithm 1; Appendix A"
+    locator: "Section 2.2, Equation 1; Sections 3.1-3.2; Algorithm 1; Appendix A"
     relation: contextualizes
     note: "Prior work on structure-preserving gated-MLP channel selection and down-projection reconstruction."
   - source_id: src-grafting-2025
@@ -71,6 +71,7 @@ related:
   - "[[method-block-importance]]"
   - "[[method-hybrid-operator-replacement]]"
   - "[[source-summary-phase-transitions-compression-2026]]"
+  - "[[synthesis-homogeneous-swiglu-findings]]"
 supersedes: []
 superseded_by: []
 ---
@@ -80,10 +81,13 @@ superseded_by: []
 ## Overview and Terminology
 
 **Mixed design and single-run evidence.** The generic whole-MLP stage has been
-executed over eligible layers 1-22. Structure-aware and teacher-tailored
-operators remain planned. The recorded rankings apply only to the configured
-model, data, seed, local-fit budget, isolated replacements, and recovery
-protocol.
+executed over eligible layers 1-22. This page preserves that singleton study.
+Aligned teacher-neuron initialization and per-layer width allocation were
+subsequently tested in the completed homogeneous family,
+[[synthesis-homogeneous-swiglu-findings]]. Arbitrary branch simplification,
+projection factorization, and learned nested topology remain proposals. The
+rankings below apply only to this page's original model, data, seed, local-fit
+budget, isolated replacements, and recovery protocol.
 
 - **Tier I operator:** project-local shorthand for a generic whole-MLP
   substitute selected without teacher-specific internal decisions.
@@ -112,10 +116,14 @@ $$
 \widehat f(x)=\widehat D\left(\widehat G(x)\odot\widehat U(x)\right).
 $$
 
-These are explanatory/project formalizations and require no citation. Gate and
-value outputs must have the same intermediate width, while the down path must
-return width $d$. Replacing SiLU alone saves no material weight storage;
-compression must alter a parameterized branch or aligned channels.
+The first expression is standard gated-MLP architecture notation, not an
+original thesis operator; MoDeGPT describes the gated form in Section 2.2,
+Equation 1. [src-modegpt-2025, Section 2.2, Equation 1] SiLU is the configured
+teacher activation. The second is a project-proposed nested-interface
+formalization and needs no citation to define the proposal. Gate and value
+outputs must share an intermediate width; the down path returns width $d$.
+Replacing SiLU alone saves no material weight storage; compression must alter
+a parameterized branch or aligned channels.
 
 Intermediate channel $i$ spans row $i$ of $W_g$, row $i$ of $W_u$, and column
 $i$ of $W_d$. Candidate forward-only diagnostics include post-gating activity
@@ -246,12 +254,13 @@ pre-recovery ranking from repairability.
 
 ## Planned Extensions
 
-Structure-aware and teacher-tailored stages remain unverified. They should
-change one internal intervention at a time, compare any importance-guided
-choice with random and simple activation controls at the same retained width,
-and evaluate shortlisted candidates at matched or nearest-feasible footprint.
-Capacity boundaries should be called degradation knees or operational
-boundaries unless a repeatable sharp transition is demonstrated.
+The remaining branch/factorization/nested-topology proposals are unverified;
+teacher-subset homogeneous widths are already studied separately. Future
+internal interventions should compare importance-guided choices with random
+and simple activation controls at matched retained width, and evaluate
+shortlisted candidates at matched or nearest-feasible footprint. Capacity
+boundaries should be called degradation knees or operational boundaries unless
+a repeatable sharp transition is demonstrated.
 
 Factorization, replacement, and quantization mechanisms must first be measured
 separately; their errors are not assumed additive or orthogonal.
@@ -266,8 +275,9 @@ separately; their errors are not assumed additive or orthogonal.
   updates denote shared-stream traversal, not optimizer updates.
 - Branch and channel effects may interact, so singleton component scores need
   not compose.
-- Every result replaces one MLP independently; multi-block behavior remains
-  unknown.
+- Every result in this artifact replaces one MLP independently; it does not
+  measure simultaneous cross-family interactions. Separate homogeneous
+  multi-block evidence does not answer that broader question.
 
 Status: draft and experiment-backed for Stage 1 only. The checked local,
 ignored schema-1 artifact contains 220 unique fitting rows and 220 matching
@@ -288,11 +298,15 @@ hardware telemetry. No independent seed or model replication exists.
 - [[method-hybrid-operator-replacement]] defines the generic hybrid family.
 - [[source-summary-phase-transitions-compression-2026]] records the capacity-
   curve source and qualifications.
+- [[synthesis-homogeneous-swiglu-findings]] records the later completed
+  teacher-initialized, width-allocated homogeneous family without changing
+  this historical singleton artifact.
 
 ## Sources
 
 - `src-minitron-2024` - Section 2.2, Section 4.2, Tables 13-14
-- `src-modegpt-2025` - Sections 3.1-3.2, Algorithm 1, Appendix A
+- `src-modegpt-2025` - Section 2.2, Equation 1; Sections 3.1-3.2,
+  Algorithm 1, Appendix A
 - `src-grafting-2025` - Sections 3.1-3.3 and 4.1, Tables 1-3
 - `src-phase-transitions-compression-2026` - overview, proposed transition
   modeling, and criticality-aware framework; supplement pending

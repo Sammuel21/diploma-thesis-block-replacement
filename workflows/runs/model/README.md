@@ -5,6 +5,9 @@ notebooks under `notebooks/model/`. They run the scientific computation and
 write notebook-compatible JSON; notebooks remain the explanatory and analysis
 frontend.
 
+The [baseline runner index](baseline/README.md) links the compression and
+quantization entry points to their configurations and experiment guides.
+
 [`heterogenous/`](heterogenous/README.md) is reserved for the heterogeneous
 operator experiment class. It currently contains a README only, with no
 executable runner. Its configurations belong under

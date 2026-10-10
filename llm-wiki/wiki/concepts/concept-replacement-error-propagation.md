@@ -5,7 +5,7 @@ summary: Local approximation errors alter downstream activation distributions an
 type: concept
 status: review
 created: 2026-07-17
-updated: 2026-08-20
+updated: 2026-10-02
 
 authorship:
   created_by: collaborative
@@ -14,10 +14,11 @@ authorship:
     - llm
 
 epistemic:
-  role: synthesis
+  role: mixed
   confidence: high
   verification:
     - source-checked
+    - experiment-backed
 
 scope:
   topics:
@@ -36,7 +37,7 @@ scope:
 
 sources:
   - source_id: src-grafting-2025
-    locator: "Sections 1 and 3.1"
+    locator: "Sections 1 and 3.1; Section 3.3, Table 2"
     relation: defines
 
 related:
@@ -46,6 +47,8 @@ related:
   - "[[experiment-initial-block-compression-study]]"
   - "[[experiment-baseline-operator-analysis]]"
   - "[[experiment-swiglu-operator-design-progression]]"
+  - "[[method-discrete-width-curve-allocation]]"
+  - "[[synthesis-homogeneous-swiglu-findings]]"
 supersedes: []
 superseded_by: []
 ---
@@ -89,12 +92,22 @@ block-level approximation error measures isolated functional matching, while
 model-level loss and perplexity measure the composed system after replacement
 and any recovery.
 
+**Project empirical context.** The completed homogeneous SwiGLU family now
+provides causal-LLM multi-block evidence, summarized in
+[[synthesis-homogeneous-swiglu-findings]]. Independent local fits and
+singleton-KL width allocation produced useful integrated models, and recovery
+improved their quality. This does not validate summing singleton KL as an exact
+prediction of jointly replaced model KL. The tested composition-aware refit
+did not establish a better default; that negative result does not show that
+distribution shift or interactions are absent.
+
 ## Limitations and Open Issues
 
-The current evidence is from diffusion transformers. The magnitude and shape
-of propagation in causal LLMs may depend on residual connections, normalization
-placement, replacement depth, token distribution, and the number and spacing
-of replacements.
+The cited prior-work evidence is from diffusion transformers; the project
+evidence concerns one causal LLM and homogeneous substitutes. Neither
+establishes a general propagation law. Its magnitude and shape may depend on
+residual connections, normalization, depth, token distribution, operator
+family, and the number and spacing of replacements.
 
 Local MSE cannot be assumed to predict model-level degradation monotonically.
 The thesis should test that relationship directly and report both levels.
@@ -113,9 +126,15 @@ The thesis should test that relationship directly and report both levels.
   pre-recovery model-level KL for independently fitted single-block
   replacements across depth.
 - [[experiment-swiglu-operator-design-progression]] extends that singleton
-  profile across ten generic operator configurations before simultaneous
-  replacement interactions are introduced.
+  profile across ten generic operator configurations without measuring their
+  simultaneous cross-family interactions.
+- [[method-discrete-width-curve-allocation]] uses an additive singleton-KL
+  surrogate whose selected topology still needs integrated evaluation.
+- [[synthesis-homogeneous-swiglu-findings]] supplies the bounded completed
+  multi-block evidence, not proof of additivity.
 
 ## Sources
 
 - `src-grafting-2025` - Sections 1 and 3.1; Section 3.3, Table 2
+- Project evidence - original SwiGLU-5 and SwiGLU-7 artifacts linked from
+  [[synthesis-homogeneous-swiglu-findings]], checked 2026-10-02.

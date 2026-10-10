@@ -4,8 +4,9 @@ This directory studies model-level compression strategies that replace multiple
 MLP blocks and evaluate their combined footprint and quality effects. Secondarily,
 the directory studies block interactions and sensitivity to multi-block replacement.
 
-- `baseline/compression-baseline.ipynb` evaluates uniform interleaved replacement as an
-  end-to-end compression baseline.
+- [Baseline notebooks](baseline/README.md) include
+  [compression-baseline.ipynb](baseline/compression-baseline.ipynb), which
+  evaluates uniform interleaved replacement as an end-to-end compression baseline.
 - `interaction/block-interaction.ipynb` studies how replacement errors interact across
   multiple blocks.
 - [`heterogenous/`](heterogenous/README.md) reserves notebooks and reports for

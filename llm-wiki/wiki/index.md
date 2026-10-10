@@ -6,14 +6,20 @@ substantive update, archive, or distillation operation.
 
 ## Current Research Focus
 
-Artifact-backed profiling now covers isolated replacement behavior across all
-eligible MLP layers for the baseline and generic operator-family suites. The
-active next direction is simultaneous multi-block replacement interaction:
-the initial skeleton is
+The homogeneous SwiGLU-1 through SwiGLU-7 progression is complete. Start from
+[[synthesis-homogeneous-swiglu-findings]] for the working discrete-width,
+replacement-only recovery control, its attribution, and its limits. Detailed
+tables and plots remain in the linked experiment reports and notebooks.
+
+Baseline and generic operator-family singleton profiles are also preserved.
+Heterogeneous replacement and generic multi-block interactions remain separate
+research directions; the interaction skeleton is
 [`block-interaction.ipynb`](../../notebooks/model/interaction/block-interaction.ipynb).
 Its subset construction, operator controls, interaction metric, ordering, and
 recovery protocol remain to be designed. Singleton KL profiles must not be
-assumed to compose additively.
+assumed to compose additively. The separate
+[Quantization-1](../../docs/experiments/model/baseline/quantization-1.md)
+baseline is implemented, with its scientific GPU execution still pending.
 
 ## Sources
 
@@ -48,6 +54,10 @@ and PyTorch benchmarking references are registered in the same registry for
 [Quantization-1](../../docs/experiments/model/baseline/quantization-1.md).
 Selected APIs were checked; all five entries remain `registered`. Scientific
 backend validation and experiment execution are pending.
+
+The original LoRA paper (2021 preprint v2) is registered for recovery-scope
+attribution. Sections 4.1-4.2 were selectively checked; the source remains
+`registered`, with no full ingestion or source-summary page implied.
 
 ## Concepts
 
@@ -91,7 +101,11 @@ No model, dataset, software, or other entity pages have been created yet.
   compression target.
 - [[method-global-to-local-operator-budget-allocation|Global-to-local operator budget allocation]]:
   Adapts MoDeGPT's importance-weighted softmax allocation into bounded,
-  feasible-size MLP replacement caps without selecting local operators.
+  feasible-size MLP replacement caps; the full heterogeneous proposal remains
+  unverified, separate from the working homogeneous control.
+- [[method-discrete-width-curve-allocation|Discrete width-curve allocation]]:
+  Selects homogeneous SwiGLU widths by minimizing a summed singleton-KL
+  surrogate under one shared parameter budget; not a composition theorem.
 - [[method-hybrid-operator-replacement|Hybrid linear-nonlinear MLP replacement]]:
   Defines a project-proposed linear-plus-nonlinear drop-in operator while
   leaving its internal capacity allocation as unresolved future work.
@@ -103,7 +117,8 @@ No model, dataset, software, or other entity pages have been created yet.
 
 - [[implementation-maintained-mlp-replacement-package|Maintained MLP replacement package]]:
   Separates reusable scientific code, top-level experiment runners, and
-  executor-specific jobs, including the TUKE Perun submission layer.
+  executor-specific jobs; records completed dedicated SwiGLU-7 execution
+  without certifying generic launchers or pending quantization runs.
 - [[implementation-compute-environments|Research compute environments]]:
   Records the local MVP and shared remote experiment capacity, setup, and
   constraints without identifying the remote host or its owner.
@@ -123,9 +138,9 @@ No model, dataset, software, or other entity pages have been created yet.
 - [[experiment-initial-block-compression-study|Initial block-compression study]]:
   Working design covering activation geometry, a fixed six-condition
   single-block baseline protocol with a draft reusable runner, independent
-  dense-linear multi-block degradation, and an optional quantization baseline.
-  Status: `draft`; checked singleton results are maintained on the two linked
-  downstream experiment pages rather than duplicated here.
+  dense-linear degradation, and links to completed homogeneous work and the
+  implemented-but-unexecuted quantization baseline. Status: `draft`; numerical
+  evidence remains on downstream pages and reports.
 - [[experiment-baseline-operator-analysis|Baseline operator analysis]]:
   Artifact-backed single-run evidence for calibration scaling, reduced-SwiGLU
   capacity, replacement-only recovery, and full-depth isolated replacement
@@ -133,9 +148,9 @@ No model, dataset, software, or other entity pages have been created yet.
   notebook additions remain pending rerun.
 - [[experiment-swiglu-operator-design-progression|SwiGLU operator-design progression]]:
   Artifact-backed full-depth comparison of ten generic operator
-  configurations, followed by planned structure-aware internal surgery and
-  teacher-tailored nested designs. Status: `draft`; Tier I singleton evidence
-  is checked and later stages remain unverified.
+  configurations. Status: `draft`; preserves the checked singleton results,
+  links the completed homogeneous family, and leaves branch/factorization/
+  nested-topology proposals unverified.
 
 No MVP evidence has been ingested into canonical experiment pages. The
 historical archive remains available at `docs/prototype/mvp/`.
@@ -143,16 +158,20 @@ historical archive remains available at `docs/prototype/mvp/`.
 ## Syntheses and Comparisons
 
 - [[comparison-recovery-objective-trainable-scope|Recovery objective and trainable scope]]:
-  Distinguishes model-level loss placement from full-student,
-  replacement-only, and LoRA update scopes in the project, Minitron, and
-  Grafting.
+  Separates loss placement from parameter scope, including all three completed
+  S7 variants and their Minitron, Grafting, and LoRA attribution.
+- [[synthesis-homogeneous-swiglu-findings|Homogeneous SwiGLU findings and methodology boundary]]:
+  Compact SwiGLU-1 through SwiGLU-7 decisions, evidence anchors, borrowed-method
+  boundaries, and limitations. Status: `review`; experiment-backed, not
+  independently reproduced or a claim of literature novelty.
 
 ## Maintenance
 
 - Schema version: 1.1
-- Last structural lint: 2026-09-18 (implementation standards and agent routing)
+- Last structural lint: 2026-10-02 (all maintained pages and source registries)
+- Last focused scientific/provenance review: 2026-10-02 (homogeneous SwiGLU)
 - Orphan pages: none detected
-- Registered source collections: 5
-- Registered individual sources: 16
+- Registered source collections: 6
+- Registered individual sources: 17
 - Ingested individual sources: 4
 - Sources in review: 1

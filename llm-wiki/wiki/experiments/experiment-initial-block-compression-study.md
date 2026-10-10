@@ -5,7 +5,7 @@ summary: Defines the working activation, practical single-block replacement, and
 type: experiment
 status: draft
 created: 2026-07-27
-updated: 2026-09-19
+updated: 2026-10-02
 
 authorship:
   created_by: collaborative
@@ -55,6 +55,7 @@ related:
   - "[[implementation-compute-environments]]"
   - "[[implementation-maintained-mlp-replacement-package]]"
   - "[[decision-working-experiment-code-standards]]"
+  - "[[synthesis-homogeneous-swiglu-findings]]"
 supersedes: []
 superseded_by: []
 ---
@@ -67,7 +68,10 @@ superseded_by: []
 notebooks; it does not duplicate their numerical evidence. Artifact-backed
 singleton results belong to [[experiment-baseline-operator-analysis]] and
 [[experiment-swiglu-operator-design-progression]]. Activation analysis and the
-new multi-block interaction stage remain unverified here.
+separate generic multi-block interaction stage remain unverified here. The
+completed homogeneous model-level SwiGLU-1 through SwiGLU-7 family is recorded
+in [[synthesis-homogeneous-swiglu-findings]], not duplicated on this initial
+design page.
 
 ## Objective and Hypotheses
 
@@ -85,9 +89,11 @@ BI, and global KL may capture different aspects of replaceability; and damage
 from simultaneous replacements may be non-additive. These are not established
 results.
 
-An optional later numerical baseline may compare uniform MLP quantization with
-replacement at matched stored bytes. It remains an unimplemented extension,
-not a fourth required stage.
+The separate [Quantization-1 baseline](../../../docs/experiments/model/baseline/quantization-1.md)
+is now implemented for uniform eligible-MLP weight-only INT8/INT4 comparison;
+its scientific GPU run remains pending. It measures stored-byte reduction,
+not parameter removal, and is not a fourth required stage of this initial
+study. The guide owns its library attribution and project-defined protocol.
 
 ## Configuration and Inputs
 
@@ -143,19 +149,23 @@ simultaneous replacement behavior.
   not the final interaction protocol.
 - The multi-block operator set, subset construction, order, and recovery
   controls have not yet been frozen.
-- Quantization remains an unimplemented baseline idea.
+- Quantization-1 is implemented but has no completed scientific result to
+  promote as evidence.
 - Latency and downstream benchmark claims remain outside this initial study.
 
 Status: draft and mixed. Downstream singleton pages are experiment-backed for
 their recorded artifacts; activation analysis, reusable-runner parity,
-quantization, and the new multi-block stage remain unverified.
+quantization execution, and the separate generic multi-block stage remain
+unverified. Completed homogeneous findings have their own evidence boundary.
 
 ## Relationships
 
 - [[experiment-baseline-operator-analysis]] owns calibration, width, recovery,
   and baseline singleton-sensitivity evidence.
 - [[experiment-swiglu-operator-design-progression]] owns the broader generic
-  operator comparison and future teacher-tailored progression.
+  operator comparison and remaining branch/topology proposals.
+- [[synthesis-homogeneous-swiglu-findings]] owns the completed model-level
+  homogeneous progression and the control for later experiment classes.
 - [[concept-replacement-error-propagation]] motivates the transition from
   singleton profiles to simultaneous-replacement experiments.
 - [[method-block-importance]] separates forward-only screening signals from

@@ -5,7 +5,7 @@ summary: Adapts MoDeGPT's importance-weighted softmax allocation into bounded pe
 type: method
 status: draft
 created: 2026-08-08
-updated: 2026-08-22
+updated: 2026-10-02
 
 authorship:
   created_by: collaborative
@@ -55,6 +55,8 @@ related:
   - "[[concept-replacement-error-propagation]]"
   - "[[decision-primary-compression-evaluation-scope]]"
   - "[[concept-moe-parameter-accounting]]"
+  - "[[method-discrete-width-curve-allocation]]"
+  - "[[synthesis-homogeneous-swiglu-findings]]"
 supersedes: []
 superseded_by: []
 ---
@@ -81,8 +83,11 @@ operator sizes, unused-budget reconciliation, and actual-footprint reporting.
 Importance estimation and downstream operator construction remain replaceable
 policies. The softmax allocation rule itself is not claimed as an original
 project contribution.
-The method is currently unverified and makes no empirical claim that its
-nonuniform allocation outperforms a uniform budget.
+The full heterogeneous cap contract remains unverified. Homogeneous ranked
+width instantiations have since been tested, but the completed family now
+uses [[method-discrete-width-curve-allocation]] as its control. This page
+preserves the earlier proposal; it does not claim that MoDeGPT's softmax rule
+or its transfer to arbitrary operators is universally superior.
 
 **Project terminology.** Because a replacement may be a smaller dense
 operator rather than a zero-masked version of the original operator, this page
@@ -555,6 +560,13 @@ empirical finding. Any future claim about correlation, predictive validity, or
 allocation performance requires a preserved experiment configuration and
 result artifact.
 
+**Bounded project evidence.** [[synthesis-homogeneous-swiglu-findings]] records
+the completed homogeneous tests: BI-derived allocations did not beat uniform
+in SwiGLU-1; operator-conditioned ranked widths improved SwiGLU-2; discrete
+width curves improved the matched-recipe SwiGLU-5 comparison. This supports
+the current homogeneous control, not rejection of every importance-based
+allocator or validation of the heterogeneous reconciliation proposal here.
+
 ## Limitations and Open Issues
 
 Importance is not the same as approximability. A block may strongly influence
@@ -612,6 +624,10 @@ additional variables rather than automatic consequences of this allocator.
   to use actual footprint and quality rather than nominal allocation alone.
 - [[concept-moe-parameter-accounting]] defines the additional stored-versus-
   active accounting required before extending the method to MoE models.
+- [[method-discrete-width-curve-allocation]] owns the separate width-dependent
+  surrogate used by the completed homogeneous workflow.
+- [[synthesis-homogeneous-swiglu-findings]] records the tested instantiations
+  and the boundary between this draft cap proposal and the working control.
 
 ## Sources
 

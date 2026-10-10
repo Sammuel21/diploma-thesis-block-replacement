@@ -77,3 +77,15 @@ collections:
     mutability: mixed
     ingestion_policy: selective-with-source-verification
     notes: Quantization-1 backend registration; pinned source APIs and selected documentation locators checked, without full source ingestion.
+
+  - id: recovery-references
+    title: Original recovery and adaptation method references
+    locations:
+      - https://arxiv.org
+    storage: remote
+    origin: external-other
+    evidence_kinds: [scholarly-primary]
+    priority: supporting
+    mutability: immutable-snapshot
+    ingestion_policy: selective-with-source-verification
+    notes: Original method citations for implemented recovery variants; selected sections checked, without implying full paper ingestion.
