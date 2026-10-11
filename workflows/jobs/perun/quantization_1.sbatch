@@ -83,7 +83,7 @@ fi
 # Check the environment before taking the output lock, so a broken install
 # fails without leaving a lock or a scratch directory behind. prepare only
 # tokenizes data and belongs on a CPU partition; the other modes need the GPU.
-PREFLIGHT='from importlib.metadata import version; from packaging.version import Version; import torch, torchao, transformers, datasets, lm_eval, safetensors, psutil; from lm_eval.models.huggingface import HFLM; assert version("torchao") == "0.17.0", "torchao 0.17.0 is required, found " + version("torchao"); assert version("mslk").startswith("1.1.0"), "mslk 1.1.0 is required, found " + version("mslk"); assert Version(version("accelerate")) >= Version("0.26.0"), "accelerate>=0.26.0 is required"; print("environment preflight: OK", torch.__version__, "torchao", version("torchao"), "mslk", version("mslk"), flush=True)'
+PREFLIGHT='from importlib.metadata import version; from packaging.version import Version; import torch, torchao, transformers, datasets, lm_eval, safetensors, psutil; from lm_eval.models.huggingface import HFLM; assert version("torchao").split("+")[0] == "0.17.0", "torchao 0.17.0 is required, found " + version("torchao"); assert version("mslk").startswith("1.1.0"), "mslk 1.1.0 is required, found " + version("mslk"); assert Version(version("accelerate")) >= Version("0.26.0"), "accelerate>=0.26.0 is required"; print("environment preflight: OK", torch.__version__, "torchao", version("torchao"), "mslk", version("mslk"), flush=True)'
 if [[ "$MODE" != prepare ]]; then
     nvidia-smi
     [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]] || { echo "Slurm did not expose a CUDA device to the job." >&2; exit 2; }
