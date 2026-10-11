@@ -41,7 +41,8 @@ in [perun-log.md](perun-log.md) and [perun-status.md](perun-status.md).
 
 **What you submit, in total: 5 submissions.** SwiGLU-8 has three: the block
 check, prepare, and the training array of 16 runs (section 3). Quantization-1
-has two: prepare, and the model array of 5 runs (section 4). The two
+has two: prepare, and the five model runs (section 4). The second is one block
+with two `sbatch` lines, because its tasks need different time limits. The two
 experiments are independent and can run at the same time.
 
 **Official PERUN rules these commands follow**, checked against the
@@ -78,53 +79,68 @@ EOF
 chmod 600 ~/.perun-private.sh
 ```
 
-### 0.2 Quantization-1 environment
+### 0.2 Add the Quantization-1 packages to the project environment
 
-**Safe to re-run.** It creates the environment only if it is missing, and pip
-skips what is already installed. Use a Conda environment, not a `venv`: the job
-scripts resolve the interpreter's real path, which bypasses a `venv`.
+Both experiments use the one project environment, `mlp-replacement`. It
+already has the SwiGLU-7 software stack that Quantization-1 pins (PyTorch
+2.11.0+cu128, Transformers 5.14.1, Datasets 5.0.0, LM Evaluation Harness
+0.4.13). Quantization-1 adds only TorchAO 0.17.0 and MSLK 1.1.0+cu128.
+
+The install uses `--no-deps`, so pip cannot upgrade or replace an existing
+package. The block saves the package list before the first install and
+compares it with the list afterwards. Only the two new packages may differ,
+because SwiGLU-8's reproduction checks need the rest exactly as SwiGLU-7
+recorded it. Run it before your first SwiGLU-8 or Quantization-1 submission,
+so every job uses the same environment.
+
+**Safe to re-run.** The "before" files are written only on the first run, and
+pip skips packages that are already installed.
 
 ```bash
 source ~/.perun-private.sh
 cd "/mnt/project/$PERUN_ACCOUNT/diploma-thesis-block-replacement"
 source ~/miniconda3/etc/profile.d/conda.sh
-perunfsusage   # HOME needs several GB free for PyTorch and its CUDA libraries
-conda env list | grep -qE '^quantization-1[[:space:]]' || conda create -y -n quantization-1 python=3.12
-conda activate quantization-1
-python -m pip install --no-cache-dir -r workflows/environments/quantization-1-requirements.txt
+conda activate mlp-replacement
+perunfsusage   # HOME needs free space for the two packages
+[[ -e ~/conda-mlp-replacement-before-q1.yml ]] || conda env export -n mlp-replacement > ~/conda-mlp-replacement-before-q1.yml
+[[ -e ~/pip-mlp-replacement-before-q1.txt ]] || python -m pip freeze > ~/pip-mlp-replacement-before-q1.txt
+python -m pip install --no-cache-dir --no-deps \
+  --extra-index-url https://download.pytorch.org/whl/cu128 \
+  "torchao==0.17.0" "mslk==1.1.0+cu128"
+python -m pip freeze > ~/pip-mlp-replacement-after-q1.txt
+CHANGED=$(diff ~/pip-mlp-replacement-before-q1.txt ~/pip-mlp-replacement-after-q1.txt | grep -E '^[<>]' | grep -vE '^> (torchao|mslk)==')
+if [[ -n "$CHANGED" ]]; then
+    echo "STOP: the install changed other packages:"; echo "$CHANGED"
+else
+    echo "OK: no existing package changed. Added:"
+    grep -E '^(torchao|mslk)==' ~/pip-mlp-replacement-after-q1.txt
+fi
 python -m pip check
-conda deactivate
 ```
 
-### 0.3 Check both environments
+On STOP, submit nothing and paste the output. The saved
+`~/conda-mlp-replacement-before-q1.yml` can rebuild the original environment.
 
-**Safe to re-run.** Run 1.2 first. Login nodes have no GPU; each job checks
-CUDA on its GPU node before it takes its output lock.
+### 0.3 Check the environment
 
-After 1.3 (SwiGLU-8):
+**Safe to re-run.** Run 1.2 and 1.3 first. The packages listed are the ones the
+Quantization-1 job checks before it starts. Login nodes have no GPU; each job
+checks CUDA on its GPU node before it takes its output lock.
 
 ```bash
-python -c 'from importlib.metadata import version; import torch, transformers, datasets, lm_eval; from lm_eval.models.huggingface import HFLM; print("mlp-replacement OK:", torch.__version__, "transformers", transformers.__version__, "accelerate", version("accelerate"))'
+python -c 'from importlib.metadata import version; import torch, torchao, transformers, datasets, lm_eval, safetensors, psutil; from lm_eval.models.huggingface import HFLM; print("mlp-replacement OK:", torch.__version__, "transformers", transformers.__version__, "accelerate", version("accelerate"), "triton", version("triton"), "torchao", version("torchao"), "mslk", version("mslk"))'
 python -m pip check
 ```
 
-After 1.3 (Quantization-1):
+### 0.4 Save the environment specification
 
-```bash
-python -c 'from importlib.metadata import version; import torch, torchao, transformers, datasets, lm_eval; from lm_eval.models.huggingface import HFLM; print("quantization-1 OK:", torch.__version__, "torchao", version("torchao"), "mslk", version("mslk"))'
-python -m pip check
-```
-
-### 0.4 Save the environment specifications
-
-**Safe to re-run;** it refreshes the files. The PERUN Conda guide recommends
+**Safe to re-run;** it refreshes the file. The PERUN Conda guide recommends
 keeping an export of each environment in HOME, so a broken environment can be
 rebuilt.
 
 ```bash
 source ~/miniconda3/etc/profile.d/conda.sh
 conda env export -n mlp-replacement > ~/conda-mlp-replacement.yml
-conda env list | grep -qE '^quantization-1[[:space:]]' && conda env export -n quantization-1 > ~/conda-quantization-1.yml
 ls -l ~/conda-*.yml
 ```
 
@@ -157,25 +173,14 @@ source ~/miniconda3/etc/profile.d/conda.sh
 pwd
 ```
 
-### 1.3 Choose the environment
+### 1.3 Activate the environment
 
-**Safe to re-run.** Jobs use the Python that `MLP_REPLACEMENT_PYTHON` points
-to *at submission*. Run the matching block before submitting, and again
-whenever you switch experiments.
-
-SwiGLU-8:
+**Safe to re-run.** Both experiments use `mlp-replacement`. Jobs use the
+Python that `MLP_REPLACEMENT_PYTHON` points to *at submission*, so run this
+before submitting.
 
 ```bash
 conda activate mlp-replacement
-export LD_LIBRARY_PATH="$CONDA_PREFIX/lib${PERUN_BASE_LD_LIBRARY_PATH:+:$PERUN_BASE_LD_LIBRARY_PATH}"
-export MLP_REPLACEMENT_PYTHON="$(command -v python)"
-echo "Jobs will use: $MLP_REPLACEMENT_PYTHON"
-```
-
-Quantization-1:
-
-```bash
-conda activate quantization-1
 export LD_LIBRARY_PATH="$CONDA_PREFIX/lib${PERUN_BASE_LD_LIBRARY_PATH:+:$PERUN_BASE_LD_LIBRARY_PATH}"
 export MLP_REPLACEMENT_PYTHON="$(command -v python)"
 echo "Jobs will use: $MLP_REPLACEMENT_PYTHON"
@@ -199,7 +204,7 @@ git log -1 --oneline
 
 ## 2. Status at a glance
 
-Run 1.2 and either 1.3 block first; these use the environment's `python`.
+Run 1.2 and 1.3 first; these use the environment's `python`.
 
 ### 2.1 Everything at once
 
@@ -285,7 +290,7 @@ each at targets 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75 and 0.8 in that order. Task
 the SwiGLU-7 reproduction at every monitoring point and stop themselves on a
 mismatch.
 
-Run 1.2, 1.3 (SwiGLU-8) and 1.4 first.
+Run 1.2, 1.3 and 1.4 first, and 0.2 once before the first submission.
 
 ### 3.1 Pre-submission checks (G2)
 
@@ -494,40 +499,42 @@ sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 
 ## 4. Quantization-1
 
 Design: [quantization-1.md](../../experiments/model/baseline/quantization-1.md).
-The environment setup and check are in 0.2 and 0.3. Select the environment
-with 1.3 (Quantization-1) before any submission.
+Quantization-1 uses the same `mlp-replacement` environment as SwiGLU-8, with
+TorchAO and MSLK added once by 0.2; 0.3 checks it. Run 1.2 and 1.3 before any
+submission.
 
 Two submissions:
 
 1. **Prepare.** It freezes the evaluation data and uses no GPU, so it goes to
    a CPU partition. The launcher checks for a GPU only in the other modes.
-2. **Model array.** One command, `run-array` with `--array=0-4`, starts the
-   five models, each as its own task:
+2. **The five models.** One block starts all five, each as its own task of
+   `run-array`. It contains two `sbatch` lines, because one array can have
+   only one time limit: tasks 0-3 get 8 hours and task 4 gets 36 hours.
 
-| Task | Model | Output |
-| --- | --- | --- |
-| 0 | Original BF16 (control) | `dense-001` |
-| 1 | INT8 | `int8-001` |
-| 2 | INT4 | `int4-001` |
-| 3 | INT4 retrained on 100M tokens | `qat-int4-100m-001` |
-| 4 | INT4 retrained on 1B tokens | `qat-int4-1b-001` |
+| Task | Model | Output | Expected run time | Time limit |
+| --- | --- | --- | --- | --- |
+| 0 | Original BF16 (control) | `dense-001` | 0.5-2 h | 8 h |
+| 1 | INT8 | `int8-001` | 0.5-2 h | 8 h |
+| 2 | INT4 | `int4-001` | 0.5-2 h | 8 h |
+| 3 | INT4 retrained on 100M tokens | `qat-int4-100m-001` | 1.5-3 h | 8 h |
+| 4 | INT4 retrained on 1B tokens | `qat-int4-1b-001` | 13-20 h; about 25 h if fake quantization doubles the cost | 36 h |
 
-The blocks below use the proposed deployment choices: prepare on `cpu_short`
-for 1 hour, and one 36-hour limit for the model array, sized for the 1B QAT
-run. Speed is measured per run; comparisons across different GPUs are marked
-incompatible, as designed. Submit only after the researcher approves these
-choices.
+Quantization-1 has never run, so these run times are estimates. The
+[experiment guide](../../experiments/model/baseline/quantization-1.md) gives
+their basis. Speed is reported only as raw measurements, because the tasks run
+on different GPUs (decision of 2026-10-11).
 
-### 4.1 Check that Slurm accepts both requests
+### 4.1 Check that Slurm accepts the requests
 
-**Safe to re-run;** nothing is submitted. Run 1.2 and 1.3 (Quantization-1)
-first.
+**Safe to re-run;** nothing is submitted. Run 1.2 and 1.3 first.
 
 ```bash
 sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
   --partition=cpu_short --gres=none --cpus-per-task=4 --mem=32G --time=01:00:00 \
   workflows/jobs/perun/quantization_1.sbatch prepare prepare-001
-sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 --array=0-4 \
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=08:00:00 --array=0-3 \
+  workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 --array=4 \
   workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json"
 ```
 
@@ -553,9 +560,10 @@ fi
 
 When it ends, read it with 2.2 and `RUN=quantization-1/prepare-001`.
 
-### 4.3 Submit the model array
+### 4.3 Submit the five models
 
-**Submits a job. Run once,** after preparation completed.
+**Submits jobs. Run once,** after preparation completed. It submits two
+arrays: tasks 0-3 (8 hours) and task 4 (36 hours).
 
 ```bash
 export Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
@@ -563,35 +571,43 @@ EXISTING=$(find "$PERUN_RESULTS/quantization-1" -maxdepth 1 \( -name 'dense-001*
 if [[ -n "$EXISTING" ]]; then
     echo "STOP: these outputs already exist:"; echo "$EXISTING"
 else
-    JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 --array=0-4 \
+    JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=08:00:00 --array=0-3 \
         --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
         workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$Q1_PREPARED")
-    echo "quantization-1 model array: ${JOB%%;*}   <- record it in local/perun/runs/quantization-1.md"
+    echo "quantization-1 tasks 0-3: ${JOB%%;*}   <- record it in local/perun/runs/quantization-1.md"
+    JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 --array=4 \
+        --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$Q1_PREPARED")
+    echo "quantization-1 task 4:   ${JOB%%;*}   <- record it in local/perun/runs/quantization-1.md"
 fi
 ```
 
-### 4.4 Watch the model array
+### 4.4 Watch the five models
 
-**Safe to re-run.** Section 2.1 also shows each running task's current stage.
+**Safe to re-run.** It shows each task's newest log, including a resumed
+one. Section 2.1 also shows each running task's current stage. In the first
+hour of tasks 3 and 4, the training progress lines show the real QAT speed.
 
 ```bash
-ARRAY=$(ls -t "$PERUN_LOG_DIR"/quantization-1_*_0.out | head -n 1 | sed -E 's/.*quantization-1_([0-9]+)_0\.out/\1/')
 squeue -u "$USER" -n quantization-1
 for TASK in 0 1 2 3 4; do
-    LAST=$(tail -n 1 "$PERUN_LOG_DIR/quantization-1_${ARRAY}_${TASK}.out" 2>/dev/null)
-    FAILED=$(grep -l 'Traceback' "$PERUN_LOG_DIR/quantization-1_${ARRAY}_${TASK}.err" 2>/dev/null)
-    echo "task $TASK: ${LAST:-not started}${FAILED:+   <- check its .err}"
+    LOG=$(ls -t "$PERUN_LOG_DIR"/quantization-1_*_"$TASK".out 2>/dev/null | head -n 1)
+    LAST=$([[ -n "$LOG" ]] && tail -n 1 "$LOG")
+    FAILED=$([[ -n "$LOG" ]] && grep -l 'Traceback' "${LOG%.out}.err" 2>/dev/null)
+    echo "task $TASK: ${LAST:-not started}${FAILED:+   <- check ${FAILED}}"
 done
 gpu-status
 ```
 
 ### 4.5 Resume one model task
 
-**Submits a job. Run once, after the cause is understood.** Replace 4 with
-the task number from the table above.
+**Submits a job. Run once, after the cause is understood.** Set `TASK` to the
+task number from the table above; the block picks its time limit.
 
 ```bash
-sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 --array=4 \
+TASK=4
+LIMIT=$([[ "$TASK" == 4 ]] && echo 36:00:00 || echo 08:00:00)
+sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time="$LIMIT" --array="$TASK" \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
   workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json" --resume
 ```

@@ -17,8 +17,10 @@ requires an explicit positive training-token budget. Full GPU scientific
 validation remains pending.
 
 Quantization-1 has dedicated [local](../../../jobs/local/quantization_1.sh) and
-[Perun](../../../jobs/perun/quantization_1.sbatch) launchers and a
-[pinned environment](../../../environments/quantization-1-requirements.txt).
+[Perun](../../../jobs/perun/quantization_1.sbatch) launchers. It runs in the
+shared `mlp-replacement` environment with TorchAO and MSLK added; the
+[environment pins](../../../environments/quantization-1-requirements.txt)
+record the expected stack.
 Use its experiment guide for commands and artifact conventions.
 
 See the [baseline experiment index](../../../../docs/experiments/model/baseline/README.md),

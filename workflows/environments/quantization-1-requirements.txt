@@ -1,4 +1,8 @@
-# Install in a separate Python 3.12 Linux environment. See quantization-1.md.
+# Expected Quantization-1 software stack (Python 3.12, Linux). On PERUN it runs
+# in the mlp-replacement environment, which is expected to have everything
+# except torchao and mslk; install only those two, with --no-deps, and check
+# the rest with the PERUN runbook, section 0.3 (see quantization-1.md).
+# Install the whole file only into a fresh environment.
 --extra-index-url https://download.pytorch.org/whl/cu128
 torch==2.11.0+cu128
 torchao==0.17.0

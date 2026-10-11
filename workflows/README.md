@@ -62,9 +62,10 @@ and validation details.
 
 [Quantization-1](../docs/experiments/model/baseline/quantization-1.md) adds a
 separate model baseline with `prepare`, `run`, `evaluate`, and `report` commands.
-Its dedicated [environment pins](environments/quantization-1-requirements.txt)
-and local/Perun launchers preserve the shared SwiGLU environment and historical
-workflows. INT4 QAT requires an explicit positive token budget.
+It runs in the shared `mlp-replacement` environment with TorchAO and MSLK
+added; its [environment pins](environments/quantization-1-requirements.txt)
+record the expected stack. Its local and Perun launchers leave the historical
+workflows unchanged. INT4 QAT requires an explicit positive token budget.
 
 The heterogeneous operator class has reserved directories under
 [`runs/model/heterogenous/`](runs/model/heterogenous/README.md) and

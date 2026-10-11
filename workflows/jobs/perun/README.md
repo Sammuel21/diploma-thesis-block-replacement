@@ -303,16 +303,19 @@ same `--array` index.
 ## Results and logs
 
 [quantization_1.sbatch](quantization_1.sbatch) submits one explicitly selected
-Quantization-1 prepare/run/evaluate job. Alternatively, `run-array` with
-`--array=0-4` starts the five decided models in one submission. The tasks map,
+Quantization-1 prepare/run/evaluate job. Alternatively, `run-array` starts the
+five decided models as array tasks 0-4. The runbook submits `--array=0-3` with
+an 8-hour limit and `--array=4` with 36 hours, because one array has a single
+time limit. The tasks map,
 in order, to dense BF16, PTQ INT8, PTQ INT4, QAT INT4 at 100M tokens, and QAT
 INT4 at 1B tokens, with outputs `dense-001`, `int8-001`, `int4-001`,
 `qat-int4-100m-001`, and `qat-int4-1b-001`. Each task is still one experiment
 in one process. Before it locks the chosen output, it
 checks CUDA and the pinned TorchAO and MSLK versions, so a broken environment
 fails without leaving a lock. It stages supplied inputs and verifies durable
-stage-out before scratch cleanup. It uses the separate pinned quantization
-Conda environment and does not rely on `.rsyncignore`. See the
+stage-out before scratch cleanup. It uses the project's `mlp-replacement`
+Conda environment with TorchAO and MSLK added, and does not rely on
+`.rsyncignore`. See the
 [Quantization-1 guide](../../../docs/experiments/model/baseline/quantization-1.md)
 for submission, resource-planning, and resume requirements.
 

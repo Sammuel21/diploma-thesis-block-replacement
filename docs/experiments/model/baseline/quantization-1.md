@@ -5,7 +5,7 @@ type: experiment-workflow
 category: experiments/model/baseline
 status: active
 created: 2026-10-02
-modified: 2026-10-10
+modified: 2026-10-11
 authorship:
   created_by: llm
 curation:
@@ -39,19 +39,28 @@ has no Quantization-1 job.
   needs, generation timing, and QAT training or resume. The first full run is
   therefore also the first backend validation. INT4 is the most likely failure
   point because it depends on the MSLK kernel.
-- **Open: runtime comparability.** The runtime fingerprint includes the
-  physical GPU UUID. Variants run as separate jobs on different H200s would
-  likely be marked speed-incompatible. Decide before running whether to match
-  on GPU model, driver, and software instead, or to measure all variants'
-  speed in one job. Speed is an optional measurement in the project's
-  evaluation scope.
+- **Decided 2026-10-11: speed is reported raw only.** The runtime fingerprint
+  includes the physical GPU UUID, and the array tasks run on different H200s,
+  so speeds are marked not comparable. Quantization-1 reports speed only as
+  raw measurements and makes no speed claims; its role is quality per byte
+  (decision log). Measuring all variants in one job remains possible later if
+  the thesis needs a speed claim.
 - **Decided 2026-10-11: QAT budget.** QAT runs for INT4 only, at 100M and at
   1B tokens, as two separate runs from token 0 (decision log). INT8 gets PTQ
   only. Equal tokens do not mean equal compute or total preparation cost.
-  The deployment plan still has to cover the 1B recovery stream and the
-  resource plan.
-- **Not measurements:** run-time estimates discussed during implementation
-  were extrapolated from SwiGLU artifacts, not measured for Quantization-1.
+  Each QAT task builds its own recovery stream at its start (see the resource
+  plan below).
+- **Decided 2026-10-11: same training tokens, checked after the runs.** The
+  QAT stream is built from C4 shards 1 onward with the same builder, order,
+  and tokenizer as SwiGLU-7's 1B recovery stream, so the streams should be
+  byte-identical. This is inferred from the code, not yet checked. After the
+  runs, compare the `recovery_stream` sha256 recorded by
+  `qat-int4-1b-001` with SwiGLU-7's stream
+  (`f78bf805d7a03e693f2573e3c3d1b664ec91af09dcc28ae0803daf50c7f0b9cd`), and
+  `qat-int4-100m-001`'s with SwiGLU-8's 100M stream. Record the outcome here.
+  A mismatch means the QAT-versus-replacement comparison needs a data caveat.
+- **Not measurements:** the run-time estimates in the resource plan are
+  extrapolated from SwiGLU-7 measurements, not measured for Quantization-1.
 - **Shared 8K KL (decided 2026-10-10, moved 2026-10-11):** the KL stream
   builder and evaluator now live in
   [`teacher_kl.py`](../../../../src/mlp_replacement/evaluation/teacher_kl.py),
@@ -106,27 +115,38 @@ serving-engine tuning. Activation calibration and PTQ training counts are zero.
   PyTorch 2.11.0+cu128, CUDA 12.8, and Python 3.12 on Linux. See
   `src-mslk-1-1-0`, release compatibility table; and
   `src-torchao-compatibility`, release 0.17.0 row.
-- The dedicated environment keeps Transformers 5.14.1, Datasets 5.0.0,
-  Triton 3.6.0, and LM Evaluation Harness 0.4.13, matching the observed
-  SwiGLU-7 production software stack. The run records installed versions.
+- Transformers 5.14.1, Datasets 5.0.0, Triton 3.6.0, and LM Evaluation
+  Harness 0.4.13 match the observed SwiGLU-7 production software stack. The
+  run records installed versions.
 
-Install in a separate environment, not over the original SwiGLU environment.
-On PERUN use a Conda environment, as for SwiGLU:
+Quantization-1 runs in the project's `mlp-replacement` Conda environment, the
+same one SwiGLU-7 and SwiGLU-8 use (decision of 2026-10-11). That environment
+already has the stack above. Only TorchAO and MSLK are added, with
+`--no-deps`, so pip cannot change an existing package:
 
 ```bash
 source ~/miniconda3/etc/profile.d/conda.sh
-conda create -y -n quantization-1 python=3.12
-conda activate quantization-1
-python -m pip install --no-cache-dir -r workflows/environments/quantization-1-requirements.txt
+conda activate mlp-replacement
+python -m pip install --no-cache-dir --no-deps \
+  --extra-index-url https://download.pytorch.org/whl/cu128 \
+  "torchao==0.17.0" "mslk==1.1.0+cu128"
 python -m pip check
 export MLP_REPLACEMENT_PYTHON="$(command -v python)"
 ```
 
+Sharing the environment means Quantization-1 and SwiGLU-8, which are compared
+on the same 8K KL, run on identical software. The install must leave every
+existing package unchanged, because SwiGLU-8's reproduction checks depend on
+SwiGLU-7's recorded environment. The
+[PERUN runbook](../../../infrastructure/perun/perun-runbook.md), section 0.2,
+compares `pip freeze` before and after the install and stops if anything else
+changed. The full pin list in `workflows/environments/quantization-1-requirements.txt`
+documents the expected stack. It can also build a fresh Python 3.12 Linux
+environment on a machine without `mlp-replacement`.
+
 Do not use a standard `venv` with the PERUN launchers. A venv's `python` is a
 symlink, and the launchers resolve the interpreter's real path. Python then
-starts outside the venv and silently uses the base installation's packages.
-The [PERUN runbook](../../../infrastructure/perun/perun-runbook.md) has the
-complete setup and checks. Source inspection and version compatibility do not
+starts outside the venv and silently uses the base installation's packages. Source inspection and version compatibility do not
 establish that kernels execute correctly on a particular GPU; the intended full
 scientific run must verify that. Unsupported kernels or incomplete conversion
 raise errors. Each PERUN job checks the TorchAO and MSLK versions and CUDA
@@ -302,23 +322,39 @@ sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
 ```
 
 The same launcher accepts `prepare OUTPUT_NAME` and `evaluate OUTPUT_NAME`.
-Its `run-array` mode with `--array=0-4` starts the five decided models in one
-submission: dense BF16, PTQ INT8, PTQ INT4, QAT INT4 at 100M tokens, and QAT
-INT4 at 1B tokens (decision log, 2026-10-11). The full mapping and commands
-are in the [PERUN runbook](../../../infrastructure/perun/perun-runbook.md#4-quantization-1).
-`prepare` uses no GPU and belongs on a CPU partition. Reporting can run locally
-from retained results. Persistent environment/cache
+Its `run-array` mode maps array tasks 0-4 to the five decided models: dense
+BF16, PTQ INT8, PTQ INT4, QAT INT4 at 100M tokens, and QAT INT4 at 1B tokens
+(decision log, 2026-10-11). The runbook submits them in one step as two
+arrays, `--array=0-3` with an 8-hour limit and `--array=4` with 36 hours,
+because one array has a single time limit. The full mapping and commands are
+in the [PERUN runbook](../../../infrastructure/perun/perun-runbook.md#4-quantization-1).
+`prepare` uses no GPU and runs on `cpu_short` (1 hour, 4 CPUs, 32 GB, no GPU).
+Reporting can run locally from retained results. Persistent environment/cache
 paths are supplied through `MLP_REPLACEMENT_PYTHON` and `HF_HOME`.
 
-**Pre-run resource plan:** one independent process/GPU per variant, serial
-stages, no distributed training. Tracked ceilings are one GPU, eight CPUs,
-128 GiB host RAM, and 48 hours on gpu_short; they are conservative inherited
-ceilings, not measured consumption. Set a justified wall time before submission.
-Expected elapsed/GPU-hours/CPU-hours, peak RAM/VRAM, and scratch demand are
-**Unknown**, pending the full intended run. Confidence is low until quantized
-kernel and full-suite timing evidence exists. Retain packed model bundles, raw
-task/generation records, and any incomplete QAT checkpoint on PROJECT; recovery
-token scratch requires four bytes per requested token, excluding other data.
+**Pre-run resource plan (2026-10-11):** one independent process and GPU per
+variant, serial stages, no distributed training. Each GPU task requests one
+H200, eight CPUs, and 128 GiB host RAM on `gpu_short`. The run times are
+estimates, extrapolated from SwiGLU-7's measured runs; nothing has been
+measured for Quantization-1.
+
+| Task | Expected run time | Time limit | Basis | Reliability |
+| --- | --- | --- | --- | --- |
+| Prepare (CPU) | minutes | 1 h | Tokenizes WikiText, the 24 × 8,192-token KL stream, and task files | Medium |
+| 0-2: dense, INT8, INT4 | 0.5-2 h each | 8 h | SwiGLU-7 final evaluation took 805-846 s; bundle export, 8K KL, and speed measurement are added; INT4 kernel speed is unknown | Low-medium |
+| 3: QAT 100M | 1.5-3 h | 8 h | SwiGLU-7 recovery took about 1 h per 100M tokens with a narrower student; fake-quantization overhead, 25M-token checkpoints, and stream building are added | Low |
+| 4: QAT 1B | 13-20 h; about 25 h if fake quantization doubles the cost | 36 h | SwiGLU-7 measured 9.8-10.5 h of training for 1B tokens; same additions as task 3 | Low |
+
+Expected total: about 16-34 GPU-hours. The main unknown is the cost of fake
+quantization; the first hour of the QAT tasks' progress lines shows the real
+speed. A QAT task that reaches its limit resumes from its last checkpoint,
+which is at most 25M tokens back. Peak VRAM is unknown. SwiGLU-7 recovery used
+33.5 GiB with a smaller trainable set. QAT keeps 1.1B FP32 weights with two
+Adam moments, about 13 GB, so peak VRAM should stay far below the H200's
+141 GB; this is reasoning, not a measurement. Scratch needs four bytes per
+QAT token (0.4 GB for 100M, 4 GB for 1B) plus two checkpoint generations of
+about 13 GB each during replacement. Retain packed model bundles, raw
+task/generation records, and any incomplete QAT checkpoint on PROJECT.
 
 Follow [Perun resource accounting](../../../infrastructure/perun/perun-resources.md)
 before submission and after every attempt. The runner records stage timings,
@@ -326,8 +362,10 @@ attempts, training tokens, peak VRAM/RSS, and workflow-time GPU-hour proxies.
 Scheduler allocation and utilization remain Unknown without scheduler/telemetry
 evidence. No job was submitted as part of this implementation.
 
-The inherited per-job ceiling is 48 GPU-hours and 384 CPU core-hours; these
-are standard allocated-resource/time calculations, not consumption estimates.
+The requested ceilings are 8 GPU-hours for each of tasks 0-3 and 36 for task
+4 (68 GPU-hours and 544 CPU core-hours in total), plus 4 CPU core-hours for
+prepare. These are allocated-resource/time calculations, not consumption
+estimates.
 PTQ records zero training tokens and seconds. QAT records committed recovery
 update time, validation/checkpoint time, and elapsed workflow time across
 attempts; replayed work can make workflow cost exceed committed-update cost.
@@ -341,7 +379,7 @@ restoration, and incompatible-resume rejection. Focused CPU/static contract
 tests do not replace the full scientific dense/INT8/INT4 runs or the declared
 QAT run when enabled. No smoke or reduced-budget jobs are provided.
 
-Run the focused checks in the pinned environment with
+Run the focused checks in the project environment with
 `python -m unittest discover -s tests -p test_quantization_contracts.py -v`.
 Tensor/QAT checks are skipped if their dependencies are absent. Packed kernel
 execution, serialization round trips, and full-model quality/latency remain
