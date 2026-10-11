@@ -512,10 +512,89 @@ Two submissions:
 | 3 | INT4 retrained on 100M tokens | `qat-int4-100m-001` |
 | 4 | INT4 retrained on 1B tokens | `qat-int4-1b-001` |
 
-The submission blocks will be added here with the Quantization-1 deployment
-plan, which covers wall times, the CPU-partition request for prepare,
-structural comparisons, and speed comparability. Do not submit
-Quantization-1 jobs before that plan is approved.
+The blocks below use the proposed deployment choices: prepare on `cpu_short`
+for 1 hour, and one 36-hour limit for the model array, sized for the 1B QAT
+run. Speed is measured per run; comparisons across different GPUs are marked
+incompatible, as designed. Submit only after the researcher approves these
+choices.
+
+### 4.1 Check that Slurm accepts both requests
+
+**Safe to re-run;** nothing is submitted. Run 1.2 and 1.3 (Quantization-1)
+first.
+
+```bash
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+  --partition=cpu_short --gres=none --cpus-per-task=4 --mem=32G --time=01:00:00 \
+  workflows/jobs/perun/quantization_1.sbatch prepare prepare-001
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 --array=0-4 \
+  workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+```
+
+If the first command is rejected because of `--gres=none` or the QoS, stop
+and paste the message.
+
+### 4.2 Submit preparation
+
+**Submits a job. Run once.**
+
+```bash
+OUT="$PERUN_RESULTS/quantization-1/prepare-001"
+if [[ -e "$OUT" || -e "$OUT.perun-lock" ]] || squeue -u "$USER" -h -n quantization-1 | grep -q .; then
+    echo "STOP: preparation exists, is locked, or a quantization-1 job is queued"
+else
+    JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+        --partition=cpu_short --gres=none --cpus-per-task=4 --mem=32G --time=01:00:00 \
+        --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+        workflows/jobs/perun/quantization_1.sbatch prepare prepare-001)
+    echo "quantization-1 prepare job: ${JOB%%;*}   <- record it in local/perun/runs/quantization-1.md"
+fi
+```
+
+When it ends, read it with 2.2 and `RUN=quantization-1/prepare-001`.
+
+### 4.3 Submit the model array
+
+**Submits a job. Run once,** after preparation completed.
+
+```bash
+export Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+EXISTING=$(find "$PERUN_RESULTS/quantization-1" -maxdepth 1 \( -name 'dense-001*' -o -name 'int8-001*' -o -name 'int4-001*' -o -name 'qat-int4-*' \) 2>/dev/null)
+if [[ -n "$EXISTING" ]]; then
+    echo "STOP: these outputs already exist:"; echo "$EXISTING"
+else
+    JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 --array=0-4 \
+        --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$Q1_PREPARED")
+    echo "quantization-1 model array: ${JOB%%;*}   <- record it in local/perun/runs/quantization-1.md"
+fi
+```
+
+### 4.4 Watch the model array
+
+**Safe to re-run.** Section 2.1 also shows each running task's current stage.
+
+```bash
+ARRAY=$(ls -t "$PERUN_LOG_DIR"/quantization-1_*_0.out | head -n 1 | sed -E 's/.*quantization-1_([0-9]+)_0\.out/\1/')
+squeue -u "$USER" -n quantization-1
+for TASK in 0 1 2 3 4; do
+    LAST=$(tail -n 1 "$PERUN_LOG_DIR/quantization-1_${ARRAY}_${TASK}.out" 2>/dev/null)
+    FAILED=$(grep -l 'Traceback' "$PERUN_LOG_DIR/quantization-1_${ARRAY}_${TASK}.err" 2>/dev/null)
+    echo "task $TASK: ${LAST:-not started}${FAILED:+   <- check its .err}"
+done
+gpu-status
+```
+
+### 4.5 Resume one model task
+
+**Submits a job. Run once, after the cause is understood.** Replace 4 with
+the task number from the table above.
+
+```bash
+sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 --array=4 \
+  --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+  workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json" --resume
+```
 
 ## 5. When a job fails
 
