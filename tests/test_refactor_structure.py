@@ -103,6 +103,10 @@ class RefactorStructure(unittest.TestCase):
             (S5, "blank_candidate_student"),
             (WORKFLOW + "swiglu_6_recovery.py", "run_recovery"),
             (WORKFLOW + "swiglu_6_evaluate.py", "export_cohort_model"),
+            # SwiGLU-8 (approved 2026-10-11): optional extensions; defaults unchanged.
+            (SOURCE + "data.py", "sample_partitioned_windows"),
+            (SOURCE + "operators/training.py", "fit_operator_fp32_detailed"),
+            (WORKFLOW + "shared.py", "build_local_data"),
         }
         for path in git("ls-tree", "-r", "--name-only", BASELINE, "src", "workflows").splitlines():
             if not path.endswith(".py"):

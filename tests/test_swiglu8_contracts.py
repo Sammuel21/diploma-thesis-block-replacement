@@ -22,6 +22,7 @@ from workflows.runs.model.swiglu import swiglu_7, swiglu_8
 
 CONFIG = ROOT / "workflows/configs/model/swiglu/swiglu-8.json"
 SBATCH = ROOT / "workflows/jobs/perun/swiglu_8.sbatch"
+NOTEBOOK = ROOT / "notebooks/model/swiglu/swiglu-8.ipynb"
 COMBINATIONS = [(layer, width) for layer in (3, 11, 19) for width in (2048, 4096)]
 
 
@@ -230,6 +231,20 @@ class SwiGLU8Contracts(unittest.TestCase):
         self.assertIn("rsync -rcn", source)
         self.assertNotIn(".rsyncignore", source)
         self.assertTrue(callable(swiglu_8.main))
+
+    def test_notebook_is_load_only_and_uses_the_decided_interpretation(self):
+        notebook = read_json(NOTEBOOK)
+        code = "\n".join("".join(cell["source"]) for cell in notebook["cells"] if cell["cell_type"] == "code")
+        self.assertNotRegex(code, r"(?m)^\s*(import|from)\s+(torch|transformers|mlp_replacement)\b")
+        self.assertTrue(all(
+            cell.get("execution_count") is None and cell.get("outputs") == []
+            for cell in notebook["cells"] if cell["cell_type"] == "code"
+        ))
+        constants = dict(re.findall(r"(?m)^(GAP_THRESHOLD|STABILITY_THRESHOLD|TARGETS|ARMS) = (.+)$", code))
+        self.assertEqual(float(constants["GAP_THRESHOLD"]), 0.02)
+        self.assertEqual(float(constants["STABILITY_THRESHOLD"]), 0.01)
+        self.assertEqual(eval(constants["TARGETS"]), swiglu_8.TARGETS)
+        self.assertEqual(eval(constants["ARMS"]), swiglu_8.ARMS)
 
 
 if __name__ == "__main__":

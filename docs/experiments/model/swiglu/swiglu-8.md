@@ -275,6 +275,11 @@ Configuration:
 [`swiglu-8.json`](../../../../workflows/configs/model/swiglu/swiglu-8.json).
 PERUN job: [`swiglu_8.sbatch`](../../../../workflows/jobs/perun/swiglu_8.sbatch),
 with commands in the [PERUN job README](../../../../workflows/jobs/perun/README.md#swiglu-8-workflow).
+Analysis: the load-only
+[`swiglu-8.ipynb`](../../../../notebooks/model/swiglu/swiglu-8.ipynb), which
+applies the decided Part B interpretation in code. It reads the local copy
+under `data/results/workflows/model/swiglu-8/` and works on partial results:
+Part A alone, or any completed subset of the 16 runs.
 The configuration validates every block it shares with SwiGLU-7 and
 Quantization-1 against their versioned configurations. It also pins the
 SwiGLU-7 source artifacts by sha256.
