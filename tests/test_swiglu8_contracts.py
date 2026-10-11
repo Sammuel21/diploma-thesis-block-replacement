@@ -33,28 +33,33 @@ class CharacterTokenizer:
         return types.SimpleNamespace(input_ids=[ord(word[0]) for word in text.split()])
 
 
-def block_rows(values):
-    """Build block-check rows from {recipe: (kl_128, kl_8192)} per combination."""
+def block_rows(settings, values):
+    """Build fit rows from {setting: [(kl_128, kl_8192) per seed]} at every combination.
 
-    return [
-        {"recipe": recipe, "layer": layer, "replacement_width": width,
-         "width_ratio": width / 8192, "kl_128": short, "kl_8192": long}
-        for recipe, (short, long) in values.items()
-        for layer, width in COMBINATIONS
-    ]
+    Settings without values score 1.0 at both contexts for every seed.
+    """
+
+    rows = []
+    for setting in settings["block_check"]["settings"]:
+        seeds = swiglu_8.expected_seeds(setting, settings)
+        for seed, (short, long) in zip(seeds, values.get(setting, [(1.0, 1.0)] * len(seeds))):
+            for layer, width in COMBINATIONS:
+                rows.append({"setting": setting, "seed": seed, "layer": layer, "replacement_width": width,
+                             "width_ratio": width / 8192, "kl_128": short, "kl_8192": long})
+    return rows
 
 
 class SwiGLU8Contracts(unittest.TestCase):
     def setUp(self):
         self.settings, unused_path = swiglu_8.load_settings(CONFIG)
-        self.neutral = {recipe: (1.0, 1.0) for recipe in self.settings["block_check"]["recipes"]}
-        self.neutral["cur-s22"] = (1.02, 1.02)
 
     def test_configuration_fixes_the_decided_design(self):
         settings = self.settings
         self.assertEqual(settings["targets"], [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8])
         self.assertEqual(settings["arms"], ["fitted", "slice"])
-        self.assertEqual(len(settings["block_check"]["recipes"]), 9)
+        self.assertEqual(len(settings["block_check"]["settings"]), 15)
+        self.assertEqual(settings["block_check"]["seeds"], [21, 22, 23])
+        self.assertEqual(settings["long_context"]["selection_sequences"], settings["long_context"]["kl_sequences"])
         self.assertEqual(settings["recovery"]["target_tokens"], 100_000_000)
         self.assertEqual(settings["recovery"]["learning_rate"], 3e-5)
         self.assertEqual(settings["allocation"]["width_ratios"][:2], [0.0625, 0.125])
@@ -64,11 +69,52 @@ class SwiGLU8Contracts(unittest.TestCase):
         for key in ("model", "data", "calibration", "local_fitting", "evaluation"):
             self.assertEqual(settings[key], reference[key])
 
+    def test_part_a_grid_crosses_context_schedule_and_rate(self):
+        grid = self.settings["block_check"]["settings"]
+        gradient = {name: value for name, value in grid.items()
+                    if value["method"] == "gradient" and value["batch_size"] == 2048}
+        self.assertEqual(
+            {(value["calibration_context"], value["scheduler"], value["learning_rate"]) for value in gradient.values()},
+            {(context, scheduler, rate) for context in (128, 8192) for scheduler in ("constant", "cosine")
+             for rate in (1e-3, 3e-4, 1e-4)},
+        )
+        for value in gradient.values():
+            expected = (32, 32) if value["scheduler"] == "cosine" else (64, 3)
+            self.assertEqual((value["max_epochs"], value["early_stopping_patience"]), expected)
+        current = grid[swiglu_8.CURRENT_SETTING]
+        self.assertEqual({key: current[key] for key in ("learning_rate", "scheduler", "batch_size", "max_epochs",
+                                                        "early_stopping_patience")},
+                         {key: self.settings["local_fitting"][key] for key in ("learning_rate", "scheduler",
+                                                                                "batch_size", "max_epochs",
+                                                                                "early_stopping_patience")})
+        self.assertEqual(grid["c1e-3-128-b256"], {**current, "batch_size": 256})
+        self.assertEqual({grid[name]["calibration_context"] for name in ("ols-128", "ols-8k")}, {128, 8192})
+        self.assertEqual(swiglu_8.expected_seeds("ols-8k", self.settings), [None])
+        self.assertEqual(sum(len(swiglu_8.expected_seeds(name, self.settings)) for name in grid) * 6, 246)
+
+    def test_settings_reach_the_fitting_view_without_changing_the_context(self):
+        context = types.SimpleNamespace(settings=deepcopy(self.settings))
+        view = swiglu_8.recipe_context(context, swiglu_8.PART_A_SETTINGS["cos3e-4-8k"], 22)
+        self.assertEqual(
+            [view.settings["local_fitting"][key] for key in ("learning_rate", "scheduler", "batch_size",
+                                                              "max_epochs", "early_stopping_patience")],
+            [0.0003, "cosine", 2048, 32, 32],
+        )
+        self.assertEqual(view.settings["seed"], 22)
+        self.assertEqual(context.settings, self.settings)
+        self.assertEqual(swiglu_8.recipe_context(context, swiglu_8.PART_A_SETTINGS["ols-8k"], None).settings,
+                         self.settings)
+        self.assertEqual(swiglu_8.fit_context_kind("c1e-3-128", 21), "dense")
+        self.assertEqual(swiglu_8.fit_context_kind("c1e-3-128", 22), "c1e-3-128-s22")
+        self.assertEqual(swiglu_8.fit_context_kind("ols-8k", None), "ols-8k")
+
     def test_configuration_rejects_changed_contracts(self):
         changes = (
-            ("block_check", "recipes", "c3e-4", "learning_rate", 0.0005),
+            ("block_check", "settings", "c3e-4-128", "learning_rate", 0.0005),
+            ("block_check", "seeds", None, None, [21, 22]),
+            ("long_context", "selection_sequences", None, None, 12),
             ("acceptance", "fit_relative", None, None, 0.01),
-            ("part_b", "fitting_recipe", None, None, "cos1e-3"),
+            ("part_b", "fitting_recipe", None, None, "cos1e-3-128"),
             ("recovery", "learning_rate", None, None, 1e-4),
         )
         with tempfile.TemporaryDirectory() as directory:
@@ -84,43 +130,61 @@ class SwiGLU8Contracts(unittest.TestCase):
                 with self.subTest(change=(first, second, third)), self.assertRaises(ValueError):
                     swiglu_8.load_settings(path)
 
-    def test_adoption_keeps_the_current_recipe_when_nothing_qualifies(self):
-        decision = swiglu_8.adoption_decision(block_rows(self.neutral), self.settings)
-        self.assertEqual(decision["selected_recipe"], "cur-s21")
+    def test_adoption_keeps_the_current_setting_when_nothing_qualifies(self):
+        decision = swiglu_8.adoption_decision(block_rows(self.settings, {}), self.settings)
+        self.assertEqual(decision["selected_recipe"], "c1e-3-128")
         self.assertEqual(decision["qualifying"], [])
 
-    def test_adoption_decides_at_8k_and_guards_at_128(self):
-        values = dict(self.neutral)
-        values["c3e-4"] = (1.0, 0.90)   # about 11% better at 8K: qualifies
-        values["cos3e-4"] = (1.0, 0.85)  # about 16% better: qualifies and wins
-        values["ols"] = (1.2, 0.80)      # better at 8K, but about 19% worse at 128
-        values["c1e-4"] = (0.80, 0.97)   # better at 128 only: below 5% at 8K
-        decision = swiglu_8.adoption_decision(block_rows(values), self.settings)
-        self.assertEqual(sorted(decision["qualifying"]), ["c3e-4", "cos3e-4"])
-        self.assertEqual(decision["selected_recipe"], "cos3e-4")
-        self.assertIn("worse", decision["recipes"]["ols"]["reasons"][0])
-        self.assertFalse(decision["recipes"]["c1e-4"]["qualifies"])
+    def test_adoption_compares_seed_means_decides_at_8k_and_guards_at_128(self):
+        values = {
+            "c3e-4-128": [(1.0, 0.90)] * 3,   # 10% better at 8K: qualifies
+            "cos3e-4-8k": [(1.0, 0.85)] * 3,  # 15% better: qualifies and wins
+            "ols-128": [(1.2, 0.80)],         # better at 8K, but 20% worse at 128
+            "c1e-4-128": [(0.80, 0.97)] * 3,  # better at 128 only: below 5% at 8K
+        }
+        decision = swiglu_8.adoption_decision(block_rows(self.settings, values), self.settings)
+        self.assertEqual(sorted(decision["qualifying"]), ["c3e-4-128", "cos3e-4-8k"])
+        self.assertEqual(decision["selected_recipe"], "cos3e-4-8k")
+        self.assertIn("worse", decision["settings"]["ols-128"]["reasons"][0])
+        self.assertFalse(decision["settings"]["c1e-4-128"]["qualifies"])
 
-    def test_adoption_requires_more_than_the_seed_variation(self):
-        values = dict(self.neutral)
-        values["cur-s22"] = (1.3, 1.3)   # seed variation about 26%
-        values["c3e-4"] = (1.0, 1.0)     # about 13% below the seed mean only
-        decision = swiglu_8.adoption_decision(block_rows(values), self.settings)
-        self.assertIn("seed-to-seed", decision["recipes"]["c3e-4"]["reasons"][0])
-        self.assertEqual(decision["selected_recipe"], "cur-s21")
+    def test_adoption_requires_more_than_the_seed_noise(self):
+        values = {
+            "c1e-3-128": [(1.0, 1.0), (1.0, 1.2), (1.0, 0.8)],     # mean 1.0, sample sd 0.2
+            "c3e-4-128": [(1.0, 0.82), (1.0, 0.92), (1.0, 0.72)],  # 18% better, sd 0.1: noise 30%
+            "c1e-3-8k": [(1.0, 0.6)] * 3,                           # 40% better, noise 20%
+        }
+        decision = swiglu_8.adoption_decision(block_rows(self.settings, values), self.settings)
+        noisy = decision["settings"]["c3e-4-128"]
+        self.assertAlmostEqual(noisy["mean_reduction"]["8192"], 0.18)
+        self.assertAlmostEqual(noisy["mean_seed_noise"], 0.3)
+        self.assertEqual(noisy["reasons"], ["mean reduction is not above the seed noise"])
+        self.assertEqual(decision["selected_recipe"], "c1e-3-8k")
 
-    def test_stage_two_indicator_detects_early_best_with_falling_training_error(self):
-        def row(layer, best, train):
+    def test_adoption_refuses_a_setting_with_missing_seeds(self):
+        rows = [row for row in block_rows(self.settings, {})
+                if not (row["setting"] == "c3e-4-8k" and row["seed"] == 23)]
+        with self.assertRaisesRegex(ValueError, "lacks seeds"):
+            swiglu_8.adoption_decision(rows, self.settings)
+
+    def test_stage_two_indicator_counts_a_layer_when_most_seeds_overfit(self):
+        def row(layer, seed, best, train):
             history = [{"phase": "full", "epoch": index + 1, "train_mse": value}
                        for index, value in enumerate(train)]
-            return {"recipe": "cur-s21", "layer": layer, "width_ratio": 0.5,
+            return {"setting": "c1e-3-128", "seed": seed, "layer": layer, "width_ratio": 0.5,
                     "best_epoch": best, "history": history}
 
-        rows = [row(3, 2, [5, 4, 3, 2, 1]), row(11, 1, [5, 4, 3, 2]), row(19, 20, [5] * 23)]
-        result = swiglu_8.stage_two_indicator(rows, "cur-s21")
+        overfit = (2, [5, 4, 3, 2, 1])
+        settled = (20, [5] * 23)
+        pattern = {3: (overfit, overfit, overfit), 11: (overfit, overfit, settled), 19: (overfit, settled, settled)}
+        rows = [row(layer, seed, *case) for layer, cases in pattern.items()
+                for seed, case in zip((21, 22, 23), cases)]
+        result = swiglu_8.stage_two_indicator(rows, "c1e-3-128")
         self.assertEqual(result["overfitting_layers"], [3, 11])
         self.assertTrue(result["overfitting_remains"])
-        self.assertFalse(swiglu_8.stage_two_indicator(rows, "ols")["applicable"])
+        least_squares = [{"setting": "ols-128", "seed": None, "layer": 3, "width_ratio": 0.5, "best_epoch": 0,
+                          "history": []}]
+        self.assertFalse(swiglu_8.stage_two_indicator(least_squares, "ols-128")["applicable"])
 
     def test_acceptance_comparisons_use_relative_tolerances_and_stop_on_failure(self):
         passed = swiglu_8.comparison("A2", 1.0005, 1.0, 1e-3, metric="local_nmse")
@@ -130,8 +194,10 @@ class SwiGLU8Contracts(unittest.TestCase):
         reference = {(3, 2048): {"initial_local_nmse": 0.4733, "local_nmse": 0.3397, "local_mse": 0.1275}}
         curves = {(3, 2048): {"raw_teacher_kl": 0.0269}}
         slices = [{"layer": 3, "replacement_width": 2048, "validation_128": {"nmse": 0.4733}}]
-        fits = [{"recipe": "cur-s21", "layer": 3, "replacement_width": 2048,
-                 "local_nmse": 0.3397, "local_mse": 0.1275, "kl_128": 0.0270}]
+        anchor = {"layer": 3, "replacement_width": 2048, "local_nmse": 0.3397, "local_mse": 0.1275,
+                  "kl_128": 0.0270}
+        fits = [{"setting": "c1e-3-128", "seed": 21, **anchor},
+                {"setting": "c1e-3-128", "seed": 22, **anchor, "local_nmse": 0.5}]
         self.assertTrue(all(row["passed"] for row in swiglu_8.slice_checks(slices, reference, 1e-4)))
         checks = swiglu_8.current_recipe_checks(fits, reference, curves, 1e-3)
         self.assertEqual([row["passed"] for row in checks], [True, True, False])
@@ -166,7 +232,7 @@ class SwiGLU8Contracts(unittest.TestCase):
         with self.assertRaises(ValueError):
             swiglu_8.partition_record_indices(self.settings, indices[:-1])
 
-    def test_fitting_streams_are_document_disjoint_from_kl_and_local_windows(self):
+    def test_8k_streams_are_document_disjoint_from_kl_local_windows_and_each_other(self):
         records = [{"text": text} for text in (
             "a b c", "d e", " ", "f g h", "i j", "k l", "m n o", "p q", "r s", "t u", "v w",
         )]
@@ -177,16 +243,21 @@ class SwiGLU8Contracts(unittest.TestCase):
             last = swiglu_8.replay_kl_records(records, tokenizer, np.fromfile(root / "kl.int32", dtype=np.int32))
             self.assertEqual((kl["documents_consumed"], last), (3, 3))
             built = swiglu_8.build_fitting_streams(
-                records, tokenizer, last + 1, {5}, {"calibration": root / "c.int32", "validation": root / "v.int32"},
-                2, {"calibration": 2, "validation": 1},
+                records, tokenizer, last + 1, {5},
+                {"calibration": root / "c.int32", "validation": root / "v.int32", "selection": root / "s.int32"},
+                2, {"calibration": 2, "validation": 1, "selection": 1},
             )
             calibration = np.fromfile(root / "c.int32", dtype=np.int32).tolist()
             validation = np.fromfile(root / "v.int32", dtype=np.int32).tolist()
+            selection = np.fromfile(root / "s.int32", dtype=np.int32).tolist()
         self.assertEqual(calibration, [ord("i"), ord("j"), 0, ord("m")])
         self.assertEqual(built["calibration"]["first_record"], 4)
         self.assertEqual(built["calibration"]["excluded_records_skipped"], 1)
         self.assertEqual(validation, [ord("p"), ord("q")])
+        self.assertEqual(selection, [ord("r"), ord("s")])
+        self.assertEqual(list(built), ["calibration", "validation", "selection"])
         self.assertGreater(built["validation"]["first_record"], built["calibration"]["last_record"])
+        self.assertGreater(built["selection"]["first_record"], built["validation"]["last_record"])
         with self.assertRaisesRegex(ValueError, "does not reproduce"):
             swiglu_8.replay_kl_records(records[1:], tokenizer, np.asarray([97, 98, 99, 0], dtype=np.int32))
 

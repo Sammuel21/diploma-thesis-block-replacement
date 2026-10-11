@@ -1,6 +1,7 @@
 """Run SwiGLU-8: local-fitting attribution and the 20-80% control spectrum.
 
-``block-check`` compares local-fitting recipes on three layers (Part A).
+``block-check`` compares local-fitting settings on three layers with three seeds
+and selects on a dedicated 8K selection stream (Part A).
 ``prepare`` builds the shared neuron selection, width curves, allocations, and
 both arms' token-zero starts (Part B). ``train`` recovers one arm at one target
 to 100M tokens and runs the final evaluation. The binding design is recorded in
@@ -18,9 +19,15 @@ from pathlib import Path
 from time import perf_counter
 from types import SimpleNamespace
 
-from workflows.runs.model.common import resolve_path
+from workflows.runs.model.common import relative_to_root, resolve_path
 
-from mlp_replacement.artifacts import content_digest, file_digest, read_json
+from mlp_replacement.artifacts import (
+    atomic_torch_save,
+    content_digest,
+    file_digest,
+    read_json,
+    sha256_file,
+)
 from mlp_replacement.compression.allocation import (
     allocate_discrete_swiglu_widths,
     build_swiglu_width_curve,
@@ -69,7 +76,13 @@ from .shared import (
     recovery_memory_record,
     resolve_source_asset,
 )
-from .swiglu5.fitting import capture_dense_pairs, fit_operator, load_fit_operator
+from .swiglu5.fitting import (
+    capture_dense_pairs,
+    fit_key,
+    fit_operator,
+    load_fit_operator,
+    operator_state_path,
+)
 from .swiglu_7 import (
     code_hashes,
     configure_strategy,
@@ -107,31 +120,48 @@ TARGETS = (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8)
 SWIGLU7_TARGETS = (0.2, 0.3, 0.4, 0.5)
 ARMS = ("fitted", "slice")
 CONTEXTS = (128, 8192)
-CURRENT_RECIPE = "cur-s21"
-SEED_RECIPE = "cur-s22"
-PART_A_RECIPES = {
-    "cur-s21": {"method": "gradient", "learning_rate": 0.001, "scheduler": "constant",
-                "seed": 21, "calibration_context": 128},
-    "cur-s22": {"method": "gradient", "learning_rate": 0.001, "scheduler": "constant",
-                "seed": 22, "calibration_context": 128},
-    "c3e-4": {"method": "gradient", "learning_rate": 0.0003, "scheduler": "constant",
-              "seed": 21, "calibration_context": 128},
-    "c1e-4": {"method": "gradient", "learning_rate": 0.0001, "scheduler": "constant",
-              "seed": 21, "calibration_context": 128},
-    "cos1e-3": {"method": "gradient", "learning_rate": 0.001, "scheduler": "cosine",
-                "seed": 21, "calibration_context": 128},
-    "cos3e-4": {"method": "gradient", "learning_rate": 0.0003, "scheduler": "cosine",
-                "seed": 21, "calibration_context": 128},
-    "cos1e-4": {"method": "gradient", "learning_rate": 0.0001, "scheduler": "cosine",
-                "seed": 21, "calibration_context": 128},
-    "ols": {"method": "least_squares", "calibration_context": 128},
-    "ctx8k": {"method": "gradient", "learning_rate": 0.001, "scheduler": "constant",
-              "seed": 21, "calibration_context": 8192},
-}
+PART_A_SEEDS = (21, 22, 23)
+# SwiGLU-7's recipe at seed 21 is the anchor that A1-A3 compare with SwiGLU-7.
+CURRENT_SETTING = "c1e-3-128"
+CURRENT_SEED = 21
+SELECTION_KL_PROTOCOL = "teacher-kl-t1-all-valid-positions-c4-shard0-selection-24x8192-v1"
+
+
+def part_a_settings():
+    """Build the decided Part A grid (decision log, 2026-10-11).
+
+    Every combination of training context, schedule, and learning rate is
+    tested, plus batch 256 with the current recipe and the exact least-squares
+    down projection at both contexts. Cosine decays over a fixed 32 epochs; a
+    patience equal to that budget never stops a fit early, and the best
+    validation epoch is kept as for every other setting.
+    """
+
+    grid = {}
+    for context, suffix in ((128, "128"), (8192, "8k")):
+        for scheduler, prefix, epochs, patience in (("constant", "c", 64, 3), ("cosine", "cos", 32, 32)):
+            for rate, label in ((0.001, "1e-3"), (0.0003, "3e-4"), (0.0001, "1e-4")):
+                grid[f"{prefix}{label}-{suffix}"] = {
+                    "method": "gradient",
+                    "calibration_context": context,
+                    "learning_rate": rate,
+                    "scheduler": scheduler,
+                    "batch_size": 2048,
+                    "max_epochs": epochs,
+                    "early_stopping_patience": patience,
+                }
+    grid[f"{CURRENT_SETTING}-b256"] = {**grid[CURRENT_SETTING], "batch_size": 256}
+    for context, suffix in ((128, "128"), (8192, "8k")):
+        grid[f"ols-{suffix}"] = {"method": "least_squares", "calibration_context": context}
+    return grid
+
+
+PART_A_SETTINGS = part_a_settings()
 ADOPTION_RULE = {
     "deciding_context": 8192,
     "minimum_mean_reduction": 0.05,
     "maximum_combination_increase": 0.05,
+    "seed_noise": "sum of the two settings' sample seed standard deviations over the current mean",
 }
 ACCEPTANCE = {
     "exact_relative": 0.0001,
@@ -198,10 +228,14 @@ def load_settings(path):
         "source": quantization["kl_source"],
         "sequence_length": quantization["sequence_length"],
         "kl_sequences": quantization["kl_sequences"],
+        "selection_sequences": quantization["kl_sequences"],
         "calibration_sequences": 48,
         "validation_sequences": 1,
     }:
-        raise ValueError("SwiGLU-8 uses Quantization-1's 8K KL source and 48+1 8K fitting sequences")
+        raise ValueError(
+            "SwiGLU-8 uses Quantization-1's 8K KL source, an equal-size 8K selection stream, "
+            "and 48+1 8K fitting sequences"
+        )
     if (
         long_context["calibration_sequences"] * long_context["sequence_length"]
         != settings["calibration"]["selected_pairs"]
@@ -210,10 +244,15 @@ def load_settings(path):
     if settings.get("block_check") != {
         "layers": [3, 11, 19],
         "width_ratios": [0.25, 0.5],
-        "recipes": PART_A_RECIPES,
+        "seeds": list(PART_A_SEEDS),
+        "settings": PART_A_SETTINGS,
         "adoption": ADOPTION_RULE,
     }:
-        raise ValueError("SwiGLU-8 fixes the decided Part A grid and adoption rule")
+        raise ValueError("SwiGLU-8 fixes the decided Part A grid, seeds, and adoption rule")
+    current = PART_A_SETTINGS[CURRENT_SETTING]
+    if any(current[key] != settings["local_fitting"][key]
+           for key in ("learning_rate", "scheduler", "batch_size", "max_epochs", "early_stopping_patience")):
+        raise ValueError("The current Part A setting must be SwiGLU-7's local-fitting recipe")
     if settings.get("acceptance") != ACCEPTANCE:
         raise ValueError("SwiGLU-8 fixes the decided acceptance tolerances")
     part_b = settings.get("part_b", {})
@@ -222,10 +261,10 @@ def load_settings(path):
     if (
         set(part_b) != {"fitting_recipe", "block_check_sha256"}
         or (recipe is None) != (digest is None)
-        or (recipe is not None and (recipe not in PART_A_RECIPES or recipe == SEED_RECIPE))
+        or (recipe is not None and recipe not in PART_A_SETTINGS)
         or (digest is not None and not is_digest(digest))
     ):
-        raise ValueError("part_b names one adoptable recipe and its block-check sha256, or neither")
+        raise ValueError("part_b names one Part A setting and its block-check sha256, or neither")
     sources = settings.get("sources", {})
     runs = sources.get("swiglu7_runs_sha256", {})
     prefix = sources.get("swiglu7_recovery_prefix_sha256")
@@ -387,7 +426,7 @@ def slice_checks(rows, reference_fits, tolerance):
 def current_recipe_checks(rows, reference_fits, reference_curves, tolerance):
     checks = []
     for row in rows:
-        if row["recipe"] != CURRENT_RECIPE:
+        if (row["setting"], row["seed"]) != (CURRENT_SETTING, CURRENT_SEED):
             continue
         key = (row["layer"], row["replacement_width"])
         labels = {"layer": row["layer"], "width": row["replacement_width"]}
@@ -438,110 +477,147 @@ def monitoring_checks(row, reference_history, tolerances):
     return checks
 
 
-def adoption_decision(rows, settings):
-    """Apply the decided Part A adoption rule to completed block-check rows.
+def seed_summary(values):
+    """Mean and sample standard deviation over seeds; one value has no spread."""
 
-    The two current-recipe seeds form the reference. A recipe qualifies when
-    its mean reduction of 8K single-block KL exceeds both the minimum and the
-    mean seed-to-seed variation, and no combination is worse than allowed at
-    either context. The largest mean 8K reduction wins among qualifying recipes.
+    mean = sum(values) / len(values)
+    if len(values) == 1:
+        return mean, 0.0
+    return mean, math.sqrt(sum((value - mean) ** 2 for value in values) / (len(values) - 1))
+
+
+def expected_seeds(setting, settings):
+    if settings["block_check"]["settings"][setting]["method"] == "least_squares":
+        return [None]
+    return [int(seed) for seed in settings["block_check"]["seeds"]]
+
+
+def adoption_decision(rows, settings):
+    """Apply the decided multi-seed Part A adoption rule to completed fit rows.
+
+    Each setting is summarized by its seed mean and sample standard deviation
+    per layer-width combination and context. A setting qualifies when its mean
+    8K reduction against the current setting exceeds the minimum and the mean
+    seed noise, (sd_setting + sd_current) / mean_current, and no combination
+    is worse than allowed at either context. The largest mean 8K reduction
+    wins; otherwise the current setting stays.
     """
 
     rule = settings["block_check"]["adoption"]
     deciding = int(rule["deciding_context"])
-    values = {
-        (row["recipe"], row["layer"], row["replacement_width"], context): float(row[f"kl_{context}"])
-        for row in rows
-        for context in CONTEXTS
-    }
     combinations = sorted({(row["layer"], row["replacement_width"]) for row in rows})
-    reference = {}
-    variation = {}
-    for layer, width in combinations:
+    values = {}
+    for row in rows:
         for context in CONTEXTS:
-            first = values[(CURRENT_RECIPE, layer, width, context)]
-            second = values[(SEED_RECIPE, layer, width, context)]
-            reference[(layer, width, context)] = (first + second) / 2
-            variation[(layer, width, context)] = abs(first - second) / reference[(layer, width, context)]
-    seed_variation = sum(variation[(layer, width, deciding)] for layer, width in combinations) / len(
-        combinations
-    )
+            values.setdefault((row["setting"], row["layer"], row["replacement_width"], context), {})[
+                row["seed"]
+            ] = float(row[f"kl_{context}"])
+    summaries = {}
+    for setting in settings["block_check"]["settings"]:
+        for layer, width in combinations:
+            for context in CONTEXTS:
+                by_seed = values.get((setting, layer, width, context), {})
+                if sorted(by_seed, key=str) != sorted(expected_seeds(setting, settings), key=str):
+                    raise ValueError(f"Block check lacks seeds for {setting} at layer {layer}, width {width}")
+                summaries[(setting, layer, width, context)] = seed_summary(
+                    [by_seed[seed] for seed in expected_seeds(setting, settings)]
+                )
+
+    def summary_rows(setting):
+        return [
+            {"layer": layer, "width": width, "context": context, "mean": mean, "seed_sd": deviation}
+            for (name, layer, width, context), (mean, deviation) in sorted(summaries.items())
+            if name == setting
+        ]
+
     table = {}
-    for recipe in settings["block_check"]["recipes"]:
-        if recipe in (CURRENT_RECIPE, SEED_RECIPE):
+    for setting in settings["block_check"]["settings"]:
+        if setting == CURRENT_SETTING:
             continue
-        reductions = {
-            (layer, width, context): 1.0
-            - values[(recipe, layer, width, context)] / reference[(layer, width, context)]
-            for layer, width in combinations
-            for context in CONTEXTS
-        }
+        reductions = {}
+        noise = {}
+        for layer, width in combinations:
+            for context in CONTEXTS:
+                current_mean, current_sd = summaries[(CURRENT_SETTING, layer, width, context)]
+                mean, deviation = summaries[(setting, layer, width, context)]
+                reductions[(layer, width, context)] = 1.0 - mean / current_mean
+                noise[(layer, width, context)] = (deviation + current_sd) / current_mean
         mean_reduction = {
             context: sum(reductions[(layer, width, context)] for layer, width in combinations)
             / len(combinations)
             for context in CONTEXTS
         }
+        mean_noise = sum(noise[(layer, width, deciding)] for layer, width in combinations) / len(
+            combinations
+        )
         worst = min(reductions.values())
         reasons = []
         if not mean_reduction[deciding] > rule["minimum_mean_reduction"]:
             reasons.append(
                 f"mean {deciding}-token reduction is not above {rule['minimum_mean_reduction']:.0%}"
             )
-        if not mean_reduction[deciding] > seed_variation:
-            reasons.append("mean reduction is not above the seed-to-seed variation")
+        if not mean_reduction[deciding] > mean_noise:
+            reasons.append("mean reduction is not above the seed noise")
         if worst < -rule["maximum_combination_increase"]:
             reasons.append(
                 f"a combination is more than {rule['maximum_combination_increase']:.0%} worse"
             )
-        table[recipe] = {
+        table[setting] = {
             "mean_reduction": {str(context): value for context, value in mean_reduction.items()},
+            "mean_seed_noise": mean_noise,
             "worst_reduction": worst,
             "reductions": [
-                {"layer": layer, "width": width, "context": context, "reduction": value}
+                {"layer": layer, "width": width, "context": context, "reduction": value,
+                 "seed_noise": noise[(layer, width, context)]}
                 for (layer, width, context), value in sorted(reductions.items())
             ],
+            "seed_summaries": summary_rows(setting),
             "qualifies": not reasons,
             "reasons": reasons,
         }
-    qualifying = [recipe for recipe, row in table.items() if row["qualifies"]]
+    qualifying = [setting for setting, row in table.items() if row["qualifies"]]
     selected = (
-        max(qualifying, key=lambda recipe: table[recipe]["mean_reduction"][str(deciding)])
+        max(qualifying, key=lambda setting: table[setting]["mean_reduction"][str(deciding)])
         if qualifying
-        else CURRENT_RECIPE
+        else CURRENT_SETTING
     )
     return {
         "rule": deepcopy(rule),
-        "reference_recipes": [CURRENT_RECIPE, SEED_RECIPE],
-        "seed_variation": {
-            "mean_deciding_context": seed_variation,
-            "combinations": [
-                {"layer": layer, "width": width, "context": context, "variation": value}
-                for (layer, width, context), value in sorted(variation.items())
-            ],
-        },
-        "recipes": table,
+        "reference_setting": CURRENT_SETTING,
+        "reference_seed_summaries": summary_rows(CURRENT_SETTING),
+        "settings": table,
         "qualifying": qualifying,
         "selected_recipe": selected,
     }
 
 
-def stage_two_indicator(rows, recipe):
-    """Report whether the adopted recipe still overfits at width 0.5."""
+def stage_two_indicator(rows, setting):
+    """Report whether the adopted setting still overfits at width 0.5.
 
-    candidates = [row for row in rows if row["recipe"] == recipe and row["width_ratio"] == 0.5]
-    if not candidates or any("history" not in row for row in candidates):
-        return {"recipe": recipe, "applicable": False, "overfitting_remains": False}
-    layers = []
+    A layer counts when most of its seeds reach their best epoch by epoch 3
+    while their training MSE is still falling.
+    """
+
+    candidates = [row for row in rows if row["setting"] == setting and row["width_ratio"] == 0.5]
+    if not candidates or any(not row.get("history") for row in candidates):
+        return {"setting": setting, "applicable": False, "overfitting_remains": False}
+    votes = {}
     for row in candidates:
         history = [entry for entry in row["history"] if entry["phase"] == "full"]
         best = max(1, int(row["best_epoch"]))
-        if int(row["best_epoch"]) <= 3 and len(history) > best:
-            if history[-1]["train_mse"] < history[best - 1]["train_mse"]:
-                layers.append(row["layer"])
+        overfits = (
+            int(row["best_epoch"]) <= 3
+            and len(history) > best
+            and history[-1]["train_mse"] < history[best - 1]["train_mse"]
+        )
+        votes.setdefault(row["layer"], []).append(overfits)
+    layers = sorted(layer for layer, flags in votes.items() if 2 * sum(flags) > len(flags))
     return {
-        "recipe": recipe,
+        "setting": setting,
         "applicable": True,
-        "definition": "best epoch <= 3 while training MSE still falls, at width 0.5",
+        "definition": (
+            "best epoch <= 3 while training MSE still falls, at width 0.5, in most seeds of a layer"
+        ),
         "overfitting_layers": layers,
         "overfitting_remains": len(layers) >= 2,
     }
@@ -663,17 +739,17 @@ def unused_records(records, start, excluded, consumed):
 def build_fitting_streams(
     records, tokenizer, start, excluded, paths, sequence_length, sequence_counts, text_column="text"
 ):
-    """Pack document-disjoint 8K calibration and validation streams after ``start``."""
+    """Pack document-disjoint 8K streams after ``start`` in ``sequence_counts`` order."""
 
     built = {}
     cursor = start
-    for name in ("calibration", "validation"):
+    for name, count in sequence_counts.items():
         consumed = []
         record = build_finite_stream(
             unused_records(records, cursor, excluded, consumed),
             tokenizer,
             paths[name],
-            int(sequence_counts[name]) * int(sequence_length),
+            int(count) * int(sequence_length),
             text_column=text_column,
         )
         record.update(
@@ -697,12 +773,15 @@ def verified_stream(root, record):
     return path
 
 
-def prepare_long_context_data(context, settings, output_dir, artifact, include_fitting):
-    """Freeze the shared 8K KL stream and, when needed, the 8K fitting streams.
+def prepare_long_context_data(context, settings, output_dir, artifact, include_fitting,
+                              include_selection=False):
+    """Freeze the shared 8K KL stream and, when needed, the later 8K streams.
 
-    The fitting streams use shard-0 records after the last KL-stream document
-    and skip every record that supplied a 128-token window, so they share no
-    document with the 8K evaluation or any 128-token partition.
+    The 8K calibration, validation, and Part A selection streams follow the
+    last KL-stream document in that order and skip every record that supplied
+    a 128-token window. None of them shares a document with the 8K final
+    evaluation, with each other, or with any 128-token partition, so Part A
+    never selects on data that the final evaluation uses.
     """
 
     import numpy as np
@@ -721,8 +800,16 @@ def prepare_long_context_data(context, settings, output_dir, artifact, include_f
         records["kl_stream"] = record
         persist(output_dir, artifact, "long_context:kl_stream")
     kl_path = verified_stream(output_dir, records["kl_stream"])
-    needs_fitting = include_fitting and "calibration_stream" not in records
-    if "audit" in records and not needs_fitting:
+    counts = {}
+    if include_fitting or include_selection:
+        counts.update(calibration=long_context["calibration_sequences"],
+                      validation=long_context["validation_sequences"])
+    if include_selection:
+        counts["selection"] = long_context["selection_sequences"]
+    needs_streams = any(f"{name}_stream" not in records for name in counts)
+    if "audit" in records and not needs_streams:
+        for name in counts:
+            verified_stream(output_dir, records[f"{name}_stream"])
         return records
     source = settings["data"]["local_source"]
     if any(source[key] != long_context["source"][key] for key in ("path", "revision", "data_file")):
@@ -741,11 +828,8 @@ def prepare_long_context_data(context, settings, output_dir, artifact, include_f
             for name, indices in partitions.items()
         },
     }
-    if needs_fitting:
-        paths = {
-            "calibration": prepared / "long-context-calibration.int32",
-            "validation": prepared / "long-context-validation.int32",
-        }
+    if needs_streams:
+        paths = {name: prepared / f"long-context-{name}.int32" for name in counts}
         for path in paths.values():
             path.unlink(missing_ok=True)
         built = build_fitting_streams(
@@ -755,25 +839,25 @@ def prepare_long_context_data(context, settings, output_dir, artifact, include_f
             set(context.record_indices),
             paths,
             length,
-            {
-                "calibration": long_context["calibration_sequences"],
-                "validation": long_context["validation_sequences"],
-            },
+            counts,
             source["text_column"],
         )
         for name, record in built.items():
             record["path"] = relative_output(output_dir, paths[name])
+            if name == "selection":
+                record["protocol"] = SELECTION_KL_PROTOCOL
             records[f"{name}_stream"] = record
-        records["audit"]["fitting_streams_document_disjoint"] = (
-            built["calibration"]["first_record"] > last_kl_record
-            and built["validation"]["first_record"] > built["calibration"]["last_record"]
-        )
-        if not records["audit"]["fitting_streams_document_disjoint"]:
-            raise RuntimeError("8K fitting streams overlap the KL evaluation documents")
+        previous_last = last_kl_record
+        disjoint = True
+        for name in counts:
+            disjoint = disjoint and built[name]["first_record"] > previous_last
+            previous_last = built[name]["last_record"]
+        records["audit"]["document_disjoint"] = disjoint
+        if not records["audit"]["document_disjoint"]:
+            raise RuntimeError("8K streams overlap each other or the KL evaluation documents")
     persist(output_dir, artifact, "long_context:audit")
-    for name in ("calibration_stream", "validation_stream"):
-        if name in records:
-            verified_stream(output_dir, records[name])
+    for name in counts:
+        verified_stream(output_dir, records[f"{name}_stream"])
     return records
 
 
@@ -839,21 +923,23 @@ def fitting_context(settings, work_dir, output_dir, artifact, stage):
     return context, model_config
 
 
-def recipe_context(context, recipe):
-    """View the fitting context with one Part A recipe's optimizer settings."""
+def recipe_context(context, setting, seed):
+    """View the fitting context with one Part A setting's optimizer and seed."""
 
     view = SimpleNamespace(**vars(context))
     view.settings = deepcopy(context.settings)
-    if recipe["method"] == "gradient":
-        view.settings["local_fitting"]["learning_rate"] = recipe["learning_rate"]
-        view.settings["local_fitting"]["scheduler"] = recipe["scheduler"]
-        view.settings["seed"] = recipe["seed"]
+    if setting["method"] == "gradient":
+        for key in ("learning_rate", "scheduler", "batch_size", "max_epochs", "early_stopping_patience"):
+            view.settings["local_fitting"][key] = setting[key]
+        view.settings["seed"] = int(seed)
     return view
 
 
-def fit_context_kind(recipe_id):
-    # The current recipe keeps SwiGLU-7's fit keys so its records compare directly.
-    return "dense" if recipe_id == CURRENT_RECIPE else recipe_id
+def fit_context_kind(setting_id, seed):
+    # The current setting at seed 21 keeps SwiGLU-7's fit keys so its records compare directly.
+    if (setting_id, seed) == (CURRENT_SETTING, CURRENT_SEED):
+        return "dense"
+    return setting_id if seed is None else f"{setting_id}-s{seed}"
 
 
 def neuron_ranking(context, layer, inputs):
@@ -887,8 +973,13 @@ def single_block_kl_short(context, layer, module, selection_cache):
         )
 
 
-def evaluate_block(context, layer, module, pairs, selection_cache, teacher, kl_path, kl_record, length):
-    """Report local error on both validation sets and single-block KL at both contexts."""
+def evaluate_block(context, layer, module, pairs, selection_cache, teacher, stream_path, stream_record,
+                   length):
+    """Report local error on both validation sets and single-block KL at both contexts.
+
+    The 8K score uses the Part A selection stream, never the final-evaluation
+    KL stream.
+    """
 
     path = context.blocks[layer].path
     batch = int(context.settings["local_fitting"]["batch_size"])
@@ -903,8 +994,8 @@ def evaluate_block(context, layer, module, pairs, selection_cache, teacher, kl_p
         }
     short = single_block_kl_short(context, layer, module, selection_cache)
     with temporary_fp32_replacements(context.model, context.blocks, {layer: module}):
-        long = evaluate_teacher_kl(context.model, teacher, kl_path, kl_record, length,
-                                   device=context.device)
+        long = evaluate_teacher_kl(context.model, teacher, stream_path, stream_record, length,
+                                   protocol=stream_record["protocol"], device=context.device)
     record.update(
         single_block_kl_128=short,
         single_block_kl_8192=long,
@@ -914,41 +1005,96 @@ def evaluate_block(context, layer, module, pairs, selection_cache, teacher, kl_p
     return record
 
 
-def fit_block(context, recipe_id, recipe, layer, width, indices, pairs):
-    """Fit one replacement with a named Part A recipe."""
+def least_squares_operator(context, layer, width, indices, training_pairs, validation_pairs,
+                           context_kind):
+    """Solve the exact down projection of a teacher slice and record it like a gradient fit."""
 
-    path = context.blocks[layer].path
-    if recipe["method"] == "least_squares":
-        started = perf_counter()
-        module = slice_module(context, layer, width, indices)
-        solve = refit_down_projection_least_squares(
-            module,
-            pairs[128]["training"][path],
-            context.device,
-            int(context.settings["local_fitting"]["batch_size"]),
-        )
-        return module, {"fit_seconds": perf_counter() - started, "least_squares": solve,
-                        "calibration_pairs": solve["calibration_pairs"]}
-    view = recipe_context(context, recipe)
-    fitting_pairs = pairs[int(recipe["calibration_context"])]
-    row = fit_operator(
-        view,
+    identifier = fit_key("legacy_subset", layer, width, context_kind)
+    existing = {row["fit_key"]: row for row in context.artifact["results"]["local_fitting"]}
+    if identifier in existing:
+        row = existing[identifier]
+        state_path = resolve_source_asset(row["state_path"], context.output)
+        if not state_path.is_file() or sha256_file(state_path) != row["state_sha256"]:
+            raise ValueError(f"Persisted local-fit state changed: {state_path}")
+        return row
+    batch = int(context.settings["local_fitting"]["batch_size"])
+    started = perf_counter()
+    module = slice_module(context, layer, width, indices)
+    initial = evaluate_operator(module, validation_pairs, context.device, batch)
+    solve = refit_down_projection_least_squares(module, training_pairs, context.device, batch)
+    final = evaluate_operator(module, validation_pairs, context.device, batch)
+    state = {name: tensor.detach().cpu() for name, tensor in module.state_dict().items()}
+    state_path = operator_state_path(context, "legacy_subset", layer, width, context_kind)
+    atomic_torch_save(state_path, state)
+    row = {
+        "fit_key": identifier,
+        "initialization": "legacy_subset",
+        "capture_context": context_kind,
+        "layer": int(layer),
+        "replacement_width": int(width),
+        "has_output_bias": False,
+        "calibration_pairs": int(training_pairs.num_tokens),
+        "best_epoch": 0,
+        "epochs_completed": 0,
+        "updates": 0,
+        "initial_local_mse": float(initial.mse),
+        "initial_local_nmse": float(initial.relative_mse),
+        "initial_local_cosine": float(initial.cosine_similarity),
+        "output_reconstruction": None,
+        "local_mse": float(final.mse),
+        "local_nmse": float(final.relative_mse),
+        "local_cosine": float(final.cosine_similarity),
+        "fit_seconds": perf_counter() - started,
+        "state_path": relative_to_root(state_path),
+        "state_sha256": sha256_file(state_path),
+        "parameter_count": sum(value.numel() for value in state.values()),
+        "least_squares": solve,
+        "history": [],
+    }
+    context.artifact["results"]["local_fitting"].append(row)
+    context.persist("local_fitting")
+    module.to("cpu")
+    del module, state
+    release_memory()
+    return row
+
+
+def fit_setting(context, setting_id, setting, seed, layer, width, indices, training_pairs,
+                validation_pairs):
+    """Fit one teacher-slice replacement with a named Part A setting and seed."""
+
+    kind = fit_context_kind(setting_id, seed)
+    if setting["method"] == "least_squares":
+        return least_squares_operator(context, layer, width, indices, training_pairs,
+                                      validation_pairs, kind)
+    return fit_operator(
+        recipe_context(context, setting, seed),
         layer,
         width,
         "legacy_subset",
-        fitting_pairs["training"][path],
-        fitting_pairs["validation"][path],
+        training_pairs,
+        validation_pairs,
         indices,
-        context_kind=fit_context_kind(recipe_id),
+        context_kind=kind,
     )
-    module = load_fit_operator(view, row)
+
+
+def fit_block(context, setting_id, setting, seed, layer, width, indices, pairs):
+    """Fit one Part A block with its setting's own calibration context."""
+
+    path = context.blocks[layer].path
+    fitting_pairs = pairs[int(setting["calibration_context"])]
+    row = fit_setting(context, setting_id, setting, seed, layer, width, indices,
+                      fitting_pairs["training"][path], fitting_pairs["validation"][path])
+    module = load_fit_operator(context, row)
     record = {
         key: deepcopy(row[key])
         for key in (
             "fit_key", "calibration_pairs", "best_epoch", "epochs_completed", "updates",
             "fit_seconds", "initial_local_mse", "initial_local_nmse", "local_mse", "local_nmse",
-            "local_cosine", "state_sha256", "history",
+            "local_cosine", "state_sha256", "history", "least_squares",
         )
+        if key in row
     }
     return module, record
 
@@ -998,9 +1144,12 @@ def block_check(args, settings, config_path):
         results.setdefault("fits", [])
         persist(output_dir, artifact, "loading_models")
         context, model_config = fitting_context(settings, work_dir, output_dir, artifact, "block_check")
-        long_data = prepare_long_context_data(context, settings, output_dir, artifact, True)
+        long_data = prepare_long_context_data(context, settings, output_dir, artifact, True,
+                                              include_selection=True)
         kl_record = long_data["kl_stream"]
         kl_path = verified_stream(output_dir, kl_record)
+        selection_record = long_data["selection_stream"]
+        selection_path = verified_stream(output_dir, selection_record)
         length = int(settings["long_context"]["sequence_length"])
         teacher, unused_tokenizer = load_model_and_tokenizer(model_config)
         validated_attention_implementation(teacher)
@@ -1035,22 +1184,23 @@ def block_check(args, settings, config_path):
         reference_fits = swiglu7_fit_rows(reference)
         reference_curves = swiglu7_curve_rows(reference)
         tolerances = settings["acceptance"]
-        evaluation_inputs = (selection_cache, teacher, kl_path, kl_record, length)
+        evaluation_inputs = (selection_cache, teacher, selection_path, selection_record, length)
 
-        def completed(rows, recipe, layer, width):
+        def completed(rows, setting, seed, layer, width):
             return any(
-                row["recipe"] == recipe and row["layer"] == layer and row["replacement_width"] == width
+                (row["setting"], row["seed"], row["layer"], row["replacement_width"])
+                == (setting, seed, layer, width)
                 for row in rows
             )
 
         # Unfitted slices come first: A1 checks selection and data before any fitting.
         for layer in layers:
             for width in widths:
-                if completed(results["slices"], "slice", layer, width):
+                if completed(results["slices"], "slice", None, layer, width):
                     continue
                 module = slice_module(context, layer, width, selected_indices(rankings[layer], width))
                 results["slices"].append(
-                    {"recipe": "slice", "layer": layer, "replacement_width": width,
+                    {"setting": "slice", "seed": None, "layer": layer, "replacement_width": width,
                      "width_ratio": width / original,
                      **evaluate_block(context, layer, module, pairs, *evaluation_inputs)}
                 )
@@ -1059,22 +1209,29 @@ def block_check(args, settings, config_path):
                 persist(output_dir, artifact, f"block_check:slice:{layer}:{width}")
         enforce(artifact, output_dir, "A1",
                 slice_checks(results["slices"], reference_fits, tolerances["exact_relative"]))
-        recipes = settings["block_check"]["recipes"]
-        order = [CURRENT_RECIPE, *(recipe for recipe in recipes if recipe != CURRENT_RECIPE)]
-        for recipe_id in order:
+        grid = settings["block_check"]["settings"]
+        # The SwiGLU-7 anchor runs first so A2-A3 stop the job before the rest of the grid.
+        runs = [(CURRENT_SETTING, CURRENT_SEED)] + [
+            (setting, seed)
+            for setting in grid
+            for seed in expected_seeds(setting, settings)
+            if (setting, seed) != (CURRENT_SETTING, CURRENT_SEED)
+        ]
+        for setting_id, seed in runs:
             for layer in layers:
                 for width in widths:
-                    if completed(results["fits"], recipe_id, layer, width):
+                    if completed(results["fits"], setting_id, seed, layer, width):
                         continue
                     indices = selected_indices(rankings[layer], width)
-                    module, fit = fit_block(context, recipe_id, recipes[recipe_id], layer, width,
+                    module, fit = fit_block(context, setting_id, grid[setting_id], seed, layer, width,
                                             indices, pairs)
                     row = {
-                        "recipe": recipe_id,
+                        "setting": setting_id,
+                        "seed": seed,
                         "layer": layer,
                         "replacement_width": width,
                         "width_ratio": width / original,
-                        **recipes[recipe_id],
+                        **grid[setting_id],
                         **fit,
                         **evaluate_block(context, layer, module, pairs, *evaluation_inputs),
                     }
@@ -1082,13 +1239,13 @@ def block_check(args, settings, config_path):
                     module.to("cpu")
                     del module
                     release_memory()
-                    persist(output_dir, artifact, f"block_check:{recipe_id}:{layer}:{width}")
+                    persist(output_dir, artifact, f"block_check:{setting_id}:s{seed}:{layer}:{width}")
                     print(
-                        f"recipe={recipe_id} layer={layer} width={width} "
+                        f"setting={setting_id} seed={seed} layer={layer} width={width} "
                         f"kl128={row['kl_128']:.6f} kl8192={row['kl_8192']:.6f}",
                         flush=True,
                     )
-            if recipe_id == CURRENT_RECIPE:
+            if (setting_id, seed) == (CURRENT_SETTING, CURRENT_SEED):
                 enforce(artifact, output_dir, "A2-A3",
                         current_recipe_checks(results["fits"], reference_fits, reference_curves,
                                               tolerances["fit_relative"]))
@@ -1216,8 +1373,8 @@ def prepare_operators(context, settings, output_dir, artifact, reference, recipe
     """Rank neurons, extend or refit width curves, allocate, and fit start widths."""
 
     results = artifact["results"]
-    recipe = settings["block_check"]["recipes"][recipe_id]
-    view = recipe_context(context, recipe)
+    recipe = settings["block_check"]["settings"][recipe_id]
+    seed = None if recipe["method"] == "least_squares" else int(settings["seed"])
     hidden = int(settings["model"]["hidden_size"])
     original = int(settings["model"]["intermediate_size"])
     batch = int(settings["local_fitting"]["batch_size"])
@@ -1238,7 +1395,7 @@ def prepare_operators(context, settings, output_dir, artifact, reference, recipe
     swiglu7_widths = {width for unused_layer, width in reference_curves} - {original}
     curve_widths = (
         [width for width in configured if width not in swiglu7_widths]
-        if recipe_id == CURRENT_RECIPE
+        if recipe_id == CURRENT_SETTING
         else configured
     )
     selection_cache = cache_teacher_logits(
@@ -1260,16 +1417,8 @@ def prepare_operators(context, settings, output_dir, artifact, reference, recipe
 
     def fit(layer, width, fitting):
         path = context.blocks[layer].path
-        row = fit_operator(
-            view,
-            layer,
-            width,
-            "legacy_subset",
-            fitting[0][path],
-            fitting[1][path],
-            selected_indices(rankings[layer], width),
-            context_kind=fit_context_kind(recipe_id),
-        )
+        row = fit_setting(context, recipe_id, recipe, seed, layer, width,
+                          selected_indices(rankings[layer], width), fitting[0][path], fitting[1][path])
         fit_rows[(layer, width)] = row
         return row
 
@@ -1293,7 +1442,7 @@ def prepare_operators(context, settings, output_dir, artifact, reference, recipe
             enforce(artifact, output_dir, "P1", audit)
             for width in curve_widths:
                 row = fit(layer, width, fitting)
-                module = load_fit_operator(view, row)
+                module = load_fit_operator(context, row)
                 kl = single_block_kl_short(context, layer, module, selection_cache)
                 module.to("cpu")
                 del module
@@ -1303,7 +1452,7 @@ def prepare_operators(context, settings, output_dir, artifact, reference, recipe
                 print(f"curve layer={layer} width={width} kl128={kl['teacher_kl']:.6f}", flush=True)
         del short, fitting
         release_memory()
-    if recipe_id == CURRENT_RECIPE:
+    if recipe_id == CURRENT_SETTING:
         curve_rows += [
             {"layer": layer, "replacement_width": width, "raw_teacher_kl": float(row["raw_teacher_kl"]),
              "source": "swiglu-7", "fit_key": row.get("fit_key")}
@@ -1386,7 +1535,7 @@ def prepare_operators(context, settings, output_dir, artifact, reference, recipe
         for unused_key, row in sorted(fit_rows.items())
     ]
     persist(output_dir, artifact, "local_fitting_completed")
-    if recipe_id == CURRENT_RECIPE:
+    if recipe_id == CURRENT_SETTING:
         checks = []
         keys = sorted(
             {
@@ -1531,7 +1680,7 @@ def validate_completed_preparation(artifact, output_dir, settings):
         if fitted["selection"]["fingerprint"] != sliced["selection"]["fingerprint"]:
             raise ValueError(f"Arms at target {target} do not share their neuron selection")
     groups = {"P1", "P3", "P4", "P5"}
-    if settings["part_b"]["fitting_recipe"] == CURRENT_RECIPE:
+    if settings["part_b"]["fitting_recipe"] == CURRENT_SETTING:
         groups.add("P2")
     acceptance = results["acceptance"]
     if not groups <= set(acceptance) or not all(group["passed"] for group in acceptance.values()):
@@ -1590,7 +1739,7 @@ def prepare(args, settings, config_path):
         persist(output_dir, artifact, "loading_models")
         context, model_config = fitting_context(settings, work_dir, output_dir, artifact, "prepare")
         prepare_monitoring_evaluation(settings, output_dir, artifact, tokenizer, local_data=context.data)
-        recipe = settings["block_check"]["recipes"][recipe_id]
+        recipe = settings["block_check"]["settings"][recipe_id]
         long_data = prepare_long_context_data(
             context, settings, output_dir, artifact, int(recipe["calibration_context"]) == 8192
         )
@@ -1720,7 +1869,7 @@ def train(args, settings, config_path):
         reproduction = (
             arm == "fitted"
             and target in SWIGLU7_TARGETS
-            and settings["part_b"]["fitting_recipe"] == CURRENT_RECIPE
+            and settings["part_b"]["fitting_recipe"] == CURRENT_SETTING
         )
         reference_history = (
             swiglu7_run(settings, args.swiglu7_root, target)["results"]["recovery"]["validation_history"]

@@ -70,6 +70,7 @@
     },
     "sequence_length": 8192,
     "kl_sequences": 24,
+    "selection_sequences": 24,
     "calibration_sequences": 48,
     "validation_sequences": 1
   },
@@ -93,18 +94,25 @@
   "block_check": {
     "layers": [3, 11, 19],
     "width_ratios": [0.25, 0.5],
-    "recipes": {
-      "cur-s21": {"method": "gradient", "learning_rate": 0.001, "scheduler": "constant", "seed": 21, "calibration_context": 128},
-      "cur-s22": {"method": "gradient", "learning_rate": 0.001, "scheduler": "constant", "seed": 22, "calibration_context": 128},
-      "c3e-4": {"method": "gradient", "learning_rate": 0.0003, "scheduler": "constant", "seed": 21, "calibration_context": 128},
-      "c1e-4": {"method": "gradient", "learning_rate": 0.0001, "scheduler": "constant", "seed": 21, "calibration_context": 128},
-      "cos1e-3": {"method": "gradient", "learning_rate": 0.001, "scheduler": "cosine", "seed": 21, "calibration_context": 128},
-      "cos3e-4": {"method": "gradient", "learning_rate": 0.0003, "scheduler": "cosine", "seed": 21, "calibration_context": 128},
-      "cos1e-4": {"method": "gradient", "learning_rate": 0.0001, "scheduler": "cosine", "seed": 21, "calibration_context": 128},
-      "ols": {"method": "least_squares", "calibration_context": 128},
-      "ctx8k": {"method": "gradient", "learning_rate": 0.001, "scheduler": "constant", "seed": 21, "calibration_context": 8192}
+    "seeds": [21, 22, 23],
+    "settings": {
+      "c1e-3-128": {"method": "gradient", "calibration_context": 128, "learning_rate": 0.001, "scheduler": "constant", "batch_size": 2048, "max_epochs": 64, "early_stopping_patience": 3},
+      "c3e-4-128": {"method": "gradient", "calibration_context": 128, "learning_rate": 0.0003, "scheduler": "constant", "batch_size": 2048, "max_epochs": 64, "early_stopping_patience": 3},
+      "c1e-4-128": {"method": "gradient", "calibration_context": 128, "learning_rate": 0.0001, "scheduler": "constant", "batch_size": 2048, "max_epochs": 64, "early_stopping_patience": 3},
+      "cos1e-3-128": {"method": "gradient", "calibration_context": 128, "learning_rate": 0.001, "scheduler": "cosine", "batch_size": 2048, "max_epochs": 32, "early_stopping_patience": 32},
+      "cos3e-4-128": {"method": "gradient", "calibration_context": 128, "learning_rate": 0.0003, "scheduler": "cosine", "batch_size": 2048, "max_epochs": 32, "early_stopping_patience": 32},
+      "cos1e-4-128": {"method": "gradient", "calibration_context": 128, "learning_rate": 0.0001, "scheduler": "cosine", "batch_size": 2048, "max_epochs": 32, "early_stopping_patience": 32},
+      "c1e-3-8k": {"method": "gradient", "calibration_context": 8192, "learning_rate": 0.001, "scheduler": "constant", "batch_size": 2048, "max_epochs": 64, "early_stopping_patience": 3},
+      "c3e-4-8k": {"method": "gradient", "calibration_context": 8192, "learning_rate": 0.0003, "scheduler": "constant", "batch_size": 2048, "max_epochs": 64, "early_stopping_patience": 3},
+      "c1e-4-8k": {"method": "gradient", "calibration_context": 8192, "learning_rate": 0.0001, "scheduler": "constant", "batch_size": 2048, "max_epochs": 64, "early_stopping_patience": 3},
+      "cos1e-3-8k": {"method": "gradient", "calibration_context": 8192, "learning_rate": 0.001, "scheduler": "cosine", "batch_size": 2048, "max_epochs": 32, "early_stopping_patience": 32},
+      "cos3e-4-8k": {"method": "gradient", "calibration_context": 8192, "learning_rate": 0.0003, "scheduler": "cosine", "batch_size": 2048, "max_epochs": 32, "early_stopping_patience": 32},
+      "cos1e-4-8k": {"method": "gradient", "calibration_context": 8192, "learning_rate": 0.0001, "scheduler": "cosine", "batch_size": 2048, "max_epochs": 32, "early_stopping_patience": 32},
+      "c1e-3-128-b256": {"method": "gradient", "calibration_context": 128, "learning_rate": 0.001, "scheduler": "constant", "batch_size": 256, "max_epochs": 64, "early_stopping_patience": 3},
+      "ols-128": {"method": "least_squares", "calibration_context": 128},
+      "ols-8k": {"method": "least_squares", "calibration_context": 8192}
     },
-    "adoption": {"deciding_context": 8192, "minimum_mean_reduction": 0.05, "maximum_combination_increase": 0.05}
+    "adoption": {"deciding_context": 8192, "minimum_mean_reduction": 0.05, "maximum_combination_increase": 0.05, "seed_noise": "sum of the two settings' sample seed standard deviations over the current mean"}
   },
   "allocation": {
     "eligible_layers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],

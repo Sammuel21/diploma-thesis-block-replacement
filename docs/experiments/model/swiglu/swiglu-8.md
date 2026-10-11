@@ -22,7 +22,8 @@ reference_artifacts:
 
 # SwiGLU-8 - Local-Fitting Attribution and Homogeneous Control Spectrum
 
-**Status:** design settled on 2026-10-10; implemented on 2026-10-11 (see
+**Status:** design settled on 2026-10-10; implemented on 2026-10-11, with
+Part A expanded the same day into a configuration-selection study (see
 [Implementation](#implementation)). No runs yet. The binding decisions are
 recorded in the [shared decision log](../../../agents/decisions.md); this page
 explains them. If this page and the log disagree, the log wins until the
@@ -78,45 +79,55 @@ that the 8K recipe tests; it has not been checked for SmolLM2.
 
 | Part | What it does | Decides |
 | --- | --- | --- |
-| A. Block check | Compares local-fitting recipes on three layers and two widths | Which fitting recipe the model runs use |
+| A. Block check | Compares local-fitting settings on three layers and two widths, with three seeds | Which fitting setting the model runs use, and why |
 | B. Model runs | Slice-only and fitted models at eight targets, recovered to 100M tokens | Whether local fitting matters after recovery; the homogeneous control spectrum |
 
 Part B's token-0 checkpoint is the before-recovery comparison; there is no
 separate stage for it.
 
-## Part A - block-level fit check
+## Part A - local-fitting configuration selection
 
-> **Superseded on 2026-10-11, not yet implemented.** Part A is being expanded
-> into a configuration-selection study: a full context × schedule ×
-> learning-rate grid, a batch-256 check, three seeds, a multi-seed adoption
-> rule, and a separate 8K selection stream. The decision log is
-> authoritative. This section and the runner still describe the original nine
-> recipes and will be updated with the implementation.
+Part A is a configuration-selection study for the local-fitting recipe
+(decision log, 2026-10-11). Besides choosing the setting Part B uses, it gives
+the thesis's operator chapter the evidence for *why* each local-fitting
+setting was chosen. The notebook's "Why these local-fitting settings" section
+reports it.
 
 **Scope:** layers 3, 11, and 19 (early, tolerant middle, sensitive late) at
 widths 0.25 and 0.5. Layers 1, 7, and 22 are excluded because their very large
 activations make them atypical.
 
-**Stage 1 recipes**, each fitted at every layer-width combination:
+**Stage 1 settings**, each fitted at every layer-width combination:
 
-| Recipe | Learning rate | Schedule | Purpose |
-| --- | --- | --- | --- |
-| Current, fitted twice with different seeds | `1e-3` | Constant | Reference and seed-to-seed variation |
-| Lower constant rate | `3e-4`, `1e-4` | Constant | Overfitting at wider widths |
-| Decay only | `1e-3` | Cosine over 64 epochs | Slow fits at 0.25 |
-| Lower rate plus decay | `3e-4`, `1e-4` | Cosine over 64 epochs | Both effects together |
-| Exact down-projection refit | None | None | Best possible output matrix for the chosen neurons, by ordinary least squares |
-| 8K-context calibration | `1e-3` | Constant | Context length only; other settings match the current recipe |
+| Settings | Training context | Schedule | Learning rate | Question |
+| --- | --- | --- | --- | --- |
+| `c1e-3-128`, `c3e-4-128`, `c1e-4-128` | 128 | Constant, at most 64 epochs, patience 3 | `1e-3`, `3e-4`, `1e-4` | Is SwiGLU-7's rate (`c1e-3-128`, the reference) too high? |
+| `cos1e-3-128`, `cos3e-4-128`, `cos1e-4-128` | 128 | Cosine over a fixed 32 epochs, best epoch kept | same | Does a decaying rate help the fit settle? |
+| The six settings above with `-8k` | 8,192 | as above | same | Does 8K training context help, and at which rate? |
+| `c1e-3-128-b256` | 128 | Constant | `1e-3`, batch 256 | Does the batch-2,048 choice hold for teacher-slice fits? |
+| `ols-128`, `ols-8k` | 128, 8,192 | None | None | Does the exact least-squares down projection beat gradient training? |
 
-That is nine fits per combination and 54 in total. Shared settings follow
-SwiGLU-7: AdamW, batch 2,048, zero weight decay, at most 64 epochs,
-early-stopping patience 3, 393,216 calibration pairs, importance-ranked
-teacher-subset initialization, MSE objective. Batch size is not varied; the
-[operator-distillation study](../../block/operator/operator-distillation.md#2-operator-batch-size-screen)
-found that batch 256 reaches the same fit as 2,048 when trained to early
-stopping. Constant and cosine variants are
-tested separately so that the effect of the rate and the effect of the
-schedule are not confounded.
+Every gradient setting runs with seeds 21, 22, and 23; least squares has no
+randomness and runs once. That is 41 setting-seed runs and 246 fits. Seeds
+change only the order of training batches. Shared settings follow SwiGLU-7:
+AdamW, zero weight decay, 393,216 calibration pairs, importance-ranked
+teacher-subset initialization, and an MSE objective. Batch is 2,048 except in
+the batch check.
+
+Cosine runs use a fixed 32-epoch decay because SwiGLU-7's fits stop early: a
+64-epoch cosine would barely decay before early stopping. 32 covers SwiGLU-7's
+longest fit at these combinations (best epoch 32). Their patience equals the
+epoch budget, so they never stop early.
+
+**Earlier evidence**, reported alongside and not retested:
+
+- **Batch 2,048:** in the
+  [operator-distillation study](../../block/operator/operator-distillation.md#2-operator-batch-size-screen),
+  batch 256 reaches the same fit when trained to early stopping.
+- **393,216 calibration pairs:** chosen in SwiGLU-3, where
+  98,304 → 196,608 → 393,216 pairs each improved the allocation-selection KL.
+- **Importance-ranked teacher slice:** the operator-distillation
+  initialization study.
 
 **Stage 2**, only if stage 1 leaves the wider widths overfitting:
 
@@ -126,16 +137,39 @@ schedule are not confounded.
 - 786,432 calibration pairs, twice the SwiGLU-7 count.
 
 **Evaluation:** single-block KL, meaning the teacher KL when only that block
-is replaced. It is measured at 128 tokens on SwiGLU-7's allocation-selection
-partition and at 8,192 tokens on Quantization-1's 8K KL definition, so the
-128-token measurement does not favor the 128-token fit. NMSE is reported
-alongside, but it is not the selection criterion, because a few
-large-magnitude tokens dominate it.
+is replaced, at 128 and at 8,192 tokens. NMSE is reported alongside, but it
+is not the selection criterion, because a few large-magnitude tokens dominate
+it.
 
-**Adoption rule:** a new recipe is used in Part B only if it reduces
-single-block KL by more than 5% and by more than the seed-to-seed variation
-of the current recipe, on average across the six combinations, without being
-clearly worse in any. Otherwise Part B uses the current recipe.
+**Selection data is separate from final-evaluation data** (decision log,
+2026-10-11).
+
+| Data | Used for | Final evaluation? |
+| --- | --- | --- |
+| 128-token calibration pairs (393,216) and operator validation (6,144) | Training and early stopping at 128 | No |
+| 128-token allocation selection (3,072 tokens) | Single-block KL at 128; width allocation | No |
+| 8K calibration (48 × 8,192) and validation (1 × 8,192) streams | Training and early stopping at 8K | No |
+| 8K selection stream (24 × 8,192) | Single-block KL at 8K, the deciding score | No |
+| Quantization-1's 8K KL stream (24 × 8,192) | Final 8K KL at 100M | Yes |
+
+All 8K streams use Quantization-1's protocol and packing. They come from
+consecutive, non-overlapping C4 shard-0 documents, and they skip every
+document that supplied a 128-token window. Part A never scores on the KL
+stream, so the final 8K comparison is not used to choose the recipe.
+
+**Adoption rule:** each setting is summarized by its seed mean and sample
+standard deviation per combination. A setting is adopted only if all of the
+following hold:
+
+- averaged over the six combinations, its 8K single-block KL is more than 5%
+  below the current setting's seed mean;
+- that reduction is larger than the mean seed noise, defined per combination
+  as the two settings' standard deviations added together and divided by the
+  current mean;
+- no combination is more than 5% worse at 128 or at 8K.
+
+The largest qualifying 8K reduction wins; otherwise Part B keeps SwiGLU-7's
+recipe. Part B fits with seed 21.
 
 ## Part B - model runs at 100M tokens
 
@@ -203,7 +237,9 @@ comparisons are promoted to 1B-token recovery.
    runs anyway.
 2. **8K data overlap.** Quantization-1's 8K KL uses C4 train shard 0, which is
    also SwiGLU-7's calibration source. The 8K calibration sequences in Part A
-   must be drawn disjointly from the 8K KL evaluation sequences.
+   must be drawn disjointly from the 8K KL evaluation sequences. Since
+   2026-10-11, Part A's 8K score also uses its own selection stream, so no
+   choice is made on final-evaluation data.
 3. **Shared neuron selection (decided 2026-10-10).** SwiGLU-7's artifacts
    record widths but not which neurons were selected. SwiGLU-8 therefore
    selects neurons once per target with SwiGLU-7's importance score, saves the
@@ -246,11 +282,11 @@ not billing:
 
 | Item | Estimated H200-hours |
 | --- | ---: |
-| Part A, stage 1 (54 fits plus evaluation) | 2-4 |
+| Part A, stage 1 (246 fits plus evaluation) | 12-23 |
 | Part A, stage 2, if needed | 1-2 |
 | Width curves extended to 0.125 and 0.0625 (full refit if a new recipe is adopted) | 2-6 |
 | Part B, 16 runs to 100M (two arms at eight targets) at about 1.2-1.5 hours each, plus about 15 minutes of final evaluation per run | 23-28 |
-| **Total** | **about 28-40** |
+| **Total** | **about 38-59** |
 
 ### Pre-run resource plan
 
@@ -259,16 +295,21 @@ Recorded 2026-10-11 under
 before any submission, and to be compared with measured use afterward. The
 evidence is SwiGLU-7's measured workflow timing: S7-0 trained 100M tokens in
 3,541-3,775 s, final evaluation took 805-846 s, and peak usage was 8.9 GiB RAM
-and 33.5 GiB VRAM. Confidence is medium. The main uncertainty is how many
-epochs the 512- and 1024-wide fits and the low-learning-rate recipes need.
+and 33.5 GiB VRAM. SwiGLU-7's six fits at the Part A combinations took 380 s
+together, about 4.4 s per epoch. Confidence is medium. The main uncertainties
+are how many epochs the 512- and 1024-wide fits and the low-learning-rate
+settings need, and the time to score each fit (single-block KL at 128 and 8K),
+which SwiGLU-7 did not record; it is estimated at 1-2 minutes per fit.
+Block-check keeps each fit's state on SCRATCH, about 75 MB on average across
+the 246 fits.
 
 | Stage | Tasks | Request per task | Expected elapsed | Expected GPU-h | Ceiling GPU-h | CPU core-h | Peak RAM / VRAM | Storage |
 | --- | ---: | --- | --- | ---: | ---: | ---: | --- | --- |
-| A: `block-check` | 1 | gpu_short, 1 H200, 8 CPU, 128 GB, 8 h | 1.5-3 h | 1.5-3 | 8 | 12-24 | ≤ 50 GB / ≤ 40 GB | PROJECT < 0.1 GB; SCRATCH ~20 GB |
+| A: `block-check` | 1 | gpu_short, 1 H200, 8 CPU, 128 GB, 36 h | 12-23 h | 12-23 | 36 | 96-184 | ≤ 50 GB / ≤ 40 GB | PROJECT < 0.1 GB; SCRATCH ~40 GB |
 | A2: stage 2 (only if triggered) | 1 | same, 6 h | 1-2 h | 1-2 | 6 | 8-16 | same | same |
 | B0: `prepare` | 1 | gpu_short, 1 H200, 8 CPU, 128 GB, 24 h | 3-6 h (recipe unchanged); 4-8 h (refit) | 3-8 | 24 | 24-64 | ≤ 60 GB / ≤ 40 GB | PROJECT ~25 GB (16 FP32 starts and 0.5 GB data); SCRATCH ~40 GB |
 | B1: `train` | 16 (tasks 0-3, then 4-15) | gpu_short, 1 H200, 8 CPU, 128 GB, 6 h | 1.2-1.5 h each | 20-24 | 96 | 160-190 | 8.9 GiB / 33.5 GiB (S7-0) | PROJECT ~38 GB (bundles and benchmarks); SCRATCH ≤ 20 GB per task |
-| **Total** | 19-20 | | Critical path ~1-2 days plus queue and review gates | **about 26-37** | 128-134 | 200-290 | | PROJECT ~63 GB new |
+| **Total** | 19-20 | | Critical path ~2-3 days plus queue and review gates | **about 35-55** | 156-162 | 280-440 | | PROJECT ~63 GB new |
 
 Before each submission, check `perunfsusage` against the 1 TB PROJECT
 allocation and the totals in
@@ -296,25 +337,28 @@ SwiGLU-7 source artifacts by sha256.
 
 | Command | Does | Output |
 | --- | --- | --- |
-| `block-check` | Part A: the 54 fits, unfitted slices, single-block KL at 128 and 8K, NMSE on both validation sets, the adoption decision, and the stage-2 indicator | `block-check-001/` |
-| `prepare` | Part B: neuron rankings, curve extension or refit, allocation, start fits, and the 16 token-zero starts; it refuses unless `part_b` names the block check's adopted recipe and its sha256 | `prepare-001/` |
+| `block-check` | Part A: 246 fits (15 settings; three seeds for each gradient setting), unfitted slices, single-block KL at 128 and on the 8K selection stream, NMSE on both validation sets, the multi-seed adoption decision, and the stage-2 indicator; resumes per completed fit | `block-check-001/` |
+| `prepare` | Part B: neuron rankings, curve extension or refit, allocation, start fits with the adopted setting at seed 21, and the 16 token-zero starts; it refuses unless `part_b` names the block check's adopted setting and its sha256 | `prepare-001/` |
 | `train --arm --target` | S7-0 recovery to 100M, monitoring at 0/10/25/50/75/100M, the full SwiGLU-7 final evaluation, and the 8K KL of the reloaded BF16 bundle | `{fitted,slice}-target-{t}-run-001/` |
 
 **Shared code.**
 - The 8K KL lives in `src/mlp_replacement/evaluation/teacher_kl.py`, shared with
   Quantization-1.
 - `fit_operator_fp32_detailed` accepts a cosine schedule, decayed once per
-  epoch over the 64-epoch budget.
+  epoch over the fit's epoch budget (32 epochs in Part A).
 - `refit_down_projection_least_squares` solves the FP64 normal equations
-  without regularization.
+  without regularization. The runner records a least-squares fit like a
+  gradient fit (saved state and metrics), so Part B can use it if it is
+  adopted.
 - `sample_partitioned_windows` can report each window's source record.
 - SwiGLU-7's `persist` and `evaluate_final_model` take the workflow name from
   the artifact, so SwiGLU-7's own outputs are unchanged.
 
 **Data.**
-- The 8K fitting streams use shard-0 records after the last 8K-KL document and
-  skip every record that supplied a 128-token window. A byte check confirms
-  that the indexed shard reproduces the KL stream.
+- The 8K calibration, validation, and selection streams follow the last
+  8K-KL document in that order and skip every record that supplied a
+  128-token window. A hard check stops the job if any two share a document.
+  A byte check confirms that the indexed shard reproduces the KL stream.
 - The block check also reports how many 128-token windows came from 8K-KL
   documents. That overlap already existed in SwiGLU-7.
 - The selection never depends on the recipe; the 8K recipe reuses the
@@ -341,13 +385,22 @@ that catch a wrong selection, wrong data, or a changed environment before the
 expensive stages run. B1, B2, and P2 apply only while the current recipe is
 kept.
 
-**Not yet verified.** Contract tests cover the configuration, the adoption
-rule, the acceptance comparisons, the selection fingerprint, the 8K data
-disjointness, the cosine schedule, the least-squares refit, and the job
-mapping. Offline, the allocation code rebuilds SwiGLU-7's 20-50% widths
-exactly from its recorded curves. GPU execution, real data streams, and
-the acceptance checks themselves have not run; the first real stages are
-also the first execution test.
+**Not yet verified.** Contract tests cover:
+
+- the configuration and the Part A grid;
+- the multi-seed adoption rule and the stage-2 indicator;
+- the acceptance comparisons and the selection fingerprint;
+- the document disjointness of the three 8K streams;
+- the settings reaching the fitting code;
+- the cosine schedule and the least-squares refit;
+- the job mapping.
+
+Offline, the allocation code rebuilds SwiGLU-7's 20-50% widths exactly from
+its recorded curves. The notebook's Part A cells were also run once against a
+synthetic block-check result, which checks field names and table code only,
+not science. GPU execution, real data streams, and the acceptance checks
+themselves have not run; the first real stages are also the first execution
+test.
 
 ## Sources and attribution
 

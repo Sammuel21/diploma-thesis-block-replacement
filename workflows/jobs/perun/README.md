@@ -283,7 +283,7 @@ pass the stage's planned `--time` from the
 [SwiGLU-8 resource plan](../../../docs/experiments/model/swiglu/swiglu-8.md#pre-run-resource-plan).
 
 ```bash
-sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=08:00:00 \
+sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 \
   --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
   workflows/jobs/perun/swiglu_8.sbatch block-check
 
@@ -298,8 +298,9 @@ sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=0-3
   workflows/jobs/perun/swiglu_8.sbatch train "$S8_PREPARED"
 ```
 
-Preparation requires `part_b` in the configuration to name the adopted recipe
-and the sha256 of the accepted block check. Tasks `0-7` are the fitted arm and
+Preparation requires `part_b` in the configuration to name the adopted Part A
+setting and the sha256 of the accepted block check. Block-check resumes per
+completed fit with `block-check --resume`. Tasks `0-7` are the fitted arm and
 `8-15` the slice-only arm, each at targets 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75,
 and 0.8. Submit tasks `0-3` first (the fitted 20-50% reproduction check), then
 `--array=4-15`. A training task stages the shared prepared inputs and only its
