@@ -86,6 +86,13 @@ separate stage for it.
 
 ## Part A - block-level fit check
 
+> **Superseded on 2026-10-11, not yet implemented.** Part A is being expanded
+> into a configuration-selection study: a full context × schedule ×
+> learning-rate grid, a batch-256 check, three seeds, a multi-seed adoption
+> rule, and a separate 8K selection stream. The decision log is
+> authoritative. This section and the runner still describe the original nine
+> recipes and will be updated with the implementation.
+
 **Scope:** layers 3, 11, and 19 (early, tolerant middle, sensitive late) at
 widths 0.25 and 0.5. Layers 1, 7, and 22 are excluded because their very large
 activations make them atypical.

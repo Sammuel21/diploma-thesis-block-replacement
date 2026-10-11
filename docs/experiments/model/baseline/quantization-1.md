@@ -45,9 +45,11 @@ has no Quantization-1 job.
   on GPU model, driver, and software instead, or to measure all variants'
   speed in one job. Speed is an optional measurement in the project's
   evaluation scope.
-- **Open: QAT budget.** One billion tokens was discussed as a budget
-  comparable with SwiGLU recovery but was not selected or enabled. Equal
-  tokens do not mean equal compute or total preparation cost.
+- **Decided 2026-10-11: QAT budget.** QAT runs for INT4 only, at 100M and at
+  1B tokens, as two separate runs from token 0 (decision log). INT8 gets PTQ
+  only. Equal tokens do not mean equal compute or total preparation cost.
+  The deployment plan still has to cover the 1B recovery stream and the
+  resource plan.
 - **Not measurements:** run-time estimates discussed during implementation
   were extrapolated from SwiGLU artifacts, not measured for Quantization-1.
 - **Shared 8K KL (decided 2026-10-10, moved 2026-10-11):** the KL stream
