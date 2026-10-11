@@ -110,20 +110,27 @@ serving-engine tuning. Activation calibration and PTQ training counts are zero.
   Triton 3.6.0, and LM Evaluation Harness 0.4.13, matching the observed
   SwiGLU-7 production software stack. The run records installed versions.
 
-Install in a separate environment, not over the original SwiGLU environment:
+Install in a separate environment, not over the original SwiGLU environment.
+On PERUN use a Conda environment, as for SwiGLU:
 
 ```bash
-python3.12 -m venv "$QUANTIZATION_ENV"
-source "$QUANTIZATION_ENV/bin/activate"
-python -m pip install -r workflows/environments/quantization-1-requirements.txt
+source ~/miniconda3/etc/profile.d/conda.sh
+conda create -y -n quantization-1 python=3.12
+conda activate quantization-1
+python -m pip install --no-cache-dir -r workflows/environments/quantization-1-requirements.txt
 python -m pip check
 export MLP_REPLACEMENT_PYTHON="$(command -v python)"
 ```
 
-Set `QUANTIZATION_ENV` to a persistent environment directory first. Source
-inspection and version compatibility do not establish that kernels execute
-correctly on a particular GPU; the intended full scientific run must verify
-that. Unsupported kernels or incomplete conversion raise errors.
+Do not use a standard `venv` with the PERUN launchers. A venv's `python` is a
+symlink, and the launchers resolve the interpreter's real path. Python then
+starts outside the venv and silently uses the base installation's packages.
+The [PERUN runbook](../../../infrastructure/perun/perun-runbook.md) has the
+complete setup and checks. Source inspection and version compatibility do not
+establish that kernels execute correctly on a particular GPU; the intended full
+scientific run must verify that. Unsupported kernels or incomplete conversion
+raise errors. Each PERUN job checks the TorchAO and MSLK versions and CUDA
+access before it takes its output lock.
 
 ## Commands and artifacts
 
@@ -295,7 +302,12 @@ sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
 ```
 
 The same launcher accepts `prepare OUTPUT_NAME` and `evaluate OUTPUT_NAME`.
-Reporting can run locally from retained results. Persistent environment/cache
+Its `run-array` mode with `--array=0-4` starts the five decided models in one
+submission: dense BF16, PTQ INT8, PTQ INT4, QAT INT4 at 100M tokens, and QAT
+INT4 at 1B tokens (decision log, 2026-10-11). The full mapping and commands
+are in the [PERUN runbook](../../../infrastructure/perun/perun-runbook.md#4-quantization-1).
+`prepare` uses no GPU and belongs on a CPU partition. Reporting can run locally
+from retained results. Persistent environment/cache
 paths are supplied through `MLP_REPLACEMENT_PYTHON` and `HF_HOME`.
 
 **Pre-run resource plan:** one independent process/GPU per variant, serial

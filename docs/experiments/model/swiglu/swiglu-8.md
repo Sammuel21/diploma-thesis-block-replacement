@@ -308,7 +308,7 @@ the 246 fits.
 | A: `block-check` | 1 | gpu_short, 1 H200, 8 CPU, 128 GB, 36 h | 12-23 h | 12-23 | 36 | 96-184 | ≤ 50 GB / ≤ 40 GB | PROJECT < 0.1 GB; SCRATCH ~40 GB |
 | A2: stage 2 (only if triggered) | 1 | same, 6 h | 1-2 h | 1-2 | 6 | 8-16 | same | same |
 | B0: `prepare` | 1 | gpu_short, 1 H200, 8 CPU, 128 GB, 24 h | 3-6 h (recipe unchanged); 4-8 h (refit) | 3-8 | 24 | 24-64 | ≤ 60 GB / ≤ 40 GB | PROJECT ~25 GB (16 FP32 starts and 0.5 GB data); SCRATCH ~40 GB |
-| B1: `train` | 16 (tasks 0-3, then 4-15) | gpu_short, 1 H200, 8 CPU, 128 GB, 6 h | 1.2-1.5 h each | 20-24 | 96 | 160-190 | 8.9 GiB / 33.5 GiB (S7-0) | PROJECT ~38 GB (bundles and benchmarks); SCRATCH ≤ 20 GB per task |
+| B1: `train` | 16 (one array, tasks 0-15) | gpu_short, 1 H200, 8 CPU, 128 GB, 6 h | 1.2-1.5 h each | 20-24 | 96 | 160-190 | 8.9 GiB / 33.5 GiB (S7-0) | PROJECT ~38 GB (bundles and benchmarks); SCRATCH ≤ 20 GB per task |
 | **Total** | 19-20 | | Critical path ~2-3 days plus queue and review gates | **about 35-55** | 156-162 | 280-440 | | PROJECT ~63 GB new |
 
 Before each submission, check `perunfsusage` against the 1 TB PROJECT
@@ -325,7 +325,9 @@ Implemented on 2026-10-11 without any run. Runner:
 Configuration:
 [`swiglu-8.json`](../../../../workflows/configs/model/swiglu/swiglu-8.json).
 PERUN job: [`swiglu_8.sbatch`](../../../../workflows/jobs/perun/swiglu_8.sbatch),
-with commands in the [PERUN job README](../../../../workflows/jobs/perun/README.md#swiglu-8-workflow).
+described in the [PERUN job README](../../../../workflows/jobs/perun/README.md#swiglu-8-workflow).
+The copy-paste commands for every stage are in the
+[PERUN runbook](../../../infrastructure/perun/perun-runbook.md#3-swiglu-8).
 Analysis: the load-only
 [`swiglu-8.ipynb`](../../../../notebooks/model/swiglu/swiglu-8.ipynb), which
 applies the decided Part B interpretation in code. It reads the local copy

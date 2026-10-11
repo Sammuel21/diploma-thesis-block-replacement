@@ -281,39 +281,33 @@ stage reads its pinned SwiGLU-7 sources read-only from
 `PROJECT/perun-results/swiglu-7/`. Each submission needs the researcher's go;
 pass the stage's planned `--time` from the
 [SwiGLU-8 resource plan](../../../docs/experiments/model/swiglu/swiglu-8.md#pre-run-resource-plan).
-
-```bash
-sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 \
-  --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-  workflows/jobs/perun/swiglu_8.sbatch block-check
-
-sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=24:00:00 \
-  --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-  workflows/jobs/perun/swiglu_8.sbatch prepare \
-  "$PERUN_PROJECT/perun-results/swiglu-8/block-check-001/result.json"
-
-export S8_PREPARED="$PERUN_PROJECT/perun-results/swiglu-8/prepare-001/result.json"
-sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=0-3 \
-  --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-  workflows/jobs/perun/swiglu_8.sbatch train "$S8_PREPARED"
-```
+The copy-paste commands for every stage, with checks before and after each
+submission, are in the
+[PERUN runbook](../../../docs/infrastructure/perun/perun-runbook.md#3-swiglu-8).
 
 Preparation requires `part_b` in the configuration to name the adopted Part A
 setting and the sha256 of the accepted block check. Block-check resumes per
 completed fit with `block-check --resume`. Tasks `0-7` are the fitted arm and
 `8-15` the slice-only arm, each at targets 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75,
-and 0.8. Submit tasks `0-3` first (the fitted 20-50% reproduction check), then
-`--array=4-15`. A training task stages the shared prepared inputs and only its
+and 0.8. All 16 are submitted as one array (`--array=0-15`). Tasks `0-3` (the
+fitted 20-50% runs) check the SwiGLU-7 reproduction at every monitoring point
+and stop themselves on a mismatch. A training task stages the shared prepared inputs and only its
 own start file. Resume one task with `train --resume "$S8_PREPARED"` and the
 same `--array` index.
 
 ## Results and logs
 
 [quantization_1.sbatch](quantization_1.sbatch) submits one explicitly selected
-Quantization-1 prepare/run/evaluate job. It stages supplied inputs, locks the
-chosen output, and verifies durable stage-out before scratch cleanup. It uses
-the separate pinned quantization environment and does not rely on
-`.rsyncignore`. See the
+Quantization-1 prepare/run/evaluate job. Alternatively, `run-array` with
+`--array=0-4` starts the five decided models in one submission. The tasks map,
+in order, to dense BF16, PTQ INT8, PTQ INT4, QAT INT4 at 100M tokens, and QAT
+INT4 at 1B tokens, with outputs `dense-001`, `int8-001`, `int4-001`,
+`qat-int4-100m-001`, and `qat-int4-1b-001`. Each task is still one experiment
+in one process. Before it locks the chosen output, it
+checks CUDA and the pinned TorchAO and MSLK versions, so a broken environment
+fails without leaving a lock. It stages supplied inputs and verifies durable
+stage-out before scratch cleanup. It uses the separate pinned quantization
+Conda environment and does not rely on `.rsyncignore`. See the
 [Quantization-1 guide](../../../docs/experiments/model/baseline/quantization-1.md)
 for submission, resource-planning, and resume requirements.
 

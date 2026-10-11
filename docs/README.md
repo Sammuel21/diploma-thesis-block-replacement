@@ -5,7 +5,7 @@ type: index
 category: documentation
 status: active
 created: 2026-07-17
-modified: 2026-10-10
+modified: 2026-10-11
 authorship:
   created_by: unknown
 curation:
@@ -66,11 +66,9 @@ Markdown files in this directory follow the
 - [TUKE Perun workflow infrastructure](infrastructure/perun/perun.md) records the
   stable access, Slurm, storage, environment, scratch, and artifact contracts
   for unattended Perun workflows.
-- [TUKE Perun deployment template](infrastructure/perun/perun-deployment.md)
-  provides a workflow-neutral blueprint for setup, submission, monitoring,
-  result retrieval, failure capture, and cleanup verification.
-- [TUKE Perun command cheat sheet](infrastructure/perun/perun-cheatsheet.md)
-  collects short commands for routine cluster operation and troubleshooting.
+- [TUKE Perun runbook](infrastructure/perun/perun-runbook.md) holds the
+  copy-paste commands for setup, every login, SwiGLU-8 and Quantization-1
+  submission, monitoring, failure handling, and copying results home.
 - [TUKE Perun project status](infrastructure/perun/perun-status.md) tracks current
   readiness, available capacity, cumulative consumption, and open questions.
 - [TUKE Perun experiment log](infrastructure/perun/perun-log.md) is the append-only

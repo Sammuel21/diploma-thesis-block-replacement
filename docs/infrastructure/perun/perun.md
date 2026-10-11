@@ -5,7 +5,7 @@ type: architecture
 category: infrastructure/perun
 status: active
 created: 2026-09-11
-modified: 2026-09-29
+modified: 2026-10-11
 authorship:
   created_by: collaborative
 curation:
@@ -31,14 +31,18 @@ It records three different kinds of information:
 Current project readiness, available capacity, and cumulative use belong in
 the [Perun status](perun-status.md). Individual submitted jobs and their
 measured allocations belong in the append-only [Perun experiment
-log](perun-log.md). Copyable production commands belong in the [Perun
-deployment template](perun-deployment.md); short operational commands belong
-in the [Perun cheat sheet](perun-cheatsheet.md). Every Perun experiment must
+log](perun-log.md). Copy-paste commands, from login and setup to submission,
+monitoring, failure handling, and copying results home, belong in the [Perun
+runbook](perun-runbook.md). Every Perun experiment must
 follow the [resource planning and accounting
 contract](perun-resources.md), which separates estimates, requested capacity,
 scheduler allocation, workflow timing, observed utilization, and storage.
 
-The official documentation was last checked on 2026-09-27. Perun policies and
+The official documentation was last checked on 2026-10-11, now at
+[wiki.hpc.tuke.sk](https://wiki.hpc.tuke.sk/perun/perun/). That check covered
+storage, partitions, the example scripts, job states, Conda, connecting, data
+transfer, `perunfsusage`, and `gpu-status`. The rules the project follows are
+summarized at the top of the [runbook](perun-runbook.md). Perun policies and
 available software can change, so recheck the linked pages before changing
 partitions, resource limits, storage assumptions, or environment setup.
 

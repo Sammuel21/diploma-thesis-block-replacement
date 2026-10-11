@@ -5,7 +5,7 @@ type: procedure
 category: infrastructure/perun
 status: active
 created: 2026-09-29
-modified: 2026-09-29
+modified: 2026-10-11
 authorship:
   created_by: collaborative
 curation:
@@ -146,6 +146,6 @@ sequence and preserve `Unknown` values rather than manufacturing measurements.
 ## Related documentation
 
 - [PERUN operating contract](perun.md)
-- [PERUN deployment blueprint](perun-deployment.md)
+- [PERUN runbook](perun-runbook.md)
 - [PERUN experiment log](perun-log.md)
 - [PERUN project status](perun-status.md)
