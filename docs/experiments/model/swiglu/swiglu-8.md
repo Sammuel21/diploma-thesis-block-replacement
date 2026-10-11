@@ -24,7 +24,9 @@ reference_artifacts:
 
 **Status:** design settled on 2026-10-10; implemented on 2026-10-11, with
 Part A expanded the same day into a configuration-selection study (see
-[Implementation](#implementation)). No runs yet. The binding decisions are
+[Implementation](#implementation)). Part A ran on PERUN on 2026-10-11 and kept
+SwiGLU-7's recipe (see [Part A results](#part-a-results-2026-10-11)). Part B
+has not run yet. The binding decisions are
 recorded in the [shared decision log](../../../agents/decisions.md); this page
 explains them. If this page and the log disagree, the log wins until the
 conflict is raised with the researcher.
@@ -129,7 +131,8 @@ epoch budget, so they never stop early.
 - **Importance-ranked teacher slice:** the operator-distillation
   initialization study.
 
-**Stage 2**, only if stage 1 leaves the wider widths overfitting:
+**Stage 2** (deferred on 2026-10-11; see the results below), only if stage 1
+leaves the wider widths overfitting:
 
 - a penalty keeping weights near the copied teacher slice, at a weak and a
   strong setting (the L2-SP method; Li et al., ICML 2018, to be registered
@@ -170,6 +173,83 @@ following hold:
 
 The largest qualifying 8K reduction wins; otherwise Part B keeps SwiGLU-7's
 recipe. Part B fits with seed 21.
+
+### Part A results (2026-10-11)
+
+The block check ran as PERUN array 105196: 15 tasks, all completed. The
+login-node merge verified that every task used the same configuration, code,
+software, data streams, and neuron rankings. It wrote
+`perun-results/swiglu-8/block-check-001/result.json` (sha256
+`a268f1b0537579580eac5fe908ac6fccb06cf6912688a57a4db972fa28c32724`). The
+anchor task's checks passed: P5 (the teacher's 8K KL against itself is zero),
+A1 (slices match SwiGLU-7), and A2-A3 (`c1e-3-128` reproduces SwiGLU-7's fits
+and single-block KL). The values below were read on PERUN from that file; the
+notebook analysis follows once the results are copied home.
+
+**Outcome: no setting qualified, so Part B uses `c1e-3-128`** (decision log,
+2026-10-11).
+
+Reduction of the mean single-block KL against `c1e-3-128` (positive is
+better), averaged over the six layer-width combinations:
+
+| Setting | At 8K | At 128 | Mean seed noise | Worst combination | Why not adopted |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `c3e-4-128` | 1.18% | 0.77% | 0.32% | 0.39% | Below 5% |
+| `c1e-4-128` | 1.62% | 0.76% | 0.25% | -0.77% | Below 5% |
+| `cos1e-3-128` | -1.02% | 0.40% | 0.29% | -7.37% | Below 5%; below noise; a combination more than 5% worse |
+| `cos3e-4-128` | 1.96% | 0.70% | 0.26% | -1.65% | Below 5% |
+| `cos1e-4-128` | 2.01% | -0.57% | 0.25% | -7.13% | Below 5%; a combination more than 5% worse |
+| `c1e-3-8k` | 3.43% | -6.93% | 0.42% | -9.33% | Below 5%; a combination more than 5% worse |
+| `c3e-4-8k` | 4.17% | -6.18% | 0.28% | -8.32% | Below 5%; a combination more than 5% worse |
+| `c1e-4-8k` | 4.39% | -5.95% | 0.27% | -8.51% | Below 5%; a combination more than 5% worse |
+| `cos1e-3-8k` | 3.61% | -6.66% | 0.30% | -9.85% | Below 5%; a combination more than 5% worse |
+| `cos3e-4-8k` | 4.36% | -5.94% | 0.29% | -8.26% | Below 5%; a combination more than 5% worse |
+| `cos1e-4-8k` | 4.20% | -6.22% | 0.26% | -10.50% | Below 5%; a combination more than 5% worse |
+| `c1e-3-128-b256` | -3.82% | -4.23% | 0.78% | -6.35% | Below 5%; below noise; a combination more than 5% worse |
+| `ols-128` | -9.25% | -12.74% | 0.21% | -26.09% | Below 5%; below noise; a combination more than 5% worse |
+| `ols-8k` | -6.94% | -18.79% | 0.21% | -27.77% | Below 5%; below noise; a combination more than 5% worse |
+
+`c1e-3-128` seed means range from 0.0094 (layer 11, width 0.5, 128 tokens) to
+0.0554 (layer 19, width 0.25, 8K), with seed standard deviations of at most
+0.00027.
+
+What the numbers show:
+
+- **Seeds barely matter.** The mean seed noise is 0.2-0.8% of the KL, so
+  differences of 1-2% are real rather than chance.
+- **The recipe is on a plateau.** No setting moves the mean 8K KL by more than
+  4.4%.
+- **Lower learning rates help slightly.** `3e-4` and `1e-4` lower the 8K KL by
+  1.2-2.0% and the 128-token KL by up to 0.8%. Cosine decay adds nothing
+  beyond its learning rate, and `cos1e-3-128` is slightly worse.
+- **The fit specializes to its training context.** Fitting on 8K pairs lowers
+  the 8K KL by 3.4-4.4% but raises the 128-token KL by 5.9-6.9%; single
+  combinations are up to 10.5% worse. This is a trade-off, not an improvement.
+  It is consistent with the hypothesis that 128-token capture over-weights
+  early-position tokens, but Part A does not test that mechanism.
+- **Batch 2,048 stays.** Batch 256 is 3.8% worse at 8K and 4.2% worse at 128.
+  In the operator-distillation study, both reached the same NMSE when trained
+  to early stopping; with teacher-slice initialization and KL scoring, batch
+  256 is worse.
+- **Gradient training beats least squares.** The exact least-squares down
+  projection is 6.9-9.3% worse at 8K and 12.7-18.8% worse at 128, with single
+  combinations up to 28% worse. Minimizing the training MSE exactly transfers
+  worse to KL than gradient training with early stopping.
+
+**Stage-2 indicator: overfitting remains at width 0.5 in all three layers.**
+All nine `c1e-3-128` fits at width 0.5 reach their best validation epoch at
+epoch 3 (one at epoch 4) and stop three epochs later. Meanwhile their
+training MSE falls a further 1.4-2.3% (for example, layer 3 from 0.06786 to
+0.06636). The overfitting is mild, and early stopping already keeps the best
+epoch. **Stage 2 is deferred** until Part B shows whether local fitting
+matters after recovery (decision log, 2026-10-11). SwiGLU-3's calibration
+curve, where each doubling of calibration pairs lowered allocation KL by about
+3-4%, suggests stage 2 would also stay below the 5% bar. That is an
+indication from a different metric, not a test.
+
+**Limits.** Three layers and two widths. Single-block KL, not full-model
+quality. Seeds vary only the batch order. The 5% threshold is a judgment call
+fixed before the run.
 
 ## Part B - model runs at 100M tokens
 

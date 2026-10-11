@@ -124,8 +124,8 @@
   },
   "preparation": {"initialization": "legacy_subset", "allocation_method": "discrete_width_curve", "start_tokens": 0},
   "part_b": {
-    "fitting_recipe": null,
-    "block_check_sha256": null
+    "fitting_recipe": "c1e-3-128",
+    "block_check_sha256": "a268f1b0537579580eac5fe908ac6fccb06cf6912688a57a4db972fa28c32724"
   },
   "recovery": {
     "target_tokens": 100000000,

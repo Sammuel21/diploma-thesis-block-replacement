@@ -190,3 +190,19 @@ Entries are appended below in submission order.
 - Verification: structured status `completed`; structured error `None`; PROJECT lock absent after verified stage-out
 - Experiment document: [SwiGLU-7](../../experiments/model/swiglu/swiglu-7.md)
 - Notes: The resumed job reused prior preparation artifacts, imported the `HFLM` backend successfully, completed the pinned dense benchmark evaluations, and finalized the shared preparation artifact.
+
+## [2026-10-11 about 19:30 cluster time] 105196 | SwiGLU-8 Part A block check (array 0-14)
+
+- Plan: SwiGLU-7 fit timings, medium confidence; expected 1-3 h per task and about 2-3 h in total; expected 16-31 GPU-hours; CPU core-hours 128-248; at most 50 GB RAM and 40 GB VRAM per task; SCRATCH about 2 GB per task; PROJECT under 0.1 GB
+- Outcome: COMPLETED, all 15 tasks; exit codes Unknown; reason none
+- Submission: `workflows.runs.model.swiglu.swiglu_8`; `block-check --task-index 0-14`, one Part A setting per task; outputs `block-check-001-task-00` to `-14`
+- Provenance: commit Unknown (the PERUN checkout had pulled `llm-wiki-claude` through the parallel block check); config `workflows/configs/model/swiglu/swiglu-8.json` with `part_b` null; configuration and code hashes are recorded in every task artifact, and the merge verified that they are identical
+- Allocation: `gpu_short`; 1 node per task (`gpu02`, `gpu03`, `gpu05`, `gpu12`); 1 NVIDIA H200, 8 CPUs, and 128 GB requested memory per task; 6-hour limit
+- Consumption: tasks 0-9 started at once, 10-11 about 2 minutes later, and 12-14 after slots freed; the last task (2, `c1e-4-128`) ran for more than 59 minutes; elapsed per task Unknown here and recorded in the merged result's `tasks` list; requested GPU-hour ceiling 90; allocation GPU-hours Unknown, at most about 16 (15 tasks, none longer than about 1.1 h); CPU core-hours Unknown; MaxRSS Unknown; peak GPU memory Unknown
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
+- Outputs: PROJECT `perun-results/swiglu-8/block-check-001-task-00` to `-14`, and the login-node merge `block-check-001/result.json` (sha256 `a268f1b0537579580eac5fe908ac6fccb06cf6912688a57a4db972fa28c32724`); scheduler logs `swiglu-8_105196_<task>.out` and `.err`
+- Continuation: completed; no checkpoint
+- Verification: no task stderr contained `Traceback` or `AcceptanceFailure` during the run. The merge confirmed that all 15 tasks completed with identical configuration, code, environment, data streams, and rankings. The anchor checks P5, A1, and A2-A3 passed
+- Variance: finished in about 1.1 h instead of the planned 2-3 h. Setup, scoring, and the low-learning-rate fits were faster than estimated. Concurrency was capped at 12 running jobs (`AssocMaxJobsLimit`), after a brief `AssocGrpNodeLimit` held the first wave at 10. Plan later arrays for 12 concurrent tasks
+- Experiment document: [SwiGLU-8](../../experiments/model/swiglu/swiglu-8.md#part-a-results-2026-10-11)
+- Notes: The outcome kept `c1e-3-128` for Part B, and the stage-2 indicator fired; see the decision log, 2026-10-11.

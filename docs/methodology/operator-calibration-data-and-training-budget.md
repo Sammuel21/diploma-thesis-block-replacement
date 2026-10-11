@@ -154,6 +154,10 @@ Outcome (`operator-distillation-v4.json`): the 8-epoch screen selected batch
 2,048 reached the same held-out NMSE at every calibration size (largest
 difference 0.0045). The model workflows therefore keep batch 2,048; see
 [operator distillation, section 2](../experiments/block/operator/operator-distillation.md#2-operator-batch-size-screen).
+SwiGLU-8's Part A block check (2026-10-11) confirms the choice for
+teacher-slice fits scored by single-block KL: batch 256 was 3.8% worse at 8K
+and 4.2% worse at 128 tokens, averaged over three layers, two widths, and three
+seeds. See [SwiGLU-8, Part A results](../experiments/model/swiglu/swiglu-8.md#part-a-results-2026-10-11).
 
 The notebook screens all four batch sizes for 8 epochs, then uses the selected
 batch size in the combined calibration-size study with a maximum of 64 epochs.

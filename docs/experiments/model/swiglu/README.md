@@ -37,7 +37,7 @@ as the control for a new experiment class.
 | [SwiGLU-5](swiglu-5.md) | Efficient initialization/allocation search followed by gated confirmation | Search and both 100M confirmations completed |
 | [SwiGLU-6](swiglu-6.md) | 1B continuation, frozen final evaluation, and BF16 deployment accounting | Completed |
 | [SwiGLU-7](swiglu-7.md) | Native-8K production comparison of replacement-only, full-body, and MLP-plus-attention-LoRA retraining | Preparation and all 12 production runs completed |
-| [SwiGLU-8](swiglu-8.md) | Local-fitting attribution and the 20-80% homogeneous control spectrum at 100M tokens | Implemented; no runs |
+| [SwiGLU-8](swiglu-8.md) | Local-fitting attribution and the 20-80% homogeneous control spectrum at 100M tokens | Part A completed 2026-10-11 (SwiGLU-7 recipe kept); Part B pending |
 
 The maintained runners and configurations use the matching class directories
 under `workflows/runs/model/swiglu/` and `workflows/configs/model/swiglu/`.

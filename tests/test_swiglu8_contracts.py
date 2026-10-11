@@ -200,7 +200,7 @@ class SwiGLU8Contracts(unittest.TestCase):
             ("block_check", "seeds", None, None, [21, 22]),
             ("long_context", "selection_sequences", None, None, 12),
             ("acceptance", "fit_relative", None, None, 0.01),
-            ("part_b", "fitting_recipe", None, None, "cos1e-3-128"),
+            ("part_b", "fitting_recipe", None, None, "not-a-part-a-setting"),
             ("recovery", "learning_rate", None, None, 1e-4),
         )
         with tempfile.TemporaryDirectory() as directory:
