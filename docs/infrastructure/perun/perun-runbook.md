@@ -275,7 +275,7 @@ Three submissions, the same shape as SwiGLU-7 plus the block check in front:
 | Step | Block | Requested time | Expected | Before the next step |
 | --- | --- | --- | --- | --- |
 | Pre-submission checks (G2) | 3.1 | - | minutes | All checks pass |
-| **Submission 1:** block check | 3.2 | 36 h | 12-23 h | A1-A3 pass; you choose the setting and set `part_b` (3.4) |
+| **Submission 1:** block check, 15 tasks on 15 GPUs (one per setting) | 3.2 | 6 h per task | 1-3 h per task, about 2-3 h in total | Merge (3.4); A1-A3 pass; you choose the setting and set `part_b` |
 | **Submission 2:** prepare | 3.5 | 24 h | 3-8 h | P1-P5 pass |
 | **Submission 3:** training array, 16 runs on 16 GPUs | 3.6 | 6 h per run | 1.2-1.5 h per run, plus evaluation | - |
 
@@ -327,9 +327,9 @@ for name, version in sorted(recorded["packages"].items()):
 EOF
 
 # Storage, launcher syntax, and whether Slurm would accept the job (nothing is submitted).
-perunfsusage                    # SCRATCH needs about 40 GB for the block check
+perunfsusage                    # SCRATCH needs about 2 GB per block-check task
 bash -n workflows/jobs/perun/swiglu_8.sbatch && echo "launcher syntax OK"
-sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 \
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=0-14 \
   workflows/jobs/perun/swiglu_8.sbatch block-check
 ls "$PERUN_RESULTS/swiglu-8" 2>/dev/null || echo "no SwiGLU-8 outputs yet"
 grep -A2 '"part_b"' workflows/configs/model/swiglu/swiglu-8.json   # both null before the block check
@@ -340,45 +340,64 @@ stream with SwiGLU-7's file listed above.
 
 ### 3.2 Submit the block check
 
-**Submits a job. Run once.**
+**Submits a job. Run once.** One command starts 15 tasks, one per setting.
+Task 0 is SwiGLU-7's setting and also runs the reproduction checks (P5,
+A1-A3).
 
 ```bash
-OUT="$PERUN_RESULTS/swiglu-8/block-check-001"
-if [[ -e "$OUT" || -e "$OUT.perun-lock" ]] || squeue -u "$USER" -h -n swiglu-8 | grep -q .; then
-    echo "STOP: the block check exists, is locked, or a swiglu-8 job is queued"
+EXISTING=$(find "$PERUN_RESULTS/swiglu-8" -maxdepth 1 -name 'block-check-001*' 2>/dev/null)
+if [[ -n "$EXISTING" ]] || squeue -u "$USER" -h -n swiglu-8 | grep -q .; then
+    echo "STOP: block-check outputs exist or a swiglu-8 job is queued:"; echo "$EXISTING"
 else
-    JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 \
-        --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+    JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=0-14 \
+        --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
         workflows/jobs/perun/swiglu_8.sbatch block-check)
-    echo "block-check job: ${JOB%%;*}   <- record it in local/perun/runs/swiglu-8.md"
+    echo "block-check array: ${JOB%%;*}   <- record it in local/perun/runs/swiglu-8.md"
 fi
 ```
 
 ### 3.3 Watch the block check
 
-**Safe to re-run.** Loading and data preparation come first. Then the six
-unfitted slices are checked (A1), then SwiGLU-7's recipe is reproduced
-(A2-A3), and then the rest of the 246 fits run. A failed check stops the job
-with `AcceptanceFailure` in the `.err` file.
+**Safe to re-run.** Each task first loads the model and builds its data
+(about 20-40 minutes), then runs its setting's fits. Task 0 checks the
+unfitted slices (A1) and the SwiGLU-7 reproduction (A2-A3) and stops on a
+mismatch with `AcceptanceFailure` in its `.err` file.
 
 ```bash
-LOG=$(ls -t "$PERUN_LOG_DIR"/swiglu-8_*.out | head -n 1); echo "$LOG"
+ARRAY=$(ls -t "$PERUN_LOG_DIR"/swiglu-8_*_0.out | head -n 1 | sed -E 's/.*swiglu-8_([0-9]+)_0\.out/\1/')
 squeue -u "$USER" -n swiglu-8
-echo "fits finished: $(grep -c '^setting=' "$LOG") of 246"
-tail -n 3 "$LOG"
-tail -n 15 "${LOG%.out}.err"
+echo "fits finished: $(cat "$PERUN_LOG_DIR"/swiglu-8_"$ARRAY"_*.out 2>/dev/null | grep -c '^setting=') of 246"
+for TASK in $(seq 0 14); do
+    LAST=$(grep '^setting=' "$PERUN_LOG_DIR/swiglu-8_${ARRAY}_${TASK}.out" 2>/dev/null | tail -n 1)
+    FAILED=$(grep -l -E 'AcceptanceFailure|Traceback' "$PERUN_LOG_DIR/swiglu-8_${ARRAY}_${TASK}.err" 2>/dev/null)
+    echo "task $TASK: ${LAST:-no fit finished yet}${FAILED:+   <- check its .err}"
+done
+gpu-status
 ```
 
-### 3.4 Read the block check and set Part B
+### 3.4 Merge the block check and set Part B
 
-**Safe to re-run.** First check the result with 2.2, using
-`RUN=swiglu-8/block-check-001`. It must show status `completed` and every
-acceptance group passed. Then copy the results to your PC (section 6) and
-review the notebook's Part A and "why" sections.
+**Safe to re-run.** When all 15 tasks have finished (`squeue` shows none),
+merge them on the login node; it needs no GPU and reads only JSON. The merge
+checks that every task used identical data and neuron rankings, joins the
+fits, computes the adoption decision, and writes
+`swiglu-8/block-check-001/result.json`. Running it again changes nothing.
+
+```bash
+PYTHONPATH=src python -m workflows.runs.model.swiglu.swiglu_8 merge-block-check \
+  --results-root "$PERUN_RESULTS/swiglu-8"
+```
+
+It prints the selected setting, the stage-2 indicator, and the sha256 for
+`part_b`. If it reports a missing or unfinished task, check that task's log,
+resume it (3.7), and merge again.
+
+Then copy the results to your PC (section 6) and review the notebook's Part A
+and "why" sections.
 
 Then, **on your PC**, set `part_b` in
 `workflows/configs/model/swiglu/swiglu-8.json` to the selected setting and the
-sha256 printed by 2.2:
+sha256 printed by the merge:
 
 ```json
 "part_b": {
@@ -456,9 +475,9 @@ configuration, or environment, and needs the run's `result.json` on PROJECT
 with no lock (see 5.2).
 
 ```bash
-# Block check:
-sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 \
-  --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+# One block-check task; replace 7 with the task number (0-14):
+sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=7 \
+  --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
   workflows/jobs/perun/swiglu_8.sbatch block-check --resume
 
 # Preparation:

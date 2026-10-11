@@ -1,7 +1,9 @@
 """Run SwiGLU-8: local-fitting attribution and the 20-80% control spectrum.
 
 ``block-check`` compares local-fitting settings on three layers with three seeds
-and selects on a dedicated 8K selection stream (Part A).
+and selects on a dedicated 8K selection stream (Part A). It runs as one array
+task per setting; ``merge-block-check`` verifies that every task saw identical
+data and joins them into the single Part A result.
 ``prepare`` builds the shared neuron selection, width curves, allocations, and
 both arms' token-zero starts (Part B). ``train`` recovers one arm at one target
 to 100M tokens and runs the final evaluation. The binding design is recorded in
@@ -1116,9 +1118,32 @@ def teacher_self_kl(context, teacher, kl_path, kl_record, settings):
 # Part A: block check
 
 
+def block_check_setting(settings, task_index):
+    """Map one block-check array task to its Part A setting, in configuration order."""
+
+    grid = list(settings["block_check"]["settings"])
+    if not 0 <= int(task_index) < len(grid):
+        raise ValueError(f"Block-check task index must be 0-{len(grid) - 1}")
+    return grid[int(task_index)]
+
+
+def block_check_output_name(task_index):
+    return f"block-check-001-task-{int(task_index):02d}"
+
+
 def block_check(args, settings, config_path):
+    """Run one Part A setting with all its seeds as one array task.
+
+    Every task rebuilds the same data, streams, and neuron rankings, which the
+    merge verifies. The task holding SwiGLU-7's setting also runs the slices
+    and the acceptance checks P5 and A1-A3, and stops on a mismatch.
+    """
+
+    setting_id = block_check_setting(settings, args.task_index)
+    anchor = setting_id == CURRENT_SETTING
+    identity = {"kind": "block-check-task", "task_index": int(args.task_index), "setting": setting_id}
     work_dir, output_dir = resolve_storage(args.work_dir, args.output_dir, args.resume)
-    artifact = start_artifact(output_dir, settings, "block-check", args.resume, {"kind": "block-check"})
+    artifact = start_artifact(output_dir, settings, "block-check", args.resume, identity)
     try:
         reference = swiglu7_prepared(settings, args.swiglu7_root)
         contract = {
@@ -1126,6 +1151,7 @@ def block_check(args, settings, config_path):
             "configuration_sha256": file_digest(config_path),
             "code_hashes": code_hashes(),
             "swiglu7_prepare_sha256": settings["sources"]["swiglu7_prepare_sha256"],
+            "task": identity,
         }
         run_fingerprint = content_digest(contract)
         if args.resume and artifact.get("run_fingerprint") != run_fingerprint:
@@ -1153,7 +1179,7 @@ def block_check(args, settings, config_path):
         length = int(settings["long_context"]["sequence_length"])
         teacher, unused_tokenizer = load_model_and_tokenizer(model_config)
         validated_attention_implementation(teacher)
-        if "P5" not in results.get("acceptance", {}):
+        if anchor and "P5" not in results.get("acceptance", {}):
             enforce(artifact, output_dir, "P5",
                     [teacher_self_kl(context, teacher, kl_path, kl_record, settings)])
         selection_cache = cache_teacher_logits(
@@ -1194,7 +1220,7 @@ def block_check(args, settings, config_path):
             )
 
         # Unfitted slices come first: A1 checks selection and data before any fitting.
-        for layer in layers:
+        for layer in layers if anchor else ():
             for width in widths:
                 if completed(results["slices"], "slice", None, layer, width):
                     continue
@@ -1207,16 +1233,12 @@ def block_check(args, settings, config_path):
                 del module
                 release_memory()
                 persist(output_dir, artifact, f"block_check:slice:{layer}:{width}")
-        enforce(artifact, output_dir, "A1",
-                slice_checks(results["slices"], reference_fits, tolerances["exact_relative"]))
+        if anchor:
+            enforce(artifact, output_dir, "A1",
+                    slice_checks(results["slices"], reference_fits, tolerances["exact_relative"]))
         grid = settings["block_check"]["settings"]
-        # The SwiGLU-7 anchor runs first so A2-A3 stop the job before the rest of the grid.
-        runs = [(CURRENT_SETTING, CURRENT_SEED)] + [
-            (setting, seed)
-            for setting in grid
-            for seed in expected_seeds(setting, settings)
-            if (setting, seed) != (CURRENT_SETTING, CURRENT_SEED)
-        ]
+        # Seed 21 runs first, so in the anchor task A2-A3 stop the job before the other seeds.
+        runs = [(setting_id, seed) for seed in expected_seeds(setting_id, settings)]
         for setting_id, seed in runs:
             for layer in layers:
                 for width in widths:
@@ -1249,15 +1271,135 @@ def block_check(args, settings, config_path):
                 enforce(artifact, output_dir, "A2-A3",
                         current_recipe_checks(results["fits"], reference_fits, reference_curves,
                                               tolerances["fit_relative"]))
-        results["adoption"] = adoption_decision(results["fits"], settings)
-        results["stage_two_indicator"] = stage_two_indicator(
-            results["fits"], results["adoption"]["selected_recipe"]
-        )
         artifact["status"] = "completed"
         persist(output_dir, artifact, "completed")
     except BaseException as error:
         record_failure(output_dir, work_dir, artifact, error)
         raise
+
+
+def merge_block_check(tasks, settings, task_records):
+    """Join the per-setting block-check tasks into the single Part A result.
+
+    Every task must be completed and must have used the same configuration,
+    code, software, data streams, and neuron rankings; only the setting each
+    task fitted differs. The SwiGLU-7 anchor task supplies the slices and the
+    acceptance checks. The adoption decision and stage-2 indicator are
+    computed here over all 246 fits.
+    """
+
+    grid = list(settings["block_check"]["settings"])
+    expected = [
+        {"kind": "block-check-task", "task_index": index, "setting": setting}
+        for index, setting in enumerate(grid)
+    ]
+    if [task.get("identity") for task in tasks] != expected:
+        raise ValueError("The merge needs exactly one task per Part A setting, in configuration order")
+    first = tasks[0]
+    combinations = len(settings["block_check"]["layers"]) * len(settings["block_check"]["width_ratios"])
+    environment_keys = ("python", "packages", "cuda_runtime", "gpu")
+    for task in tasks:
+        index = task["identity"]["task_index"]
+        setting = task["identity"]["setting"]
+        if task.get("workflow") != WORKFLOW or task.get("command") != "block-check" or task.get("status") != "completed":
+            raise ValueError(f"Block-check task {index} ({setting}) is not completed")
+        if task.get("configuration") != settings:
+            raise ValueError(f"Block-check task {index} used a different configuration")
+        for key in ("configuration_sha256", "code_hashes"):
+            if task.get(key) != first.get(key):
+                raise ValueError(f"Block-check task {index} differs from task 0 in {key}")
+        if any(task["environment"].get(key) != first["environment"].get(key) for key in environment_keys):
+            raise ValueError(f"Block-check task {index} ran in a different software or GPU environment")
+        for key in ("long_context_data", "ranking_digests"):
+            if task["results"].get(key) != first["results"].get(key):
+                raise ValueError(f"Block-check task {index} saw different {key}; the data must be identical")
+        fits = task["results"].get("fits", [])
+        if len(fits) != combinations * len(expected_seeds(setting, settings)) or any(
+            row["setting"] != setting for row in fits
+        ):
+            raise ValueError(f"Block-check task {index} lacks fits for {setting}")
+        if setting != CURRENT_SETTING and (task["results"].get("slices") or task["results"].get("acceptance")):
+            raise ValueError(f"Only the anchor task may hold slices and acceptance checks (task {index})")
+    anchor = tasks[grid.index(CURRENT_SETTING)]
+    acceptance = anchor["results"].get("acceptance", {})
+    if (
+        not {"P5", "A1", "A2-A3"} <= set(acceptance)
+        or not all(group["passed"] for group in acceptance.values())
+        or len(anchor["results"].get("slices", [])) != combinations
+    ):
+        raise ValueError("The anchor task lacks passed P5, A1, and A2-A3 checks or its slices")
+    fits = [row for task in tasks for row in task["results"]["fits"]]
+    adoption = adoption_decision(fits, settings)
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "workflow": WORKFLOW,
+        "experiment_family": "swiglu-8",
+        "experiment_class": "local-fitting-attribution",
+        "command": "block-check",
+        "identity": {"kind": "block-check", "tasks": len(tasks)},
+        "status": "completed",
+        "created_at_utc": min(task["created_at_utc"] for task in tasks),
+        "configuration": deepcopy(settings),
+        "environment": deepcopy(anchor["environment"]),
+        "run_fingerprint": content_digest([task["run_fingerprint"] for task in tasks]),
+        "code_hashes": deepcopy(anchor["code_hashes"]),
+        "configuration_sha256": anchor["configuration_sha256"],
+        "results": {
+            "long_context_data": deepcopy(anchor["results"]["long_context_data"]),
+            "ranking_digests": deepcopy(anchor["results"]["ranking_digests"]),
+            "acceptance": deepcopy(acceptance),
+            "slices": deepcopy(anchor["results"]["slices"]),
+            "fits": deepcopy(fits),
+            "adoption": adoption,
+            "stage_two_indicator": stage_two_indicator(fits, adoption["selected_recipe"]),
+            "tasks": [
+                {
+                    **record,
+                    "task_index": task["identity"]["task_index"],
+                    "setting": task["identity"]["setting"],
+                    "run_fingerprint": task["run_fingerprint"],
+                    "created_at_utc": task["created_at_utc"],
+                    "updated_at_utc": task["updated_at_utc"],
+                    "gpu": task["environment"].get("gpu"),
+                }
+                for task, record in zip(tasks, task_records)
+            ],
+        },
+        "error": None,
+    }
+
+
+def merge_block_check_command(args, settings):
+    """Merge the completed block-check tasks under one results root; safe to re-run."""
+
+    root = resolve_path(args.results_root)
+    output_dir = resolve_path(args.output_dir) if args.output_dir else root / "block-check-001"
+    names = [block_check_output_name(index) for index in range(len(settings["block_check"]["settings"]))]
+    locked = [name for name in names if (root / f"{name}.perun-lock").exists()]
+    if locked:
+        raise ValueError(f"These tasks did not finish their copy to PROJECT: {', '.join(locked)}")
+    missing = [name for name in names if not (root / name / "result.json").is_file()]
+    if missing:
+        raise FileNotFoundError(f"These block-check tasks have no result yet: {', '.join(missing)}")
+    paths = [root / name / "result.json" for name in names]
+    merged = merge_block_check(
+        [read_json(path) for path in paths],
+        settings,
+        [{"output": name, "result_sha256": file_digest(path)} for name, path in zip(names, paths)],
+    )
+    existing = output_dir / "result.json"
+    if existing.is_file():
+        if read_json(existing).get("results") != merged["results"]:
+            raise ValueError(f"A different merged block check already exists: {existing}")
+        print(f"Already merged and identical: {existing}")
+    else:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        persist(output_dir, merged, "merged")
+        print(f"Merged {len(names)} tasks into {existing}")
+    adoption = merged["results"]["adoption"]
+    print(f"selected setting: {adoption['selected_recipe']} | qualifying: {adoption['qualifying']}")
+    print(f"stage-2 indicator: {merged['results']['stage_two_indicator']}")
+    print(f"sha256 for part_b.block_check_sha256: {file_digest(existing)}")
 
 
 def load_block_check(path, settings):
@@ -2223,7 +2365,12 @@ def parse_args():
         subparser.add_argument("--output-dir", type=Path, required=True)
         subparser.add_argument("--swiglu7-root", type=Path, default=DEFAULT_SWIGLU7_ROOT)
         subparser.add_argument("--resume", action="store_true")
+    subparsers.choices["block-check"].add_argument("--task-index", type=int, required=True)
     subparsers.choices["prepare"].add_argument("--block-check", type=Path, required=True)
+    merge = subparsers.add_parser("merge-block-check")
+    merge.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    merge.add_argument("--results-root", type=Path, required=True)
+    merge.add_argument("--output-dir", type=Path)
     train_parser = subparsers.choices["train"]
     train_parser.add_argument("--prepared", type=Path, required=True)
     train_parser.add_argument("--arm", choices=ARMS, required=True)
@@ -2240,7 +2387,9 @@ def main():
         measure_bundle(args)
         return
     settings, config_path = load_settings(args.config)
-    if args.command == "block-check":
+    if args.command == "merge-block-check":
+        merge_block_check_command(args, settings)
+    elif args.command == "block-check":
         block_check(args, settings, config_path)
     elif args.command == "prepare":
         prepare(args, settings, config_path)

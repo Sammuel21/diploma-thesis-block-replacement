@@ -282,11 +282,11 @@ not billing:
 
 | Item | Estimated H200-hours |
 | --- | ---: |
-| Part A, stage 1 (246 fits plus evaluation) | 12-23 |
+| Part A, stage 1 (246 fits plus evaluation, as 15 parallel tasks that each repeat the setup) | 16-31 |
 | Part A, stage 2, if needed | 1-2 |
 | Width curves extended to 0.125 and 0.0625 (full refit if a new recipe is adopted) | 2-6 |
 | Part B, 16 runs to 100M (two arms at eight targets) at about 1.2-1.5 hours each, plus about 15 minutes of final evaluation per run | 23-28 |
-| **Total** | **about 38-59** |
+| **Total** | **about 42-67** |
 
 ### Pre-run resource plan
 
@@ -300,16 +300,18 @@ together, about 4.4 s per epoch. Confidence is medium. The main uncertainties
 are how many epochs the 512- and 1024-wide fits and the low-learning-rate
 settings need, and the time to score each fit (single-block KL at 128 and 8K),
 which SwiGLU-7 did not record; it is estimated at 1-2 minutes per fit.
-Block-check keeps each fit's state on SCRATCH, about 75 MB on average across
-the 246 fits.
+The block check runs as 15 parallel tasks, one per setting. Each task repeats
+about 20-40 minutes of setup (model loading, data, pair capture) and keeps its
+fit states on SCRATCH, about 1.5 GB. The slowest tasks are the low-learning-rate
+settings, whose fits can run all 64 epochs.
 
 | Stage | Tasks | Request per task | Expected elapsed | Expected GPU-h | Ceiling GPU-h | CPU core-h | Peak RAM / VRAM | Storage |
 | --- | ---: | --- | --- | ---: | ---: | ---: | --- | --- |
-| A: `block-check` | 1 | gpu_short, 1 H200, 8 CPU, 128 GB, 36 h | 12-23 h | 12-23 | 36 | 96-184 | ≤ 50 GB / ≤ 40 GB | PROJECT < 0.1 GB; SCRATCH ~40 GB |
+| A: `block-check` | 15 (one array, tasks 0-14) | gpu_short, 1 H200, 8 CPU, 128 GB, 6 h | 1-3 h each; about 2-3 h in total | 16-31 | 90 | 128-248 | ≤ 50 GB / ≤ 40 GB per task | PROJECT < 0.1 GB; SCRATCH ~2 GB per task |
 | A2: stage 2 (only if triggered) | 1 | same, 6 h | 1-2 h | 1-2 | 6 | 8-16 | same | same |
 | B0: `prepare` | 1 | gpu_short, 1 H200, 8 CPU, 128 GB, 24 h | 3-6 h (recipe unchanged); 4-8 h (refit) | 3-8 | 24 | 24-64 | ≤ 60 GB / ≤ 40 GB | PROJECT ~25 GB (16 FP32 starts and 0.5 GB data); SCRATCH ~40 GB |
 | B1: `train` | 16 (one array, tasks 0-15) | gpu_short, 1 H200, 8 CPU, 128 GB, 6 h | 1.2-1.5 h each | 20-24 | 96 | 160-190 | 8.9 GiB / 33.5 GiB (S7-0) | PROJECT ~38 GB (bundles and benchmarks); SCRATCH ≤ 20 GB per task |
-| **Total** | 19-20 | | Critical path ~2-3 days plus queue and review gates | **about 35-55** | 156-162 | 280-440 | | PROJECT ~63 GB new |
+| **Total** | 32-33 | | Compute critical path about 7-14 h, plus queue and the review gate | **about 39-63** | 210-216 | 312-502 | | PROJECT ~63 GB new |
 
 Before each submission, check `perunfsusage` against the 1 TB PROJECT
 allocation and the totals in
@@ -339,7 +341,8 @@ SwiGLU-7 source artifacts by sha256.
 
 | Command | Does | Output |
 | --- | --- | --- |
-| `block-check` | Part A: 246 fits (15 settings; three seeds for each gradient setting), unfitted slices, single-block KL at 128 and on the 8K selection stream, NMSE on both validation sets, the multi-seed adoption decision, and the stage-2 indicator; resumes per completed fit | `block-check-001/` |
+| `block-check --task-index i` | Part A as 15 array tasks, one per setting (three seeds for each gradient setting): 246 fits in total, single-block KL at 128 and on the 8K selection stream, NMSE on both validation sets. Task 0 (SwiGLU-7's setting) also runs the unfitted slices and P5, A1, and A2-A3. Resumes per completed fit | `block-check-001-task-NN/` |
+| `merge-block-check` | Login node, no GPU. Checks that every task used identical configuration, code, software, data streams, and neuron rankings; joins the fits; computes the multi-seed adoption decision and the stage-2 indicator. Safe to re-run | `block-check-001/` |
 | `prepare` | Part B: neuron rankings, curve extension or refit, allocation, start fits with the adopted setting at seed 21, and the 16 token-zero starts; it refuses unless `part_b` names the block check's adopted setting and its sha256 | `prepare-001/` |
 | `train --arm --target` | S7-0 recovery to 100M, monitoring at 0/10/25/50/75/100M, the full SwiGLU-7 final evaluation, and the 8K KL of the reloaded BF16 bundle | `{fitted,slice}-target-{t}-run-001/` |
 

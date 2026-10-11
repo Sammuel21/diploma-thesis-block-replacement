@@ -49,9 +49,95 @@ def block_rows(settings, values):
     return rows
 
 
+def block_check_tasks(settings):
+    """Build one completed synthetic task artifact per Part A setting."""
+
+    rows = block_rows(settings, {})
+    tasks = []
+    for index, setting in enumerate(settings["block_check"]["settings"]):
+        anchor = setting == swiglu_8.CURRENT_SETTING
+        passed = {"checks": [], "passed": True}
+        tasks.append({
+            "workflow": "swiglu-8", "command": "block-check", "status": "completed",
+            "identity": {"kind": "block-check-task", "task_index": index, "setting": setting},
+            "configuration": deepcopy(settings), "configuration_sha256": "c" * 64, "code_hashes": {"runner": "h"},
+            "environment": {"python": "3.12.14", "packages": {"torch": "2.11.0+cu128"}, "cuda_runtime": "12.8",
+                            "gpu": "NVIDIA H200", "platform": f"node-{index}"},
+            "created_at_utc": f"2026-10-12T0{index % 10}:00:00+00:00", "updated_at_utc": "2026-10-12T12:00:00+00:00",
+            "run_fingerprint": f"{index:064d}",
+            "results": {
+                "long_context_data": {"kl_stream": {"sha256": "k" * 64}, "selection_stream": {"sha256": "s" * 64}},
+                "ranking_digests": {"3": "r", "11": "r", "19": "r"},
+                "fits": [row for row in rows if row["setting"] == setting],
+                **({"slices": [{"layer": layer, "replacement_width": width} for layer, width in COMBINATIONS],
+                    "acceptance": {"P5": passed, "A1": passed, "A2-A3": passed}} if anchor else {"slices": []}),
+            },
+        })
+    return tasks
+
+
 class SwiGLU8Contracts(unittest.TestCase):
     def setUp(self):
         self.settings, unused_path = swiglu_8.load_settings(CONFIG)
+
+    def test_block_check_runs_one_array_task_per_setting(self):
+        grid = list(self.settings["block_check"]["settings"])
+        self.assertEqual([swiglu_8.block_check_setting(self.settings, index) for index in range(len(grid))], grid)
+        self.assertEqual(swiglu_8.block_check_setting(self.settings, 0), swiglu_8.CURRENT_SETTING)
+        self.assertEqual(swiglu_8.block_check_output_name(3), "block-check-001-task-03")
+        for index in (-1, len(grid)):
+            with self.assertRaises(ValueError):
+                swiglu_8.block_check_setting(self.settings, index)
+
+    def test_merge_joins_identical_tasks_into_the_part_a_result(self):
+        tasks = block_check_tasks(self.settings)
+        records = [{"output": swiglu_8.block_check_output_name(index), "result_sha256": "x" * 64}
+                   for index in range(len(tasks))]
+        merged = swiglu_8.merge_block_check(tasks, self.settings, records)
+        self.assertEqual((merged["command"], merged["status"]), ("block-check", "completed"))
+        self.assertEqual(len(merged["results"]["fits"]), 246)
+        self.assertEqual(set(merged["results"]["acceptance"]), {"P5", "A1", "A2-A3"})
+        self.assertEqual(merged["results"]["adoption"]["selected_recipe"], swiglu_8.CURRENT_SETTING)
+        self.assertEqual([task["setting"] for task in merged["results"]["tasks"]],
+                         list(self.settings["block_check"]["settings"]))
+        self.assertEqual(merged["created_at_utc"], "2026-10-12T00:00:00+00:00")
+
+    def test_merge_command_writes_once_and_is_safe_to_rerun(self):
+        tasks = block_check_tasks(self.settings)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for index, task in enumerate(tasks):
+                write_json_atomic(root / swiglu_8.block_check_output_name(index) / "result.json", task)
+            args = types.SimpleNamespace(results_root=root, output_dir=None)
+            swiglu_8.merge_block_check_command(args, self.settings)
+            merged = read_json(root / "block-check-001" / "result.json")
+            self.assertEqual(len(merged["results"]["fits"]), 246)
+            self.assertTrue((root / "block-check-001" / "run.json").is_file())
+            swiglu_8.merge_block_check_command(args, self.settings)   # identical: no change
+            tasks[3]["results"]["fits"][0]["kl_8192"] = 0.5
+            write_json_atomic(root / swiglu_8.block_check_output_name(3) / "result.json", tasks[3])
+            with self.assertRaisesRegex(ValueError, "different merged block check"):
+                swiglu_8.merge_block_check_command(args, self.settings)
+            (root / f"{swiglu_8.block_check_output_name(5)}.perun-lock").mkdir()
+            with self.assertRaisesRegex(ValueError, "did not finish"):
+                swiglu_8.merge_block_check_command(args, self.settings)
+
+    def test_merge_refuses_tasks_that_differ_or_are_missing(self):
+        records = [{} for unused in range(15)]
+        changes = {
+            "different data": lambda tasks: tasks[5]["results"]["long_context_data"]["kl_stream"].update(sha256="z"),
+            "different rankings": lambda tasks: tasks[7]["results"]["ranking_digests"].update({"3": "other"}),
+            "different software": lambda tasks: tasks[2]["environment"]["packages"].update(torch="2.12.0"),
+            "unfinished task": lambda tasks: tasks[9].update(status="failed"),
+            "missing fits": lambda tasks: tasks[4]["results"]["fits"].pop(),
+            "failed anchor check": lambda tasks: tasks[0]["results"]["acceptance"]["A1"].update(passed=False),
+            "missing task": lambda tasks: tasks.pop(),
+        }
+        for name, change in changes.items():
+            tasks = block_check_tasks(self.settings)
+            change(tasks)
+            with self.subTest(change=name), self.assertRaises(ValueError):
+                swiglu_8.merge_block_check(tasks, self.settings, records)
 
     def test_configuration_fixes_the_decided_design(self):
         settings = self.settings
@@ -296,6 +382,10 @@ class SwiGLU8Contracts(unittest.TestCase):
         self.assertEqual([float(value) for value in targets], list(swiglu_8.TARGETS))
         self.assertIn('ARM="${ARMS[$((TASK_ID / 8))]}"', source)
         self.assertIn('TARGET="${TARGETS[$((TASK_ID % 8))]}"', source)
+        last_task = len(swiglu_8.PART_A_SETTINGS) - 1
+        self.assertIn(f"(( TASK_ID >= 0 && TASK_ID <= {last_task} ))", source)
+        self.assertIn("OUTPUT_NAME=\"$(printf 'block-check-001-task-%02d' \"$TASK_ID\")\"", source)
+        self.assertIn('--task-index "$TASK_ID"', source)
         self.assertIn("-m workflows.runs.model.swiglu.swiglu_8", source)
         self.assertIn('PROJECT_RESULTS_ROOT="$PROJECT_ROOT/perun-results/swiglu-8"', source)
         self.assertIn("trap finalize_job EXIT", source)

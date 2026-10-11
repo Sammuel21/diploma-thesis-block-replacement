@@ -16,7 +16,7 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: sbatch $0 block-check [--resume]" >&2
+    echo "Usage: sbatch --array=0-14 $0 block-check [--resume]" >&2
     echo "   or: sbatch $0 prepare [--resume] BLOCK_CHECK_RESULT" >&2
     echo "   or: sbatch --array=0-15[%N] $0 train [--resume] PREPARED_RESULT" >&2
 }
@@ -59,8 +59,11 @@ ARMS=(fitted slice)
 TARGETS=(0.2 0.3 0.4 0.5 0.6 0.7 0.75 0.8)
 case "$MODE" in
     block-check)
-        [[ -z "${SLURM_ARRAY_TASK_ID:-}" && $# -eq 0 ]] || { usage; exit 2; }
-        OUTPUT_NAME="block-check-001"
+        # One array task per Part A setting; merge-block-check joins them afterwards.
+        [[ -n "${SLURM_ARRAY_TASK_ID:-}" && $# -eq 0 ]] || { usage; exit 2; }
+        TASK_ID="$SLURM_ARRAY_TASK_ID"
+        (( TASK_ID >= 0 && TASK_ID <= 14 )) || { echo "Block-check array index must be 0-14." >&2; exit 2; }
+        OUTPUT_NAME="$(printf 'block-check-001-task-%02d' "$TASK_ID")"
         ;;
     prepare)
         [[ -z "${SLURM_ARRAY_TASK_ID:-}" && $# -eq 1 ]] || { usage; exit 2; }
@@ -185,7 +188,7 @@ fi
 COMMON_ARGUMENTS=(--work-dir "$WORK_DIR" --output-dir "$OUTPUT_DIR" --swiglu7-root "$SWIGLU7_ROOT")
 case "$MODE" in
     block-check)
-        RUN_ARGUMENTS=(block-check "${COMMON_ARGUMENTS[@]}")
+        RUN_ARGUMENTS=(block-check "${COMMON_ARGUMENTS[@]}" --task-index "$TASK_ID")
         ;;
     prepare)
         rsync -a "$INPUT_SOURCE" "$SCRATCH_DIR/inputs/block-check.json"
@@ -208,6 +211,7 @@ export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 echo "Job: ${SLURM_JOB_ID} on ${SLURM_NODELIST:-unknown}; mode=$MODE output=$PERSISTENT_OUTPUT_DIR"
 [[ "$MODE" != "train" ]] || echo "Array mapping: task=$TASK_ID arm=$ARM target=$TARGET"
+[[ "$MODE" != "block-check" ]] || echo "Block-check task: $TASK_ID (Part A setting in configuration order)"
 "$PYTHON_BIN" -u -m workflows.runs.model.swiglu.swiglu_8 "${RUN_ARGUMENTS[@]}" "${RESUME_ARGUMENTS[@]}" &
 PYTHON_PID=$!
 wait "$PYTHON_PID"

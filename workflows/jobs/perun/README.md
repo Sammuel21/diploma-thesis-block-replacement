@@ -286,8 +286,13 @@ submission, are in the
 [PERUN runbook](../../../docs/infrastructure/perun/perun-runbook.md#3-swiglu-8).
 
 Preparation requires `part_b` in the configuration to name the adopted Part A
-setting and the sha256 of the accepted block check. Block-check resumes per
-completed fit with `block-check --resume`. Tasks `0-7` are the fitted arm and
+setting and the sha256 of the accepted block check. The block check runs as an
+array of 15 tasks (`--array=0-14`), one per Part A setting, with outputs
+`block-check-001-task-NN`. The runner's `merge-block-check`, run on the login
+node, verifies that the tasks saw identical data and joins them into
+`block-check-001`, which preparation reads. A block-check task resumes per
+completed fit with `block-check --resume` and the same `--array` index.
+For training, tasks `0-7` are the fitted arm and
 `8-15` the slice-only arm, each at targets 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75,
 and 0.8. All 16 are submitted as one array (`--array=0-15`). Tasks `0-3` (the
 fitted 20-50% runs) check the SwiGLU-7 reproduction at every monitoring point
