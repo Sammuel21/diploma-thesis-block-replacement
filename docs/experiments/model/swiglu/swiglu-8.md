@@ -104,7 +104,10 @@ activations make them atypical.
 That is nine fits per combination and 54 in total. Shared settings follow
 SwiGLU-7: AdamW, batch 2,048, zero weight decay, at most 64 epochs,
 early-stopping patience 3, 393,216 calibration pairs, importance-ranked
-teacher-subset initialization, MSE objective. Constant and cosine variants are
+teacher-subset initialization, MSE objective. Batch size is not varied; the
+[operator-distillation study](../../block/operator/operator-distillation.md#2-operator-batch-size-screen)
+found that batch 256 reaches the same fit as 2,048 when trained to early
+stopping. Constant and cosine variants are
 tested separately so that the effect of the rate and the effect of the
 schedule are not confounded.
 

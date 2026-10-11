@@ -5,7 +5,7 @@ type: experiment-workflow
 category: experiments/block/operator
 status: active
 created: 2026-09-11
-modified: 2026-09-19
+modified: 2026-10-11
 authorship:
   created_by: collaborative
 curation:
@@ -107,6 +107,26 @@ current schema-5 artifact this is batch 256. The combined study then repeats
 the four calibration sizes with that selected batch, a maximum of 64 epochs,
 and early stopping. This separates a short batch-size comparison from the more
 expensive data-plus-optimization experiment.
+
+**Outcome and the batch used later.** Batch 256 wins the screen only because,
+at a fixed eight epochs, it makes eight times as many optimizer updates as
+batch 2,048. When each fit is trained to its early-stopping point, the two
+batch sizes reach the same fit at every calibration size in the combined study:
+
+| Calibration pairs | Held-out NMSE, batch 2,048 | Held-out NMSE, batch 256 |
+| ---: | ---: | ---: |
+| 12,288 | 0.6265 | 0.6220 |
+| 24,576 | 0.5657 | 0.5617 |
+| 49,152 | 0.5146 | 0.5137 |
+| 98,304 | 0.4666 | 0.4668 |
+
+The largest difference is 0.0045 NMSE, under 1% relative, and at 98,304 pairs
+batch 2,048 is marginally better. The model workflows (SwiGLU-1 to SwiGLU-8)
+therefore keep batch 2,048, which needs one-eighth of the optimizer updates
+per epoch. Speed was the reason for keeping it; this artifact does not record
+wall-clock time. The evidence is limited: layer 11 only, a randomly
+initialized 4,096-wide student, at most 98,304 pairs, and one seed, whereas
+the model workflows use teacher-subset initialization and 393,216 pairs.
 
 ## 3. Teacher-derived initialization
 
@@ -227,6 +247,7 @@ the authoritative description of the current workflow.
 | Calibration-study schedule | Batch 2,048, maximum 64 epochs |
 | Batch-size screen | 256, 512, 1,024, and 2,048 over eight epochs |
 | Screen winner in current artifact | Batch 256 |
+| Batch kept for later workflows | 2,048; equal fit when trained to early stopping (section 2) |
 | Combined study | Selected batch, maximum 64 epochs |
 | Initialization comparison | Random weights, random teacher subset, importance teacher subset |
 | Teacher-initialization fit | 98,304 pairs, batch 2,048, maximum 64 epochs |

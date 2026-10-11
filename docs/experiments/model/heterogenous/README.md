@@ -5,7 +5,7 @@ type: index
 category: experiments/model/heterogenous
 status: active
 created: 2026-10-01
-modified: 2026-10-01
+modified: 2026-10-11
 authorship:
   created_by: collaborative
 curation:
@@ -21,6 +21,11 @@ replacement operator families and allocating capacity across layers.
 
 Status: directory scaffold only. No experiment, scientific configuration, or
 execution result is defined by this scaffold.
+
+Planned requirement (decision log, 2026-10-11): each operator family gets a
+block-level recipe-selection study comparable with SwiGLU-8 Part A, so local
+fitting can be compared between the homogeneous and heterogeneous pipelines.
+It is scheduled after Quantization-1 and SwiGLU-8 are deployed.
 
 | Area | Location |
 | --- | --- |

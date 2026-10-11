@@ -5,7 +5,7 @@ type: methodology
 category: methodology
 status: draft
 created: 2026-09-04
-modified: 2026-09-11
+modified: 2026-10-11
 authorship:
   created_by: collaborative
 curation:
@@ -16,8 +16,9 @@ curation:
 
 # Operator Calibration Data and Training Budget
 
-Status: methodology note. The reworked method is implemented in the notebook,
-but it has not been executed or empirically validated yet.
+Status: methodology note. The reworked method is implemented in the notebook
+and was executed in `operator-distillation-v4.json`; the batch-size outcome is
+summarized below.
 
 ## Mental model
 
@@ -147,6 +148,12 @@ operator batch sizes without changing other settings:
 All conditions see the same pairs the same number of times. Smaller batches
 provide more frequent but noisier updates and usually take longer because the
 optimizer updates all replacement parameters more often.
+
+Outcome (`operator-distillation-v4.json`): the 8-epoch screen selected batch
+256, but in the combined study, trained to early stopping, batch 256 and batch
+2,048 reached the same held-out NMSE at every calibration size (largest
+difference 0.0045). The model workflows therefore keep batch 2,048; see
+[operator distillation, section 2](../experiments/block/operator/operator-distillation.md#2-operator-batch-size-screen).
 
 The notebook screens all four batch sizes for 8 epochs, then uses the selected
 batch size in the combined calibration-size study with a maximum of 64 epochs.
