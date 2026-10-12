@@ -124,11 +124,14 @@ On STOP, submit nothing and paste the output. The saved
 ### 0.3 Check the environment
 
 **Safe to re-run.** Run 1.2 and 1.3 first. The packages listed are the ones the
-Quantization-1 job checks before it starts. Login nodes have no GPU; each job
-checks CUDA on its GPU node before it takes its output lock.
+Quantization-1 job checks before it starts. Login nodes have no GPU driver.
+Importing `torchao` there fails with `libcuda.so.1: cannot open shared object
+file`, because it loads MSLK's CUDA library. So this check reads the TorchAO
+and MSLK versions without importing them. Each GPU job imports them and checks
+CUDA on its node before it takes its output lock.
 
 ```bash
-python -c 'from importlib.metadata import version; import torch, torchao, transformers, datasets, lm_eval, safetensors, psutil; from lm_eval.models.huggingface import HFLM; print("mlp-replacement OK:", torch.__version__, "transformers", transformers.__version__, "accelerate", version("accelerate"), "triton", version("triton"), "torchao", version("torchao"), "mslk", version("mslk"))'
+python -c 'from importlib.metadata import version; import torch, transformers, datasets, lm_eval, safetensors, psutil; from lm_eval.models.huggingface import HFLM; print("mlp-replacement OK:", torch.__version__, "transformers", transformers.__version__, "accelerate", version("accelerate"), "triton", version("triton"), "torchao", version("torchao"), "mslk", version("mslk"))'
 python -m pip check
 ```
 
