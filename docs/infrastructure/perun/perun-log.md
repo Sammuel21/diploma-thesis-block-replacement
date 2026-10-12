@@ -206,3 +206,35 @@ Entries are appended below in submission order.
 - Variance: finished in about 1.1 h instead of the planned 2-3 h. Setup, scoring, and the low-learning-rate fits were faster than estimated. Concurrency was capped at 12 running jobs (`AssocMaxJobsLimit`), after a brief `AssocGrpNodeLimit` held the first wave at 10. Plan later arrays for 12 concurrent tasks
 - Experiment document: [SwiGLU-8](../../experiments/model/swiglu/swiglu-8.md#part-a-results-2026-10-11)
 - Notes: The outcome kept `c1e-3-128` for Part B, and the stage-2 indicator fired; see the decision log, 2026-10-11.
+
+## [2026-10-11 evening, cluster time unrecorded] 105291 | SwiGLU-8 Part B preparation
+
+- Plan: SwiGLU-7 preparation timing, medium-low confidence; expected 3-8 h; expected 3-8 GPU-hours; CPU core-hours 24-64; at most 60 GB RAM and 40 GB VRAM; PROJECT about 25 GB
+- Outcome: COMPLETED; exit code Unknown; reason none
+- Submission: `workflows.runs.model.swiglu.swiglu_8`; `prepare`; identity `prepare-001`; submitted together with training array 105292, which depended on it (`afterok`)
+- Provenance: commit `c53cbe7` (`part_b` = `c1e-3-128`, block check sha256 `a268f1b0...`); config and code hashes recorded in the artifact
+- Allocation: `gpu_short`; 1 node (`gpu01`); 1 NVIDIA H200; 8 CPUs; 128 GB requested memory; 24-hour limit
+- Consumption: queue about 2 minutes; elapsed Unknown here (recorded in the artifact timestamps); requested GPU-hour ceiling 24; allocation GPU-hours Unknown; CPU core-hours Unknown; MaxRSS Unknown; peak GPU memory Unknown
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
+- Outputs: PROJECT `perun-results/swiglu-8/prepare-001/` (`result.json`, `run.json`, `prepared/` with the 100M stream and the 16 starting models); scheduler logs `swiglu-8_105291.out` and `.err`
+- Continuation: completed
+- Verification: structured status `completed`; checks P1-P5 passed (training requires them); no PROJECT lock left after stage-out
+- Variance: finished overnight within the 24-hour limit; exact duration to be read from the artifact
+- Experiment document: [SwiGLU-8](../../experiments/model/swiglu/swiglu-8.md)
+- Notes: Harmless stderr lines: `fatal: not a git repository`, because the evaluation harness looks for git metadata in the scratch copy, and lm-eval's "already-initialized model" warnings.
+
+## [2026-10-11 evening, cluster time unrecorded] 105292 | SwiGLU-8 Part B training (array 0-15)
+
+- Plan: SwiGLU-7 S7-0 timing, high confidence; expected 1.3-1.6 h per task; expected 20-24 GPU-hours; 12 tasks at once, then 4
+- Outcome: 12 tasks COMPLETED (all 8 slice-only runs, and fitted at 60-80%). Tasks 0-3 (fitted 20-50%) FAILED with `AcceptanceFailure`: the B2 reproduction check (1e-3) stopped them at 10M (tasks 0-2) and 25M (task 3). Relative differences from SwiGLU-7 were 0.02-0.21%
+- Submission: `workflows.runs.model.swiglu.swiglu_8`; `train`; `--dependency=afterok:105291 --kill-on-invalid-dep=yes`
+- Provenance: commit `c53cbe7`; prepared input `prepare-001/result.json`
+- Allocation: `gpu_short`; 1 node, 1 NVIDIA H200, 8 CPUs, and 128 GB requested memory per task; 6-hour limit; nodes Unknown
+- Consumption: elapsed per task Unknown here (recorded in each artifact); requested GPU-hour ceiling 96; allocation GPU-hours Unknown; CPU core-hours Unknown; MaxRSS Unknown; peak GPU memory Unknown
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
+- Outputs: PROJECT `perun-results/swiglu-8/{fitted,slice}-target-<t>-run-001/`; the four stopped fitted runs are kept as `...-run-001-b2-stopped`, including their 10M or 25M checkpoint
+- Continuation: completed tasks are final. The stopped tasks are rerun from token 0 after the B2 change (decision log, 2026-10-12); resuming is refused because the code changed
+- Verification: no PROJECT lock remained after stage-out; status summary read with runbook block C5
+- Variance: four tasks stopped early by an over-strict tolerance, not by an execution fault
+- Experiment document: [SwiGLU-8](../../experiments/model/swiglu/swiglu-8.md)
+- Notes: Token-0 values matched SwiGLU-7 exactly. The later drift is attributed to non-repeatable 8K-sequence GPU training, pending the rerun's own run-to-run comparison.

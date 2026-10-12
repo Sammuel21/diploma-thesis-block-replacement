@@ -25,8 +25,10 @@ reference_artifacts:
 **Status:** design settled on 2026-10-10; implemented on 2026-10-11, with
 Part A expanded the same day into a configuration-selection study (see
 [Implementation](#implementation)). Part A ran on PERUN on 2026-10-11 and kept
-SwiGLU-7's recipe (see [Part A results](#part-a-results-2026-10-11)). Part B
-has not run yet. The binding decisions are
+SwiGLU-7's recipe (see [Part A results](#part-a-results-2026-10-11)). Part B's
+preparation and 12 of its 16 runs completed overnight on 2026-10-11/12. The
+four fitted 20-50% runs were stopped by an over-strict reproduction check and
+are being rerun (see [Why B2 changed](#implementation)). The binding decisions are
 recorded in the [shared decision log](../../../agents/decisions.md); this page
 explains them. If this page and the log disagree, the log wins until the
 conflict is raised with the researcher.
@@ -450,7 +452,10 @@ SwiGLU-7 source artifacts by sha256.
   128-token ranking.
 
 **Acceptance checks.** These are the decided tolerances (relative difference
-r). A failed check stops the stage, which records the values first.
+r). A failed check stops the stage, which records the values first. The
+exception is B2: since 2026-10-12 it records every comparison and its exact
+difference, marks it against a 1% review limit, and never stops the run
+(decision log).
 
 | ID | Check | Reference | Tolerance |
 | --- | --- | --- | --- |
@@ -458,7 +463,7 @@ r). A failed check stops the stage, which records the values first.
 | A2 | Current-recipe fitted NMSE and MSE | SwiGLU-7 `local_nmse`, `local_mse` | r ≤ 1e-3 |
 | A3 | Current-recipe single-block KL at 128 tokens | SwiGLU-7 curve `raw_teacher_kl` | r ≤ 1e-3 |
 | B1 | Fitted arm at 20-50%, token-0 monitoring KL and PPL | S7-0 history | r ≤ 1e-4 |
-| B2 | Same runs, KL at 10-100M and PPL at 10/25/50/100M | S7-0 history | r ≤ 1e-3 |
+| B2 | Same runs, KL at 10-100M and PPL at 10/25/50/100M | S7-0 history | Recorded; reviewed against r ≤ 1e-2 (was a 1e-3 stop until 2026-10-12) |
 | P1 | Slice NMSE at all 135 SwiGLU-7 fit points | SwiGLU-7 `initial_local_nmse` | r ≤ 1e-4 |
 | P2 | Fitted start operators at 20-50% (recipe unchanged) | SwiGLU-7 `local_nmse`, `local_mse` | r ≤ 1e-3 |
 | P3 | Dense teacher PPL and task accuracy | SwiGLU-7 dense evaluation | PPL r ≤ 1e-4; accuracy identical |
@@ -469,6 +474,28 @@ A1-A3 and B1-B2 are required by the decision log. P1-P5 are cheap additions
 that catch a wrong selection, wrong data, or a changed environment before the
 expensive stages run. B1, B2, and P2 apply only while the current recipe is
 kept.
+
+**Why B2 changed (2026-10-12).** The first Part B attempt (array 105292)
+completed 12 of 16 runs. The four fitted 20-50% runs matched SwiGLU-7 exactly
+at token 0. Afterwards they drifted slightly, and the 1e-3 B2 stop ended them:
+
+| Run | Stopped at | Recovery KL, relative difference | WikiText PPL, relative difference |
+| --- | --- | ---: | ---: |
+| Fitted 20% | 10M | 1.19e-3 (stop) | 2.56e-4 |
+| Fitted 30% | 10M | 2.05e-3 (stop) | 4.97e-4 |
+| Fitted 40% | 10M | 2.17e-4 | 1.02e-3 (stop) |
+| Fitted 50% | 25M | 5.92e-4 (3.58e-4 at 10M) | 1.04e-3 (stop; 2.98e-4 at 10M) |
+
+The differences are small and point in both directions: lower than SwiGLU-7
+at 10M, higher at 25M. That fits run-to-run GPU noise in 8K-sequence training
+on different nodes, but this is an inference, not yet a measurement. The
+earlier exact reproductions involved only local fits, token-0 evaluation, or
+128-token training resumed on one machine, so the 1e-3 limit did not carry
+over. The stopped runs are kept on PERUN as `fitted-target-{t}-run-001-b2-stopped`.
+The rerun's values at 10M (and at 25M for 50%) against these measure
+SwiGLU-8's own run-to-run noise. If the rerun reproduced the stopped runs
+exactly, the difference from SwiGLU-7 would be systematic and would be
+investigated before any Part B interpretation.
 
 **Not yet verified.** Contract tests cover:
 

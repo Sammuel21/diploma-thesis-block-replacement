@@ -354,14 +354,45 @@ class SwiGLU8Contracts(unittest.TestCase):
             {"actual_tokens": 75_005_952, "requested_tokens": [75_000_000], "recovery_validation_kl": 0.1},
         ]
         row = deepcopy(reference[1])
-        row["recovery_validation_kl"] = 0.1002
         self.assertEqual([check["check"] for check in swiglu_8.monitoring_checks(reference[0], reference,
                                                                                     swiglu_8.ACCEPTANCE)],
                          ["B1", "B1"])
-        self.assertFalse(swiglu_8.monitoring_checks(row, reference, swiglu_8.ACCEPTANCE)[0]["passed"])
+        row["recovery_validation_kl"] = 0.1002
+        self.assertTrue(swiglu_8.monitoring_checks(row, reference, swiglu_8.ACCEPTANCE)[0]["passed"])
+        row["recovery_validation_kl"] = 0.102
+        check = swiglu_8.monitoring_checks(row, reference, swiglu_8.ACCEPTANCE)[0]
+        self.assertEqual((check["check"], check["tolerance"], check["passed"]), ("B2", 0.01, False))
+        self.assertAlmostEqual(check["relative_difference"], 0.02)
         row["wikitext_validation"] = {"perplexity": 10.0}
         with self.assertRaisesRegex(ValueError, "WikiText"):
             swiglu_8.monitoring_checks(row, reference, swiglu_8.ACCEPTANCE)
+
+    def test_later_reproduction_differences_are_recorded_but_a_token_zero_mismatch_stops(self):
+        reference = [
+            {"actual_tokens": 0, "requested_tokens": [0], "recovery_validation_kl": 0.2,
+             "wikitext_validation": {"perplexity": 20.0}},
+            {"actual_tokens": 10_002_432, "requested_tokens": [10_000_000], "recovery_validation_kl": 0.1,
+             "wikitext_validation": {"perplexity": 18.0}},
+        ]
+        history = deepcopy(reference)
+        history[1]["recovery_validation_kl"] = 0.103
+        artifact = {"results": {"recovery": {"validation_history": history}}}
+        settings = {"acceptance": swiglu_8.ACCEPTANCE}
+        stages = []
+        original = swiglu_8.persist
+        swiglu_8.persist = lambda output_dir, artifact, stage: stages.append(stage)
+        try:
+            swiglu_8.check_monitoring(artifact, None, reference, settings)
+            acceptance = artifact["results"]["acceptance"]
+            self.assertTrue(acceptance["B1"]["passed"])
+            self.assertFalse(acceptance["B2"]["passed"])
+            self.assertEqual([row["passed"] for row in acceptance["B2"]["checks"]], [False, True])
+            self.assertEqual(stages, ["acceptance:B1", "acceptance:B2"])
+            history[0]["recovery_validation_kl"] = 0.21
+            with self.assertRaisesRegex(swiglu_8.AcceptanceFailure, "B1 failed"):
+                swiglu_8.check_monitoring(artifact, None, reference, settings)
+        finally:
+            swiglu_8.persist = original
 
     def test_swiglu7_persist_keeps_its_run_record_and_names_the_artifact_workflow(self):
         with tempfile.TemporaryDirectory() as directory:

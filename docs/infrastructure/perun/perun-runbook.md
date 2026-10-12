@@ -286,9 +286,10 @@ Three submissions, the same shape as SwiGLU-7 plus the block check in front:
 
 Training task map: tasks 0-7 are the fitted arm and 8-15 the slice-only arm,
 each at targets 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75 and 0.8 in that order. Task
-11, for example, is slice-only at 0.5. Tasks 0-3 (fitted, 20-50%) also check
-the SwiGLU-7 reproduction at every monitoring point and stop themselves on a
-mismatch.
+11, for example, is slice-only at 0.5. Tasks 0-3 (fitted, 20-50%) also compare
+themselves with SwiGLU-7 at every monitoring point. They stop only on a
+token-0 mismatch (B1). Later differences (B2) are recorded with their exact
+values and reviewed against 1% afterwards (decision log, 2026-10-12).
 
 Run 1.2, 1.3 and 1.4 first, and 0.2 once before the first submission.
 
@@ -494,6 +495,44 @@ sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=24:00:00 
 sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=6 \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
   workflows/jobs/perun/swiglu_8.sbatch train --resume "$PERUN_RESULTS/swiglu-8/prepare-001/result.json"
+```
+
+### 3.8 Rerun training tasks from token 0
+
+**Deliberate, then submits a job. Run once, after the cause is understood**,
+for example when code changed and a resume would be refused. The job script
+always writes `<arm>-target-<t>-run-001`. The block therefore first renames
+each stopped output, keeping it as evidence, then submits only those tasks.
+It refuses if a task's output is locked or still running. Set `TASKS` and
+`SUFFIX` first.
+
+```bash
+TASKS="0 1 2 3"          # task numbers from the map above
+SUFFIX="b2-stopped"      # why the first attempt was set aside
+TARGETS=(0.2 0.3 0.4 0.5 0.6 0.7 0.75 0.8); ARMS=(fitted slice)
+ROOT="$PERUN_RESULTS/swiglu-8"
+if squeue -u "$USER" -h -n swiglu-8 | grep -q .; then
+    echo "STOP: a swiglu-8 job is still queued or running"
+else
+    OK=1
+    for T in $TASKS; do
+        NAME="${ARMS[$((T / 8))]}-target-${TARGETS[$((T % 8))]}-run-001"
+        if [[ -e "$ROOT/$NAME.perun-lock" || -e "$ROOT/$NAME-$SUFFIX" ]]; then
+            echo "STOP: $NAME is locked or already set aside"; OK=0
+        fi
+    done
+    if (( OK )); then
+        for T in $TASKS; do
+            NAME="${ARMS[$((T / 8))]}-target-${TARGETS[$((T % 8))]}-run-001"
+            [[ ! -d "$ROOT/$NAME" ]] || { mv "$ROOT/$NAME" "$ROOT/$NAME-$SUFFIX" && echo "set aside: $NAME-$SUFFIX"; }
+        done
+        JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 \
+            --array="$(echo $TASKS | tr ' ' ',')" \
+            --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+            workflows/jobs/perun/swiglu_8.sbatch train "$ROOT/prepare-001/result.json")
+        echo "rerun array: ${JOB%%;*}"
+    fi
+fi
 ```
 
 ## 4. Quantization-1

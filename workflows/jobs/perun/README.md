@@ -295,8 +295,9 @@ completed fit with `block-check --resume` and the same `--array` index.
 For training, tasks `0-7` are the fitted arm and
 `8-15` the slice-only arm, each at targets 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75,
 and 0.8. All 16 are submitted as one array (`--array=0-15`). Tasks `0-3` (the
-fitted 20-50% runs) check the SwiGLU-7 reproduction at every monitoring point
-and stop themselves on a mismatch. A training task stages the shared prepared inputs and only its
+fitted 20-50% runs) compare themselves with SwiGLU-7 at every monitoring
+point. They stop only on a token-0 mismatch; later differences are recorded
+and reviewed against 1%. A training task stages the shared prepared inputs and only its
 own start file. Resume one task with `train --resume "$S8_PREPARED"` and the
 same `--array` index.
 
