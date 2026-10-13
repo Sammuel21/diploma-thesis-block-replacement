@@ -5,7 +5,7 @@ type: experiment-workflow
 category: experiments/model/swiglu
 status: draft
 created: 2026-10-10
-modified: 2026-10-11
+modified: 2026-10-12
 authorship:
   created_by: collaborative
 curation:
@@ -26,9 +26,14 @@ reference_artifacts:
 Part A expanded the same day into a configuration-selection study (see
 [Implementation](#implementation)). Part A ran on PERUN on 2026-10-11 and kept
 SwiGLU-7's recipe (see [Part A results](#part-a-results-2026-10-11)). Part B's
-preparation and 12 of its 16 runs completed overnight on 2026-10-11/12. The
-four fitted 20-50% runs were stopped by an over-strict reproduction check and
-are being rerun (see [Why B2 changed](#implementation)). The binding decisions are
+preparation and all 16 runs completed on 2026-10-12. The four fitted 20-50%
+runs needed a rerun after an over-strict reproduction check stopped them. The
+review found run-to-run noise of up to about 3.5% at single checkpoints, a
+caveat for Part B's 2% rule (see [Why B2 changed](#implementation)). **Part B
+outcome:** local fitting lowers the 8K KL at 100M by 10-24% at every target,
+but the gap is still shrinking, so every target is "inconclusive at 100M"
+under the decided rule (see [Part B results](#part-b-results-2026-10-12)).
+The binding decisions are
 recorded in the [shared decision log](../../../agents/decisions.md); this page
 explains them. If this page and the log disagree, the log wins until the
 conflict is raised with the researcher.
@@ -94,8 +99,8 @@ separate stage for it.
 Part A is a configuration-selection study for the local-fitting recipe
 (decision log, 2026-10-11). Besides choosing the setting Part B uses, it gives
 the thesis's operator chapter the evidence for *why* each local-fitting
-setting was chosen. The notebook's "Why these local-fitting settings" section
-reports it.
+setting was chosen. The notebook's section 2, "Learning configuration", reports
+it, including the table "Why each setting was kept".
 
 **Scope:** layers 3, 11, and 19 (early, tolerant middle, sensitive late) at
 widths 0.25 and 0.5. Layers 1, 7, and 22 are excluded because their very large
@@ -303,10 +308,198 @@ baseline and the heterogeneous comparison use these metrics.
 
 The 2% threshold is a judgment call and is reported as such. There is no
 repeat run: both arms use seed 21 and the identical ordered recovery stream,
-so the comparison is paired.
+so the comparison is paired. The 2026-10-12 rerun showed that runs are not
+bitwise repeatable; see [Part B results](#part-b-results-2026-10-12).
 
 **Promotion:** only clear 100M results that serve as thesis headline
 comparisons are promoted to 1B-token recovery.
+
+### Part B results (2026-10-12)
+
+All values come from the local copy `data/results/workflows/model/swiglu-8/`:
+preparation `prepare-001`, and the 16 runs `{fitted,slice}-target-<t>-run-001`
+from arrays 105292 and 106606. The notebook has not yet been run on them. The
+dense reference is the pinned SmolLM2-1.7B: test perplexity 11.982 / 7.267 /
+6.933 at contexts 128 / 2,048 / 8,192, and task macro accuracy 67.14%.
+
+**Checks.**
+
+- Preparation passed P1-P5 with zero difference from SwiGLU-7. P1 covers 135
+  slice NMSE values, P2 92 fitted values, and P3 12 dense-evaluation values.
+  The 100M stream equals SwiGLU-7's first 100M tokens, and the teacher's 8K KL
+  against itself is 0.
+- The fitted 20-50% runs matched SwiGLU-7 exactly at token 0 (B1). Their B2
+  review is in [Why B2 changed](#implementation).
+
+**Allocation.** At 20-50%, the fitted and slice-only arms reuse SwiGLU-7's
+widths. Re-solving with the extended curves would change none of 20-40%. At
+50% it would change only layers 7 and 11, for a predicted KL 0.1% lower, so
+SwiGLU-7's widths stand. At 60-80%, the allocator used the curves extended to
+512 and 1,024. Layers 1 and 22 stay wide (22 is kept dense up to 70%). The
+narrowest widths go to the middle layers 5-15:
+
+| Target | Widths of layers 1-22 |
+| ---: | --- |
+| 60% | 4096 4096 3072 3072 2048 2048 2048 3072 3072 2048 1024 1024 1024 1024 2048 3072 4096 6144 5120 5120 5529 8192 |
+| 70% | 4096 3072 2048 2048 2048 1024 1024 2048 2048 1024 1024 512 1024 1024 1024 2048 3072 3379 4096 4096 4096 8192 |
+| 75% | 4096 2048 2048 2048 2048 512 1024 1024 1024 1024 512 512 512 1024 1024 2048 2048 3072 4096 3072 4096 6144 |
+| 80% | 4096 2048 2048 2048 512 512 512 1024 512 512 512 512 512 1024 1024 1024 2048 3072 3072 3072 2252 4096 |
+
+**Main result: local fitting still helps after 100M tokens, at every target,
+but its advantage is still shrinking.** Here g = (slice - fitted) / fitted on
+the 8K KL at 100M, the deciding metric. The monitoring gap is the same ratio
+on the recovery-validation KL.
+
+| Target | Whole-model removal | 8K KL fitted | 8K KL slice-only | **g** | Monitoring gap at 0 / 50M / 100M | Change 50M-100M | Rule verdict |
+| ---: | ---: | ---: | ---: | ---: | --- | ---: | --- |
+| 20% | 12.9% | 0.0787 | 0.0887 | **12.6%** | 111% / 22.1% / 16.5% | -5.6 pp | Inconclusive at 100M |
+| 30% | 19.4% | 0.1161 | 0.1288 | **10.9%** | 110% / 18.9% / 8.3%* | -10.6 pp* | Inconclusive at 100M |
+| 40% | 25.9% | 0.1701 | 0.1883 | **10.7%** | 143% / 14.9% / 11.6% | -3.3 pp | Inconclusive at 100M |
+| 50% | 32.4% | 0.2288 | 0.2527 | **10.4%** | 201% / 14.9% / 10.4% | -4.5 pp | Inconclusive at 100M |
+| 60% | 38.8% | 0.3040 | 0.3357 | **10.4%** | 301% / 16.3% / 11.7% | -4.6 pp | Inconclusive at 100M |
+| 70% | 45.3% | 0.4094 | 0.4549 | **11.1%** | 364% / 17.9% / 11.7% | -6.2 pp | Inconclusive at 100M |
+| 75% | 48.5% | 0.4707 | 0.5815 | **23.5%** | 425% / 45.6% / 24.1% | -21.5 pp | Inconclusive at 100M |
+| 80% | 51.8% | 0.5433 | 0.6432 | **18.4%** | 427% / 35.2% / 18.2% | -16.9 pp | Inconclusive at 100M |
+
+\* The fitted 30% run ends on the noise bump described in the B2 review, so its
+100M monitoring gap, and probably its g, are a few points too low.
+
+What the pre-registered rule says:
+
+- g exceeds the 2% "does not matter" bound at every target, by 5-10 times.
+  It also exceeds the run-to-run noise measured in the B2 review (up to about
+  3.5% at a single checkpoint).
+- The monitoring gap still fell by 3-22 percentage points between 50M and
+  100M, so it is not stable. **Every target is therefore "inconclusive at
+  100M".** Local fitting gives a clear advantage at this budget, but these runs
+  cannot show whether the advantage would survive longer recovery.
+
+**How the gap closes.** Recovery removes most of the slice-only arm's initial
+handicap within the first 10M tokens. At token 0 the slice-only models are
+2-5 times worse: 110-427% higher KL, and the ratio rises with removal. Later
+the gap shrinks steadily:
+
+| Target | 10M | 25M | 50M | 75M | 100M |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 20% | 33.2% | 24.1% | 22.1% | 17.3% | 16.5% |
+| 30% | 26.4% | 20.1% | 18.9% | 17.0% | 8.3%* |
+| 40% | 25.3% | 19.2% | 14.9% | 12.5% | 11.6% |
+| 50% | 26.2% | 19.6% | 14.9% | 12.4% | 10.4% |
+| 60% | 31.9% | 22.1% | 16.3% | 13.9% | 11.7% |
+| 70% | 38.7% | 26.6% | 17.9% | 14.0% | 11.7% |
+| 75% | 90.2% | 65.6% | 45.6% | 32.7% | 24.1% |
+| 80% | 70.7% | 52.5% | 35.2% | 24.4% | 18.2% |
+
+A power law fitted to 25-100M and extended to 1B suggests a gap of about
+3-8% at 1B. That is an extrapolation ten times beyond the data, not a result.
+It suggests the advantage shrinks to a few percent but may stay above 2%. Only
+a 1B measurement can settle it.
+
+**Final evaluation.** The fitted arm is better on perplexity at every target.
+On tasks the two arms are mostly within evaluation uncertainty.
+
+| Target | Test PPL 8,192, fitted / slice-only | Slice-only higher by | Test PPL 128, fitted / slice-only | Task macro, fitted / slice-only | Fitted macro minus dense |
+| ---: | --- | ---: | --- | --- | ---: |
+| 20% | 7.726 / 7.793 | 0.9% | 13.577 / 13.719 | 62.80% / 61.86% | -4.34 pp |
+| 30% | 8.170 / 8.265 | 1.2% | 14.767 / 14.960 | 60.70% / 60.00% | -6.44 pp |
+| 40% | 8.843 / 8.994 | 1.7% | 15.944 / 16.328 | 58.13% / 58.14% | -9.01 pp |
+| 50% | 9.645 / 9.873 | 2.4% | 17.895 / 18.259 | 55.65% / 55.47% | -11.49 pp |
+| 60% | 10.839 / 11.085 | 2.3% | 20.828 / 20.966 | 53.60% / 52.10% | -13.55 pp |
+| 70% | 12.474 / 12.732 | 2.1% | 24.666 / 24.693 | 50.76% / 49.54% | -16.38 pp |
+| 75% | 13.654 / 14.781 | 8.3% | 27.112 / 29.614 | 48.70% / 47.15% | -18.44 pp |
+| 80% | 14.970 / 15.952 | 6.6% | 30.061 / 32.402 | 46.99% / 45.61% | -20.15 pp |
+
+Per task, the arms differ by -1.8 to +3.3 points. Most differences are smaller
+than the 95% half-widths of each model's paired comparison with dense
+(0.5-3.4 points). HellaSwag is the exception: the fitted arm is ahead at every
+target, by 0.7-3.3 points, more than its half-width of 0.5-0.9. No paired
+between-arm interval was computed; that needs the raw task records, which
+remain on PERUN.
+
+**The homogeneous control spectrum (fitted arm, 100M tokens).** Removing
+13-52% of all parameters raises 8K test perplexity from 6.93 (dense) to
+7.73-14.97 and lowers task macro accuracy from 67.1% to 62.8-47.0%. The 8K KL
+grows smoothly with removal, from 0.079 to 0.543. BF16 bundles shrink from
+3.19 GiB to 2.78 GiB at 20% and 1.54 GiB at 80%. These are the 100M points
+the heterogeneous chapter is compared against.
+
+**Context from SwiGLU-7 (fitted arm only).** For 20-50%, SwiGLU-7 continued
+the same fitted models to 1B. From 100M to 1B its monitoring KL fell a further
+20-29%, its 8K test perplexity dropped to 7.56 / 7.87 / 8.31 / 8.86, and task
+macro rose by 1.2-2.8 points. Whether the slice-only arm improves faster over
+those 900M tokens is exactly what 1B slice-only runs would measure. SwiGLU-7's
+1B bundles remain on PERUN, so the fitted side of such a comparison only needs
+its 8K KL evaluated.
+
+**Observations without an explanation yet.**
+
+- The gap at 75% (23.5%) is larger than at 80% (18.4%). At 75% the gap also
+  closes more slowly: 45.6% at 50M, against 35.2% at 80%. The two allocations
+  differ in structure. At 75%, layer 22 stays at 6144 and layers 6 and 11-13
+  drop to 512. At 80%, more middle layers drop to 512 but layer 22 is at 4096.
+  So the gap need not be monotone in removal. No cause has been tested.
+- The 8K KL and the monitoring KL at 100M differ by -0.4% to +6.5% in both
+  arms, and they rank the two arms the same way at every target.
+
+**Limits.**
+
+- One seed per arm. Runs are not bitwise repeatable: 0.01-0.41% at 10M, and
+  single checkpoints up to about 3.5%.
+- The 8K KL is measured once per final model.
+- Task differences between arms have no paired interval.
+- Everything stops at 100M tokens, and the 1B estimate above is an
+  extrapolation.
+
+### Possible next work: the fitted/slice-only divergence at 1B
+
+**Status:** proposed by the researcher on 2026-10-12. Not decided,
+implemented, or scheduled.
+
+**Question.** Does local fitting's advantage survive to 1B recovery tokens, or
+does it fall to the noise level? How does the answer depend on sparsity? Part
+B left every target "inconclusive at 100M", and only a longer run can resolve
+that.
+
+**Proposed design.**
+
+- **Targets:** 20%, 50%, and 80% eligible-MLP removal (low, mid, and high
+  sparsity), both arms.
+- **Recipe and starts:** the S7-0 recipe to exactly 1B tokens, from the
+  existing SwiGLU-8 token-0 starts (`prepare-001/prepared/starts/` on PERUN),
+  so no new preparation is needed. Each run restarts from token 0, because the
+  100M optimizer checkpoints were deleted.
+- **Monitoring:** every 25M tokens, matching SwiGLU-7, so the gap can be
+  plotted as a full divergence curve from 0 to 1B.
+- **Final evaluation at 1B:** the full SwiGLU-8 evaluation, including the 8K
+  KL, the deciding metric.
+- **The fitted 20% and 50% arms already exist.** SwiGLU-7's S7-0 runs are the
+  same models with the same recipe to 1B (B1 and P2 matched them exactly at
+  token 0). They have monitoring every 25M, and their 1B bundles are on PERUN.
+  The minimal plan therefore needs only those two bundles' 8K KL evaluated,
+  plus four new 1B runs: slice-only 20%, 50%, and 80%, and fitted 80%.
+  Rerunning the fitted 20% and 50% arms too would give a same-pipeline pair at
+  extra cost; the measured run-to-run noise means both runs would still be
+  single samples.
+
+**Cost estimate.** Each 1B run takes about 11-12 h on one H200 (S7-0 measured
+9.8-10.5 h of training, plus monitoring and evaluation). With all runs in
+parallel, that is about half a day of elapsed time. The minimal plan needs
+about 44-48 GPU-h, and the plan with fitted reruns about 66-72 GPU-h. The
+estimate is based on SwiGLU-7's measured 1B timings; confidence is medium.
+
+**Implementation needed.**
+
+- The SwiGLU-8 runner fixes recovery at 100M through its configuration. A 1B
+  variant needs a recovery target of 1B, monitoring every 25M, separate output
+  names (for example `-1b-run-001`), and a small job to evaluate the 8K KL on
+  existing bundles.
+- If the fitted 20% and 50% arms are rerun, their reproduction check against
+  SwiGLU-7 would cover the full 1B history and use the 1% review rule.
+
+**Interpretation to fix before running.** Keep g on the 8K KL, now at 1B. The
+2% "does not matter" bound should be read against the measured noise: about
+0.4% run to run at 10M, and up to about 3.5% at a single checkpoint. Fix the
+rule for that before any run.
 
 ## Implementation requirements from the design
 
@@ -402,6 +595,26 @@ job, add a [perun-log.md](../../../infrastructure/perun/perun-log.md) entry
 with `scontrol` facts while they are available, update the status totals, and
 keep workflow timing separate from scheduler allocation.
 
+### Measured resource use (2026-10-12)
+
+Workflow timing comes from each artifact's `created_at_utc` to
+`updated_at_utc`, on one H200 per task. It is a proxy, not scheduler
+allocation; allocation GPU-hours were not recorded, since `sacct` is
+disabled.
+
+| Stage | Plan | Measured |
+| --- | --- | --- |
+| A: block check, 15 tasks | 16-31 GPU-h; about 2-3 h in total | **7.9 GPU-h**. The longest task was 1.04 h (`c1e-4-128`, task 2). About 1.1 h in total, with at most 12 tasks at once |
+| B0: prepare | 3-8 GPU-h | **3.4 GPU-h** |
+| B1: 16 runs | 20-24 GPU-h; 1.2-1.5 h each | **20.2 GPU-h**. Each run took 1.18-1.33 h: 0.91-1.05 h of training plus 0.23-0.24 h of final evaluation |
+| First attempts of fitted 20-50%, stopped by B2 | - | **0.7 GPU-h** |
+| **Total** | **about 39-63** | **about 32.1 GPU-h** |
+
+Peak usage per training run was 8.8 GiB RAM and 25.1-33.5 GiB VRAM, matching
+S7-0. Elapsed time from the block-check submission to the last rerun's end
+was about one day. It included two review gates, the overnight chain, and the
+B2 rerun.
+
 ## Implementation
 
 Implemented on 2026-10-11 without any run. Runner:
@@ -414,9 +627,12 @@ The copy-paste commands for every stage are in the
 [PERUN runbook](../../../infrastructure/perun/perun-runbook.md#3-swiglu-8).
 Analysis: the load-only
 [`swiglu-8.ipynb`](../../../../notebooks/model/swiglu/swiglu-8.ipynb), which
-applies the decided Part B interpretation in code. It reads the local copy
-under `data/results/workflows/model/swiglu-8/` and works on partial results:
-Part A alone, or any completed subset of the 16 runs.
+applies the decided Part B interpretation in code. It reads the complete local
+copy under `data/results/workflows/model/swiglu-8/`, including the stopped
+first attempts and SwiGLU-7's S7-0 runs. Its sections are design, learning
+configuration, local fit versus no local fit, context length, the 20-80%
+control spectrum, and conclusions with the 1B outlook, followed by an appendix
+on acceptance, data, and compute.
 The configuration validates every block it shares with SwiGLU-7 and
 Quantization-1 against their versioned configurations. It also pins the
 SwiGLU-7 source artifacts by sha256.
@@ -496,6 +712,34 @@ The rerun's values at 10M (and at 25M for 50%) against these measure
 SwiGLU-8's own run-to-run noise. If the rerun reproduced the stopped runs
 exactly, the difference from SwiGLU-7 would be systematic and would be
 investigated before any Part B interpretation.
+
+**Rerun and B2 review (2026-10-12).** The rerun (array 106606) completed all
+four runs, so Part B now has all 16. The rerun did not reproduce its stopped
+first attempt: at 10M the two differ by 0.01-0.41% in recovery KL and
+0.01-0.16% in WikiText perplexity. **SwiGLU-8's 8K-sequence training is
+therefore not repeatable run to run**, and the first attempt's gaps to
+SwiGLU-7 (at most 0.21%) lie within that noise.
+
+Against SwiGLU-7, 34 of the 36 B2 values are within 1%. The two flagged values
+are single-checkpoint bumps:
+
+| Run | Point | SwiGLU-8 KL | SwiGLU-7 KL | Difference | Neighbouring points |
+| --- | --- | ---: | ---: | ---: | --- |
+| Fitted 20% | 75M | 0.079554 | 0.080681 | 1.40% | SwiGLU-7 rose from 0.080062 at 50M, while SwiGLU-8 stayed flat; both agree within 0.8% at 100M |
+| Fitted 30% | 100M | 0.116592 | 0.112604 | 3.54% | SwiGLU-8 rose from 0.114848 at 75M, while SwiGLU-7 fell; they agree within 0.1% at 75M |
+
+WikiText perplexity at the same two points agrees within 0.05%. Each pipeline
+has its own bump at a different point, although both see the same data in the
+same order. The flags go in opposite directions. **Conclusion: GPU noise
+amplified by training, not a pipeline difference.** All four reruns are
+usable.
+
+**Caveat for Part B.** A single checkpoint's recovery KL can move by up to
+about 3.5% from noise alone, and the fitted 30% run ends on such a bump. Part
+B's per-target rule calls a gap meaningful at 2% (decision log, 2026-10-11),
+which assumed repeatable runs. Gaps far above that are unaffected. A target
+whose gap is near the noise level needs replicate runs or a smoothed measure
+before any conclusion. That choice is made once the gaps are known.
 
 **Not yet verified.** Contract tests cover:
 

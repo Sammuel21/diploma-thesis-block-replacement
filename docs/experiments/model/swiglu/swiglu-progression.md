@@ -5,7 +5,7 @@ type: experiment-synthesis
 category: experiments/model/swiglu
 status: active
 created: 2026-09-20
-modified: 2026-09-29
+modified: 2026-10-12
 authorship:
   created_by: collaborative
 curation:
@@ -21,6 +21,7 @@ sources:
     - notebooks/model/swiglu/swiglu-5.ipynb
     - notebooks/model/swiglu/swiglu-6.ipynb
     - notebooks/model/swiglu/swiglu-7.ipynb
+    - notebooks/model/swiglu/swiglu-8.ipynb
   artifacts:
     - data/results/notebook-model-study/swiglu-compression.json
     - data/results/notebook-model-study/swiglu-compression-optimized.json
@@ -46,6 +47,9 @@ sources:
     - data/results/workflows/model/swiglu-7/S7-2-target-0.3-run-001/result.json
     - data/results/workflows/model/swiglu-7/S7-2-target-0.4-run-001/result.json
     - data/results/workflows/model/swiglu-7/S7-2-target-0.5-run-001/result.json
+    - data/results/workflows/model/swiglu-8/block-check-001/result.json
+    - data/results/workflows/model/swiglu-8/prepare-001/result.json
+    - data/results/workflows/model/swiglu-8/{fitted,slice}-target-{0.2,0.3,0.4,0.5,0.6,0.7,0.75,0.8}-run-001/result.json
 ---
 
 # Homogeneous SwiGLU Experimental Progression
@@ -63,10 +67,11 @@ workflow pages remain the authoritative method descriptions:
 - [SwiGLU-3](swiglu-3.md);
 - [SwiGLU-4](swiglu-4.md); and
 - [SwiGLU-5](swiglu-5.md);
-- [SwiGLU-6](swiglu-6.md); and
-- [SwiGLU-7](swiglu-7.md).
+- [SwiGLU-6](swiglu-6.md);
+- [SwiGLU-7](swiglu-7.md); and
+- [SwiGLU-8](swiglu-8.md).
 
-All seven experiments use the pinned `HuggingFaceTB/SmolLM2-1.7B` model. Layers
+All eight experiments use the pinned `HuggingFaceTB/SmolLM2-1.7B` model. Layers
 0 and 23 are protected, while layers 1 through 22 are eligible for homogeneous
 SwiGLU replacement. The dense WikiText-2 validation reference is loss 2.66997
 and perplexity 14.4396.
@@ -80,7 +85,7 @@ evaluation split.
 
 ## Executive conclusion
 
-The experimental progression moved through seven distinct questions:
+The experimental progression moved through eight distinct questions:
 
 ```text
 feasible local replacement
@@ -90,9 +95,10 @@ feasible local replacement
   -> discrete, globally optimized layer widths
   -> one-billion-token recovery and final evaluation
   -> replacement-only versus broader retraining
+  -> what local fitting is worth after recovery
 ```
 
-The final evidence supports six main conclusions:
+The final evidence supports seven main conclusions:
 
 1. **Teacher-derived initialization made homogeneous replacement viable.**
    Increasing calibration data helped, but random initialization still left a
@@ -118,6 +124,10 @@ The final evidence supports six main conclusions:
    24 likelihood comparisons while using the least compute and memory. Full
    transformer-body and attention-LoRA variants produced only small, mixed task
    gains under one seed.
+7. **Local fitting still pays after 100M recovery tokens, and its recipe is
+   on a plateau.** In SwiGLU-8, skipping the local fit left 8K KL 10-24% higher
+   at every target from 20% to 80% removal. The gap was still shrinking at
+   100M, and its size at 1B is untested.
 
 At 100M tokens, the confirmed discrete-allocation model improves on SwiGLU-3:
 
@@ -142,6 +152,7 @@ that this is not dense-equivalent recovery.
 | SwiGLU-5 | Can initialization, allocation, or composition improve the quality frontier? | Output reconstruction, discrete width curves, composition-aware refit, efficient search and confirmation | Discrete allocation won; confirmed gains persisted to 100M | Use discrete allocation as the homogeneous baseline and move future novelty to heterogeneous operators or stronger allocation models |
 | SwiGLU-6 | Does recovery remain useful beyond 100M tokens, and what quality remains on full held-out evaluation? | Continued fixed 20% and 50% models to 1B and evaluated complete WikiText and five zero-shot tasks | Both targets improved through 1B, but neither reached dense quality | Test native-8K recovery and whether broader trainable scope can close the gap |
 | SwiGLU-7 | Does full-body or LoRA-assisted retraining outperform replacement-only recovery? | Fresh independent width fitting, native-8K recovery, four targets, and three trainable scopes | Replacement-only gave the strongest likelihood frontier at the lowest resource cost | Close the homogeneous family and retain S7-0 as the control for new experiment classes |
+| SwiGLU-8 | What is local fitting worth after recovery, and can the fit itself improve? | Block-level recipe-selection study; fitted versus slice-only arms at 20-80% to 100M tokens | Recipe on a plateau; local fitting still worth 10-24% in 8K KL at 100M, gap still shrinking | Provide the 20-80% control spectrum for the heterogeneous chapter; 1B slice-only runs would settle persistence |
 
 ## SwiGLU-1: establishing feasibility
 
@@ -468,6 +479,39 @@ SwiGLU-7 are not a controlled sequence-length comparison because S7 also
 refitted the starting operators and changed batching. Cross-generation metric
 differences must not be attributed to 8K recovery alone.
 
+## SwiGLU-8: does local fitting still matter after recovery?
+
+Every earlier experiment fitted each replacement locally before recovery, but
+none measured what the local fit is worth once recovery has run. SwiGLU-8
+first re-examined the local-fitting recipe itself in a block-level study (Part
+A). It covered 15 settings, 3 seeds, and 246 fits on layers 3, 11, and 19, and
+was scored on 8K single-block KL with selection data held out from final
+evaluation. No setting beat SwiGLU-7's recipe by the required 5%. Lower
+learning rates helped by 1-2%. Training on 8K-context pairs helped by 3-4% at
+8K but hurt by 6-7% at 128 tokens, so the fit specializes to its training
+context. Batch 256 and exact least squares were worse.
+
+Part B then trained the same models with and without the local fit, at eight
+targets from 20% to 80% removal, to 100M tokens with the S7-0 recipe:
+
+| Target | 8K KL fitted | 8K KL slice-only | Slice-only higher by |
+| ---: | ---: | ---: | ---: |
+| 20% | 0.0787 | 0.0887 | 12.6% |
+| 50% | 0.2288 | 0.2527 | 10.4% |
+| 80% | 0.5433 | 0.6432 | 18.4% |
+
+At token 0 the slice-only models were 2-5 times worse in KL. Recovery removed
+most of that handicap within the first 10M tokens, yet a 10-24% gap remained
+at 100M at every target. The gap was still shrinking between 50M and 100M, so
+the pre-registered verdict is "inconclusive at 100M" everywhere. A rough
+extrapolation suggests a few percent at 1B. The fitted 20-50% runs also
+reproduced SwiGLU-7's first 100M tokens to within GPU noise. That noise turned
+out to be non-zero for 8K training on PERUN: up to 0.4% at 10M, and up to
+about 3.5% at a single checkpoint.
+
+The experiment also yields the 20-80% homogeneous control spectrum at 100M
+tokens, which the heterogeneous chapter is measured against.
+
 ## Family-level interpretation
 
 ### What actually improved quality
@@ -546,6 +590,13 @@ The main limitations are:
 - no measured serving throughput or latency; and
 - substantial remaining distance from dense quality, especially at 50%
   eligible-MLP removal.
+
+A proposed homogeneous follow-up, not yet decided, would extend SwiGLU-8's
+fitted-versus-slice-only comparison to 1B recovery tokens. It would cover 20%,
+50%, and 80% removal (low, mid, and high sparsity), monitored every 25M
+tokens, to measure whether local fitting's advantage survives or falls to the
+noise level. SwiGLU-7's S7-0 runs already supply the fitted 20% and 50% arms;
+see the [SwiGLU-8 proposal](swiglu-8.md#possible-next-work-the-fittedslice-only-divergence-at-1b).
 
 The natural next experiment class is heterogeneous operator allocation: simple
 operators may be sufficient for tolerant blocks, leaving more parameter budget

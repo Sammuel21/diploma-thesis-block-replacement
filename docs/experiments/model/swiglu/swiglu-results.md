@@ -5,7 +5,7 @@ type: experiment-synthesis
 category: experiments/model/swiglu
 status: active
 created: 2026-09-21
-modified: 2026-09-29
+modified: 2026-10-12
 authorship:
   created_by: collaborative
 curation:
@@ -40,6 +40,9 @@ sources:
     - data/results/workflows/model/swiglu-7/S7-2-target-0.3-run-001/result.json
     - data/results/workflows/model/swiglu-7/S7-2-target-0.4-run-001/result.json
     - data/results/workflows/model/swiglu-7/S7-2-target-0.5-run-001/result.json
+    - data/results/workflows/model/swiglu-8/block-check-001/result.json
+    - data/results/workflows/model/swiglu-8/prepare-001/result.json
+    - data/results/workflows/model/swiglu-8/{fitted,slice}-target-{0.2,0.3,0.4,0.5,0.6,0.7,0.75,0.8}-run-001/result.json
 ---
 
 # Homogeneous SwiGLU Results Overview
@@ -164,6 +167,38 @@ not produce a consistent likelihood improvement and cost 21% to 24% more H200
 time across the four targets. This conclusion applies to the tested scopes and
 single seed; it is not proof that broader adaptation can never help.
 
+## SwiGLU-8: local fitting after 100M-token recovery and the 20-80% spectrum
+
+SwiGLU-8 trained two arms at eight targets with the S7-0 recipe to 100M
+tokens, at sequence length 8,192. Both arms use the same neurons and widths.
+The fitted arm uses slice, then local fit, then recovery; the slice-only arm
+skips the local fit. The deciding metric is the 8K KL against the dense model
+at 100M. A Part A block check first confirmed that SwiGLU-7's local-fitting
+recipe (constant `1e-3`, 128-token pairs, batch 2,048) stays: no alternative
+lowered the 8K single-block KL by more than 4.4%.
+
+| Target | Whole-model removal | 8K KL fitted | 8K KL slice-only | Slice-only higher by | Test PPL 8,192 fitted | Task macro fitted |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0% | 0% | 0 | 0 | - | **6.9331** | **67.14%** |
+| 20% | 12.94% | 0.0787 | 0.0887 | 12.6% | 7.726 | 62.80% |
+| 30% | 19.41% | 0.1161 | 0.1288 | 10.9% | 8.170 | 60.70% |
+| 40% | 25.88% | 0.1701 | 0.1883 | 10.7% | 8.843 | 58.13% |
+| 50% | 32.35% | 0.2288 | 0.2527 | 10.4% | 9.645 | 55.65% |
+| 60% | 38.82% | 0.3040 | 0.3357 | 10.4% | 10.839 | 53.60% |
+| 70% | 45.29% | 0.4094 | 0.4549 | 11.1% | 12.474 | 50.76% |
+| 75% | 48.53% | 0.4707 | 0.5815 | 23.5% | 13.654 | 48.70% |
+| 80% | 51.76% | 0.5433 | 0.6432 | 18.4% | 14.970 | 46.99% |
+
+Local fitting still lowers the 8K KL by 10-24% after 100M tokens of recovery.
+The slice-only arm's test perplexity is 0.9-8.3% higher, and the fitted task
+macro is equal or up to 1.6 points higher. But the gap was still shrinking between 50M and 100M, by
+3-22 percentage points. Under the pre-registered rule, every target is
+therefore inconclusive at 100M. At token 0 the slice-only models were 2-5
+times worse in KL, so recovery removes most, but not all, of the value of the
+local fit within 100M tokens. The 100M rows are the homogeneous control
+spectrum for the heterogeneous chapter; for 20-50%, the 1B values above remain
+the production endpoints.
+
 ## Deployment footprint
 
 Recovery length does not change model topology, so the 100M and 1B endpoints
@@ -201,6 +236,20 @@ five-model evaluation took approximately 2 hours 54 minutes of wall time.
 Independent preparation took 10.21 H200 hours. Preparation plus all 12
 production runs consumed 156.99 measured H200 hours.
 
+## Recorded SwiGLU-8 resource demand
+
+| Stage | H200 time | Per task | Peak RAM | Peak VRAM |
+| --- | ---: | --- | ---: | ---: |
+| Part A block check, 15 tasks | 7.9 h | up to 1.04 h | - | - |
+| Part B preparation | 3.4 h | - | - | - |
+| Part B, 16 runs to 100M | 20.2 h | 1.18-1.33 h | 8.8 GiB | 33.5 GiB |
+| Stopped first attempts | 0.7 h | - | - | - |
+| **Total** | **about 32.1 h** | | | |
+
+These are workflow-timing proxies from the artifacts, not scheduler
+allocation. With up to 12 concurrent tasks, the whole experiment took about one
+day of elapsed time.
+
 ## Final homogeneous conclusion
 
 The completed family supports a stable production recipe: independently fit
@@ -215,6 +264,12 @@ Training the full transformer body or adding attention LoRA did not justify its
 extra compute and memory. Future work can use replacement-only recovery as the
 homogeneous control while moving the scientific question to heterogeneous
 operators or another explicitly distinct compression axis.
+
+SwiGLU-8 adds two results. First, SwiGLU-7's local-fitting recipe sits on a
+plateau. Second, local fitting is still worth 10-24% in 8K KL after 100M
+recovery tokens, at every target from 20% to 80% removal. Whether that
+advantage persists at 1B is untested; the trend suggests it shrinks to a few
+percent.
 
 ## Reading boundaries
 
@@ -233,4 +288,8 @@ operators or another explicitly distinct compression axis.
   token recovery, so cross-generation differences combine both changes.
 - The local SwiGLU-7 analysis copy omits model weights and raw task records.
   Complete bundles remain in PERUN PROJECT; the local manifests retain their
-  hashes.
+  hashes. The same holds for SwiGLU-8.
+- SwiGLU-8 measured that 8,192-token recovery on PERUN is not bitwise
+  repeatable. The same run differs by up to 0.41% in KL at 10M, and a single
+  checkpoint can differ by up to about 3.5%. Single-run differences of that
+  size are within noise.

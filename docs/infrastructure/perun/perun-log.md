@@ -198,7 +198,7 @@ Entries are appended below in submission order.
 - Submission: `workflows.runs.model.swiglu.swiglu_8`; `block-check --task-index 0-14`, one Part A setting per task; outputs `block-check-001-task-00` to `-14`
 - Provenance: commit Unknown (the PERUN checkout had pulled `llm-wiki-claude` through the parallel block check); config `workflows/configs/model/swiglu/swiglu-8.json` with `part_b` null; configuration and code hashes are recorded in every task artifact, and the merge verified that they are identical
 - Allocation: `gpu_short`; 1 node per task (`gpu02`, `gpu03`, `gpu05`, `gpu12`); 1 NVIDIA H200, 8 CPUs, and 128 GB requested memory per task; 6-hour limit
-- Consumption: tasks 0-9 started at once, 10-11 about 2 minutes later, and 12-14 after slots freed; the last task (2, `c1e-4-128`) ran for more than 59 minutes; elapsed per task Unknown here and recorded in the merged result's `tasks` list; requested GPU-hour ceiling 90; allocation GPU-hours Unknown, at most about 16 (15 tasks, none longer than about 1.1 h); CPU core-hours Unknown; MaxRSS Unknown; peak GPU memory Unknown
+- Consumption: tasks 0-9 started at once, 10-11 about 2 minutes later, and 12-14 after slots freed; the last task (2, `c1e-4-128`) ran for more than 59 minutes; workflow elapsed per task 0.02-1.04 h (artifact timestamps), 7.91 H200-hours summed; requested GPU-hour ceiling 90; allocation GPU-hours Unknown; CPU core-hours Unknown; MaxRSS Unknown; peak GPU memory Unknown
 - Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
 - Outputs: PROJECT `perun-results/swiglu-8/block-check-001-task-00` to `-14`, and the login-node merge `block-check-001/result.json` (sha256 `a268f1b0537579580eac5fe908ac6fccb06cf6912688a57a4db972fa28c32724`); scheduler logs `swiglu-8_105196_<task>.out` and `.err`
 - Continuation: completed; no checkpoint
@@ -214,12 +214,12 @@ Entries are appended below in submission order.
 - Submission: `workflows.runs.model.swiglu.swiglu_8`; `prepare`; identity `prepare-001`; submitted together with training array 105292, which depended on it (`afterok`)
 - Provenance: commit `c53cbe7` (`part_b` = `c1e-3-128`, block check sha256 `a268f1b0...`); config and code hashes recorded in the artifact
 - Allocation: `gpu_short`; 1 node (`gpu01`); 1 NVIDIA H200; 8 CPUs; 128 GB requested memory; 24-hour limit
-- Consumption: queue about 2 minutes; elapsed Unknown here (recorded in the artifact timestamps); requested GPU-hour ceiling 24; allocation GPU-hours Unknown; CPU core-hours Unknown; MaxRSS Unknown; peak GPU memory Unknown
+- Consumption: queue about 2 minutes; workflow elapsed 3.36 h (artifact timestamps 20:35-23:57 UTC); requested GPU-hour ceiling 24; allocation GPU-hours Unknown; CPU core-hours Unknown; MaxRSS Unknown; peak GPU memory Unknown
 - Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
 - Outputs: PROJECT `perun-results/swiglu-8/prepare-001/` (`result.json`, `run.json`, `prepared/` with the 100M stream and the 16 starting models); scheduler logs `swiglu-8_105291.out` and `.err`
 - Continuation: completed
 - Verification: structured status `completed`; checks P1-P5 passed (training requires them); no PROJECT lock left after stage-out
-- Variance: finished overnight within the 24-hour limit; exact duration to be read from the artifact
+- Variance: 3.36 h against the planned 3-8 h
 - Experiment document: [SwiGLU-8](../../experiments/model/swiglu/swiglu-8.md)
 - Notes: Harmless stderr lines: `fatal: not a git repository`, because the evaluation harness looks for git metadata in the scratch copy, and lm-eval's "already-initialized model" warnings.
 
@@ -230,7 +230,7 @@ Entries are appended below in submission order.
 - Submission: `workflows.runs.model.swiglu.swiglu_8`; `train`; `--dependency=afterok:105291 --kill-on-invalid-dep=yes`
 - Provenance: commit `c53cbe7`; prepared input `prepare-001/result.json`
 - Allocation: `gpu_short`; 1 node, 1 NVIDIA H200, 8 CPUs, and 128 GB requested memory per task; 6-hour limit; nodes Unknown
-- Consumption: elapsed per task Unknown here (recorded in each artifact); requested GPU-hour ceiling 96; allocation GPU-hours Unknown; CPU core-hours Unknown; MaxRSS Unknown; peak GPU memory Unknown
+- Consumption: workflow elapsed 1.18-1.33 h for each of the 12 completed tasks (0.91-1.05 h training, 0.23-0.24 h final evaluation) and 0.13-0.28 h for the 4 stopped tasks; requested GPU-hour ceiling 96; allocation GPU-hours Unknown; CPU core-hours Unknown; MaxRSS Unknown; peak GPU memory Unknown
 - Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
 - Outputs: PROJECT `perun-results/swiglu-8/{fitted,slice}-target-<t>-run-001/`; the four stopped fitted runs are kept as `...-run-001-b2-stopped`, including their 10M or 25M checkpoint
 - Continuation: completed tasks are final. The stopped tasks are rerun from token 0 after the B2 change (decision log, 2026-10-12); resuming is refused because the code changed
@@ -238,3 +238,19 @@ Entries are appended below in submission order.
 - Variance: four tasks stopped early by an over-strict tolerance, not by an execution fault
 - Experiment document: [SwiGLU-8](../../experiments/model/swiglu/swiglu-8.md)
 - Notes: Token-0 values matched SwiGLU-7 exactly. The later drift is attributed to non-repeatable 8K-sequence GPU training, pending the rerun's own run-to-run comparison.
+
+## [2026-10-12 cluster time unrecorded] 106606 | SwiGLU-8 Part B rerun of fitted 20-50% (array 0-3)
+
+- Plan: S7-0 timing, high confidence; expected 1.3-1.6 h per task; about 6-8 GPU-hours
+- Outcome: COMPLETED, all 4 tasks; exit codes Unknown; reason none
+- Submission: `workflows.runs.model.swiglu.swiglu_8`; `train --array=0,1,2,3` after the stopped first attempts were renamed to `...-run-001-b2-stopped` (runbook 3.8)
+- Provenance: commit `86291cf`, in which B2 records and is reviewed at 1% and B1 still stops; prepared input `prepare-001/result.json` unchanged
+- Allocation: `gpu_short`; all 4 tasks on `gpu01`; 1 NVIDIA H200, 8 CPUs, and 128 GB requested memory each; 6-hour limit
+- Consumption: workflow elapsed 1.26-1.32 h per task (artifact timestamps), about 5.2 H200-hours in total; allocation GPU-hours Unknown; CPU core-hours Unknown; MaxRSS Unknown; peak GPU memory Unknown
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
+- Outputs: PROJECT `perun-results/swiglu-8/fitted-target-{0.2,0.3,0.4,0.5}-run-001/`
+- Continuation: completed
+- Verification: B1 exact at token 0. B2: 34 of 36 values within 1%; two single-checkpoint flags (1.40% and 3.54%) reviewed as noise. Rerun against first attempt at 10M differs by 0.01-0.41%, which shows run-to-run noise
+- Variance: none against the plan
+- Experiment document: [SwiGLU-8](../../experiments/model/swiglu/swiglu-8.md)
+- Notes: While the 4 tasks ran, every new `sbatch` (including `--test-only`) was refused with "your total limit is 4 nodes". This is a submission-time check separate from MaxJobs=12 and MaxSubmitJobs=48; see the status page.

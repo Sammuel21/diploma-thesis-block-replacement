@@ -55,7 +55,7 @@ the project. Replace `Unknown` only with live, non-sensitive evidence.
 | --- | --- | --- | --- |
 | GPU hardware | NVIDIA H200; up to 8 GPUs per GPU node | One NVIDIA H200 observed directly in job 91995 | 2026-09-28 |
 | GPU partitions | `gpu_short` up to 2 days; `gpu_long` up to 4 days | `gpu_long` accepted five submissions; `gpu_short` training submission remains unmeasured | 2026-09-28 |
-| Concurrent jobs/GPUs | Cluster and QoS dependent | 12 running jobs, inferred from `squeue`: with 12 SwiGLU-8 block-check tasks running, the rest waited with `AssocMaxJobsLimit`. A brief `AssocGrpNodeLimit` held the first wave at 10. Not confirmed with `scontrol` | 2026-10-11 |
+| Concurrent jobs/GPUs | Cluster and QoS dependent | 12 running jobs, inferred from `squeue`: with 12 SwiGLU-8 block-check tasks running, the rest waited with `AssocMaxJobsLimit`. A brief `AssocGrpNodeLimit` held the first wave at 10. Not confirmed with `scontrol`. A submit-time rule also exists: with 4 running SwiGLU-8 tasks, every new `sbatch`, including `--test-only`, was refused with "your total limit is 4 nodes (you have 4 short + 0 long = 4, requesting 1)". Waiting arrays appear to count once, which is why the 15- and 16-task arrays were accepted. Submit chained work while few jobs are active. Slurm association limits read with `scontrol show assoc_mgr` on 2026-10-12: `MaxJobs=12` (running at once) and `MaxSubmitJobs=48` (running plus pending, array tasks counted individually). The "4 nodes" refusal happened at 4 of 12 and 4 of 48. The QoS shows no Grp or Max limits (`scontrol show assoc_mgr qos=... flags=qos`). The refusal is therefore a separate, undocumented PERUN submission check, not a Slurm association or QoS limit (inferred; not confirmed by support) | 2026-10-12 |
 | CPU allocation | Partition and QoS dependent | 8 CPUs allocated with preparation job 91995; 1 CPU with probe 91981 | 2026-09-28 |
 | HOME storage | 500 GB documented per user | 500 GB allocation; about 665 MB used when inspected | 2026-09-26 |
 | PROJECT storage | Project-specific | 1 TB allocation; writable | 2026-09-27 |
@@ -92,6 +92,7 @@ scheduler records.
 | --- | ---: | --- |
 | Project GPU-hours consumed, PERUN dashboard | About 150 | Researcher-reported dashboard value on 2026-10-10; project-level billing total |
 | SwiGLU-7 preparation plus 12 runs, workflow timing | 156.99 H200-hours | Preparation 10.21 hours plus the 12 runs, from the [SwiGLU-7 report](../../experiments/model/swiglu/swiglu-7.md) and its result artifacts; workflow-timing proxy, not scheduler allocation |
+| SwiGLU-8 block check, preparation, 16 runs and 4 stopped attempts, workflow timing | about 32.1 H200-hours | Block check 7.91, preparation 3.36, runs 20.18, stopped attempts 0.68, from the [SwiGLU-8 page](../../experiments/model/swiglu/swiglu-8.md) and its artifacts; workflow-timing proxy, not scheduler allocation |
 
 ## SwiGLU-7 plan
 

@@ -6,7 +6,10 @@ substantive update, archive, or distillation operation.
 
 ## Current Research Focus
 
-The homogeneous SwiGLU-1 through SwiGLU-7 progression is complete. Start from
+The homogeneous SwiGLU-1 through SwiGLU-7 progression is complete. SwiGLU-8
+(2026-10-12) adds the local-fitting attribution: local fitting still lowers 8K
+KL by 10-24% after 100M recovery tokens, with the gap still shrinking. It also
+adds a 20-80% control spectrum. Start from
 [[synthesis-homogeneous-swiglu-findings]] for the working discrete-width,
 replacement-only recovery control, its attribution, and its limits. Detailed
 tables and plots remain in the linked experiment reports and notebooks.
@@ -19,7 +22,7 @@ Its subset construction, operator controls, interaction metric, ordering, and
 recovery protocol remain to be designed. Singleton KL profiles must not be
 assumed to compose additively. The separate
 [Quantization-1](../../docs/experiments/model/baseline/quantization-1.md)
-baseline is implemented, with its scientific GPU execution still pending.
+baseline was submitted on PERUN on 2026-10-12, and its results are pending.
 
 ## Sources
 
@@ -84,11 +87,13 @@ No model, dataset, software, or other entity pages have been created yet.
   proposed residual-aware MLP influence score with their boundaries separated.
 - [[method-post-pruning-knowledge-distillation|Post-pruning knowledge distillation]]:
   Recovery of a pruned student from uncompressed-teacher outputs and optional
-  intermediate states.
+  intermediate states; project evidence on adding a local fit before
+  distillation is labelled separately.
 - [[method-retraining-assisted-architecture-search|Retraining-assisted architecture search]]:
   Candidate comparison under a shared lightweight recovery budget.
 - [[method-two-stage-operator-grafting|Two-stage operator grafting]]: Local
-  activation regression followed by integrated model-level fine-tuning.
+  activation regression followed by integrated model-level fine-tuning; the
+  SwiGLU-8 ablation of the local stage is recorded as project evidence.
 - [[method-frequency-variance-expert-redundancy|Frequency-variance expert redundancy]]:
   Ranks MoE experts using routing behavior and output variance.
 - [[method-mone-novice-expert-replacement|MoNE novice expert replacement]]:
@@ -161,9 +166,10 @@ historical archive remains available at `docs/prototype/mvp/`.
   Separates loss placement from parameter scope, including all three completed
   S7 variants and their Minitron, Grafting, and LoRA attribution.
 - [[synthesis-homogeneous-swiglu-findings|Homogeneous SwiGLU findings and methodology boundary]]:
-  Compact SwiGLU-1 through SwiGLU-7 decisions, evidence anchors, borrowed-method
-  boundaries, and limitations. Status: `review`; experiment-backed, not
-  independently reproduced or a claim of literature novelty.
+  Compact SwiGLU-1 through SwiGLU-8 decisions, evidence anchors, borrowed-method
+  boundaries, the measured value of local fitting after recovery, and
+  limitations. Status: `review`; experiment-backed, not independently
+  reproduced or a claim of literature novelty.
 
 ## Maintenance
 

@@ -5,7 +5,7 @@ summary: Initializes replacement operators through local activation regression a
 type: method
 status: review
 created: 2026-07-17
-updated: 2026-08-15
+updated: 2026-10-12
 
 authorship:
   created_by: collaborative
@@ -14,10 +14,11 @@ authorship:
     - llm
 
 epistemic:
-  role: prior-work
+  role: mixed
   confidence: high
   verification:
     - source-checked
+    - experiment-backed
 
 scope:
   topics:
@@ -49,6 +50,7 @@ related:
   - "[[method-mone-novice-expert-replacement]]"
   - "[[method-modegpt-modular-decomposition]]"
   - "[[comparison-recovery-objective-trainable-scope]]"
+  - "[[synthesis-homogeneous-swiglu-findings]]"
 supersedes: []
 superseded_by: []
 ---
@@ -104,6 +106,42 @@ MHA replacement fails for the tested local alternatives. Variable-width MLP
 replacement remains effective at full replacement. [src-grafting-2025,
 Sections 4.1-4.2; Tables 3-4]
 
+## Project Evidence: Is Stage 1 Still Worth It After Stage 2?
+
+The paragraphs above report prior work. This section records project
+evidence, labelled separately.
+
+**Empirical finding.** SwiGLU-8 ablated Stage 1 for causal-LLM MLP
+replacement on pinned SmolLM2-1.7B. Both arms start from the same
+importance-ranked teacher slice at the same widths:
+
+- the fitted arm adds local MSE fitting (Stage 1);
+- the slice-only arm skips it.
+
+Both then recover only the replacement MLPs with teacher-logit KL for 100M
+tokens. Before recovery, skipping Stage 1 leaves the model 2-5 times worse in
+KL. After 100M tokens, the slice-only arm's 8K KL is still 10.4-23.5% higher
+at every target from 20% to 80% eligible-MLP removal. That residual gap was
+still shrinking between 50M and 100M, so whether it persists is open. See
+[[synthesis-homogeneous-swiglu-findings]] and the
+[SwiGLU-8 report](../../../docs/experiments/model/swiglu/swiglu-8.md).
+
+**Empirical finding.** SwiGLU-8's block-level study found SwiGLU-7's Stage 1
+recipe on a plateau, with no tested change better by 5%. Fitting on 8K-context
+activations instead of 128-token ones traded about 4% better 8K KL for about
+6% worse 128-token KL. Solving the down projection exactly by least squares
+was worse than gradient fitting with early stopping. The source's finding that
+L2 suits MLP regression is consistent with the project's MSE objective, but
+the two studies are not directly comparable. [src-grafting-2025, Section 3.3;
+Table 1]
+
+**Synthesis.** The source's Table 2 compares random initialization, local
+regression alone, and local regression plus fine-tuning, but not fine-tuning
+without local regression. Its no-local-fit baseline is also random rather than
+a teacher slice. [src-grafting-2025, Section 3.3; Table 2] SwiGLU-8 measures
+that missing cell for one LLM, one seed, and a 100M-token budget. It does not
+show that Stage 1 is necessary at longer budgets.
+
 ## Limitations and Open Issues
 
 The local objective only matches activations observed on the calibration
@@ -114,8 +152,13 @@ The global fine-tuning stage can repair composition error, but it also makes
 the final result depend on recovery data, optimizer, trainable parameter set,
 and compute budget. These must be logged as experimental variables.
 
-The evidence is from diffusion transformers. Applying the method to causal LLM
-MLPs is a thesis hypothesis, not a verified consequence of this source.
+The source's evidence is from diffusion transformers. Applying the method to
+causal LLM MLPs is a thesis hypothesis, not a verified consequence of this
+source. The project evidence above supports Stage 1's value for one LLM at
+100M recovery tokens only.
+
+**Open question.** Does Stage 1's advantage survive to 1B recovery tokens, and
+does it depend on sparsity? A follow-up is proposed but not decided.
 
 ## Relationships
 
@@ -134,7 +177,13 @@ MLPs is a thesis hypothesis, not a verified consequence of this source.
 - [[comparison-recovery-objective-trainable-scope]] separates Grafting's main
   end-to-end recovery scope, its PixArt LoRA exception, and the project's
   replacement-only updates.
+- [[synthesis-homogeneous-swiglu-findings]] records the SwiGLU-8 ablation of
+  Stage 1 and its limits.
 
 ## Sources
 
 - `src-grafting-2025` - Sections 3.1-3.3 and 4.1, Tables 1-2
+- Project evidence, checked 2026-10-12 - the SwiGLU-8 records summarized in
+  the [SwiGLU-8 report](../../../docs/experiments/model/swiglu/swiglu-8.md),
+  with the local copy in
+  [data/results/workflows/model/swiglu-8](../../../data/results/workflows/model/swiglu-8/).

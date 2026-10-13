@@ -845,3 +845,37 @@ This file is append-only. Entries use the format:
   budgets and labels workflow-timestamp runtime proxies as measured allocation
   hours. The new wiki pages distinguish both correctly; no resource-accounting
   measurement or report edit is implied by this lint.
+
+## [2026-10-12] update | SwiGLU-8 local-fitting findings
+
+- Updated [[synthesis-homogeneous-swiglu-findings]] from SwiGLU-1 through 7 to
+  1 through 8:
+  - a progression row;
+  - a borrowed-versus-project boundary row for local fit versus recovery
+    alone, citing Grafting Section 3.3, Table 2, and Minitron Sections 3 and
+    4.3;
+  - a new section with the Part A (block-level) and Part B (model-level)
+    empirical findings, a labelled synthesis, the measured run-to-run noise,
+    and the 1B persistence open question;
+  - an updated Quantization-1 status, limits, relationships, and evidence
+    anchors.
+- Added labelled project-evidence sections to
+  [[method-two-stage-operator-grafting]] (the SwiGLU-8 ablation of Stage 1)
+  and [[method-post-pruning-knowledge-distillation]] (adding a local fit
+  before logit distillation). Both pages changed from `prior-work` to `mixed`
+  with `experiment-backed` added; their prior-work text is unchanged.
+- Updated the index focus, Quantization-1 status, and three page summaries,
+  plus reciprocal `related` links.
+- Evidence: the local SwiGLU-8 copy under
+  `data/results/workflows/model/swiglu-8/`, read 2026-10-12 (merged block
+  check, preparation, and 16 run results), and the SwiGLU-8 report. No new
+  source was registered or ingested.
+- Unresolved:
+  - persistence of the local-fit advantage beyond 100M tokens; a 1B follow-up
+    at 20%, 50%, and 80% is proposed, not decided;
+  - single-seed arms;
+  - no paired between-arm task interval;
+  - Quantization-1 results pending.
+- Mechanical check of the three edited pages and the index: frontmatter
+  parses, controlled values are valid, `id` matches the filename, and
+  wikilinks and relative paths resolve. This is not a full lint.

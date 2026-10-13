@@ -70,6 +70,10 @@ def load_quantized_bundle(directory, device="cuda", attention_implementation="sd
     from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
     directory = Path(directory)
+    device = torch.device(device)
+    if device.type == "cuda" and device.index is None:
+        # Packed TorchAO tensors must name the same device as their inner storage.
+        device = torch.device("cuda", torch.cuda.current_device())
     manifest = validate_quantized_bundle(directory)
     require_backend(manifest["backend"], manifest["bits"])
     config = AutoConfig.from_pretrained(directory, local_files_only=True)

@@ -24,8 +24,8 @@ Start with the [results overview](swiglu-results.md) for the achieved quality,
 matched comparisons, compute cost, and limitations. The
 [experimental progression](swiglu-progression.md) explains the chronological
 decisions and rationale for the completed experiments. The homogeneous family
-is concluded through SwiGLU-7, except for the planned SwiGLU-8 local-fitting
-control. Future experiments use SwiGLU-7's replacement-only production recipe
+is concluded through SwiGLU-7. SwiGLU-8, completed on 2026-10-12, adds the
+local-fitting control and the 20-80% control spectrum at 100M tokens. Future experiments use SwiGLU-7's replacement-only production recipe
 as the control for a new experiment class.
 
 | Experiment | Main contribution | Execution status |
@@ -37,7 +37,7 @@ as the control for a new experiment class.
 | [SwiGLU-5](swiglu-5.md) | Efficient initialization/allocation search followed by gated confirmation | Search and both 100M confirmations completed |
 | [SwiGLU-6](swiglu-6.md) | 1B continuation, frozen final evaluation, and BF16 deployment accounting | Completed |
 | [SwiGLU-7](swiglu-7.md) | Native-8K production comparison of replacement-only, full-body, and MLP-plus-attention-LoRA retraining | Preparation and all 12 production runs completed |
-| [SwiGLU-8](swiglu-8.md) | Local-fitting attribution and the 20-80% homogeneous control spectrum at 100M tokens | Part A completed 2026-10-11 (SwiGLU-7 recipe kept); Part B: 12 of 16 runs completed, 4 fitted runs being rerun |
+| [SwiGLU-8](swiglu-8.md) | Local-fitting attribution and the 20-80% homogeneous control spectrum at 100M tokens | Part A completed 2026-10-11 (SwiGLU-7 recipe kept); all 16 Part B runs completed and analysed 2026-10-12: local fitting still worth 10-24% in 8K KL at 100M, gap still shrinking (inconclusive at 100M) |
 
 The maintained runners and configurations use the matching class directories
 under `workflows/runs/model/swiglu/` and `workflows/configs/model/swiglu/`.
