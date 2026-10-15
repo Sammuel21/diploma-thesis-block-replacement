@@ -5,7 +5,7 @@ type: architecture
 category: agents/code-and-workflows
 status: active
 created: 2026-09-18
-modified: 2026-09-23
+modified: 2026-10-15
 authorship:
   created_by: collaborative
 curation:
@@ -145,10 +145,6 @@ The SwiGLU-3 workflow is the current reference for this boundary:
 Do not copy this checkpoint machinery into a short workflow. Its complexity is
 justified by recovery runs whose loss would be material.
 
-Do not add or run reduced-budget smoke workflows unless the researcher asks for
-one in the current task. When explicitly requested, keep them separate from
-scientific defaults and never interpret their metrics as thesis results.
-
 ## Verification
 
 Verification follows the change's failure cost and scientific reach:
@@ -169,26 +165,7 @@ Do not create a broad test framework, synthetic fixture hierarchy, or unrelated
 lint cleanup for a local change. A successful smoke run establishes
 executability, not notebook parity or scientific validity.
 
-## Implementation-agent suitability
-
-Before delegating a change, report one of these ratings:
-
-| Rating | Typical change | Suggested model |
-| --- | --- | --- |
-| Low | Isolated CLI/config plumbing, serialization field, or direct adaptation with exact references | GPT-5.6 Luna Max or GPT-5.6 Terra medium |
-| Medium | One maintained module or workflow stage with settled semantics and bounded interactions | GPT-5.6 Terra high, followed by focused review |
-| High | Scientific method, artifact schema, checkpoint/resume, failure recovery, memory lifetime, or Perun/darthmachinus compatibility | GPT-5.6 Sol, high or above |
-
 Short code can be high risk when failure would invalidate a long experiment or
-silently change its meaning. If the user has not selected a model, explicitly
-ask whether they want the cheaper eligible implementation model or the stronger
-recommended model. Do not spawn an implementation agent automatically.
-
-The handoff must identify affected files, required behavior, invariants,
-reference implementation, allowed scope, and verification. A stronger model
-should review high-risk changes against the diff and invariants without
-repeating the complete repository analysis.
-
-Astra is reserved for manual selection by the researcher as the primary
-session model. An agent must not recommend, select, or spawn Astra for delegated
-implementation or review.
+silently change its meaning. Scientific method, artifact schema,
+checkpoint/resume, failure recovery, memory lifetime, and Perun/darthmachinus
+compatibility changes need the stricter checks above.

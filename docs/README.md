@@ -31,10 +31,10 @@ Markdown files in this directory follow the
 
 - [Notebook implementation standard](agents/notebook-implementation.md)
   defines the researcher-authored Markdown boundary, observed notebook style,
-  proportional verification, and implementation-model suitability.
+  and proportional verification.
 - [Maintained code and workflow implementation standard](agents/maintained-code-and-workflows.md)
   defines source-package boundaries, portable execution, artifact and resume
-  reliability, proportional verification, and implementation-model suitability.
+  reliability, and proportional verification.
 - [Grilling protocol](agents/grilling.md) defines the on-request question
   rounds used to stress-test plans, adapted with credit from Matt Pocock's
   `grilling` skill.

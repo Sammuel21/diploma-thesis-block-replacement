@@ -15,16 +15,11 @@ Slurm job or resource request is defined yet.
 | File | Purpose |
 | --- | --- |
 | `scratch_probe.sbatch` | Performs a five-minute CPU-only check of manual PROJECT-to-SCRATCH staging and PROJECT stage-out without loading Python or requesting a GPU. |
-| `smoke.sbatch` | Runs `perun-smoke-linear.json` with minimal budgets to check the real model, data, GPU, workflow, and result path. It is an infrastructure check, not thesis evidence. |
-| `run_experiment.sbatch` | Runs one supplied JSON configuration in one isolated Python process on one GPU. |
-| `run_array.sbatch` | Maps a manifest of JSON configurations onto independent one-GPU Slurm array tasks. It does not distribute one experiment across GPUs. |
 | `run_model.sbatch` | Runs the historical allow-listed model-wide workflows that still depend on the unavailable automatic-scratch helper. It is not the SwiGLU-7 launcher. |
 | `swiglu_7.sbatch` | Runs the independent SwiGLU-7 preparation or maps array tasks `0-11` onto its fixed three-scope/four-target grid. |
 | `swiglu_8.sbatch` | Runs the SwiGLU-8 block check or preparation, or maps array tasks `0-15` onto its two arms at eight targets. |
 | `speed_1.sbatch` | Times the saved dense, quantized, and SwiGLU-8 bundles in one job on one GPU, so their speeds are comparable. |
 
-`smoke.sbatch` defaults to `gpu_short`, 48 GB of CPU memory, and one hour. The
-generic and array launchers default to `gpu_long`, 64 GB, and 72 hours.
 `run_model.sbatch` defaults to the documented four-day `gpu_long` ceiling
 because the migrated studies contain long local-fitting loops. These are
 starting values, not measured requirements. Options passed to `sbatch` may
@@ -102,66 +97,6 @@ that checkout to a unique `/mnt/scratch/$USER/job_<job-key>` directory. Use a
 clean checkout so untracked runtime data does not waste staging time or scratch
 capacity. Keep installed environments and the reusable Hugging Face cache in
 persistent storage outside the checkout.
-
-## Smoke job
-
-```bash
-sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
-  workflows/jobs/perun/smoke.sbatch
-```
-
-This uses `configs/experiments/perun-smoke-linear.json`. It still loads the
-real model and datasets, so a successful result also confirms cache or network
-access from the compute allocation.
-
-## One experiment
-
-```bash
-sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
-  workflows/jobs/perun/run_experiment.sbatch \
-  configs/experiments/smollm2-one-shot-linear.json
-```
-
-An optional second script argument chooses the structured JSON output path:
-
-```bash
-sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
-  workflows/jobs/perun/run_experiment.sbatch \
-  configs/experiments/smollm2-one-shot-linear.json \
-  data/results/perun/my-run.json
-```
-
-Slurm resource options can be overridden without modifying the tracked file:
-
-```bash
-sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
-  --partition=gpu_short --time=12:00:00 --mem=48G \
-  workflows/jobs/perun/run_experiment.sbatch \
-  configs/experiments/smollm2-one-shot-linear.json
-```
-
-## Experiment array
-
-Create a plain-text manifest with one repository-relative JSON configuration
-path per non-empty line. Lines beginning with `#` are ignored:
-
-```text
-configs/experiments/operator-linear-seed-1.json
-configs/experiments/operator-linear-seed-2.json
-configs/experiments/operator-swiglu-seed-1.json
-```
-
-For a three-line manifest, submit array indices `0-2`. The optional `%2`
-limits concurrent tasks to two:
-
-```bash
-sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=0-2%2 \
-  workflows/jobs/perun/run_array.sbatch configs/experiments/perun-array.txt
-```
-
-The array range is supplied at submission time because a Slurm directive
-cannot infer it from the manifest. An out-of-range task fails before loading a
-model.
 
 ## Model-wide notebook workflows
 
@@ -276,8 +211,7 @@ result handling.
 ## SwiGLU-8 workflow
 
 `swiglu_8.sbatch` uses the SwiGLU-7 lock, scratch, and verified stage-out
-contract with Quantization-1's explicit code staging, so it does not depend on
-`.rsyncignore`. Outputs go to `PROJECT/perun-results/swiglu-8/<run-id>`. Every
+contract with Quantization-1's explicit code staging. Outputs go to `PROJECT/perun-results/swiglu-8/<run-id>`. Every
 stage reads its pinned SwiGLU-7 sources read-only from
 `PROJECT/perun-results/swiglu-7/`. Each submission needs the researcher's go;
 pass the stage's planned `--time` from the
@@ -316,8 +250,7 @@ in one process. Before it locks the chosen output, it
 checks CUDA and the pinned TorchAO and MSLK versions, so a broken environment
 fails without leaving a lock. It stages supplied inputs and verifies durable
 stage-out before scratch cleanup. It uses the project's `mlp-replacement`
-Conda environment with TorchAO and MSLK added, and does not rely on
-`.rsyncignore`. See the
+Conda environment with TorchAO and MSLK added. See the
 [Quantization-1 guide](../../../docs/experiments/model/baseline/quantization-1.md)
 for submission, resource-planning, and resume requirements.
 

@@ -120,7 +120,7 @@ trap finalize_job EXIT
 trap 'terminate_job 143' TERM
 trap 'terminate_job 130' INT
 
-# Stage only executable code/configs, independently of the historical .rsyncignore.
+# Stage only executable code and configs.
 for CODE_PATH in src workflows/runs workflows/configs workflows/__init__.py; do
     mkdir -p "$SCRATCH_DIR/$(dirname "$CODE_PATH")"
     rsync -a --exclude='__pycache__/' "$SUBMIT_DIR/$CODE_PATH" "$SCRATCH_DIR/$(dirname "$CODE_PATH")/"

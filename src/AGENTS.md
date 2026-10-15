@@ -33,16 +33,10 @@
   scheduler-launched execution on Perun. Do not hardcode machine paths,
   usernames, credentials, account names, QoS values, or cache locations.
 
-## Verification and model routing
+## Verification
 
 - Match verification to risk: inspect imports and focused behavior for a local
   change, and use the intended scientific run when execution evidence is
-  required. Do not suggest, implement, or execute a smoke path unless the user
-  explicitly requests one in the current task.
-- Before delegating an implementation, classify it as low, medium, or high
-  risk using the linked standard and recommend a model tier. If the user has
-  not chosen a model, explicitly ask whether they want the cheaper eligible
-  model or the stronger recommended model.
-- Do not delegate automatically, and do not describe a scientific or
-  infrastructure-critical change as mechanical merely because its diff is
-  short.
+  required.
+- Do not describe a scientific or infrastructure-critical change as mechanical
+  merely because its diff is short.

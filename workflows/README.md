@@ -24,28 +24,7 @@ records the submission, storage, environment, scratch, artifact, and validation
 requirements that migrated workflows must respect. Scoped implementation-agent
 instructions are in [`AGENTS.md`](AGENTS.md).
 
-## Run one experiment
-
-From the repository root, add `src/` to `PYTHONPATH` and pass one experiment
-configuration to the runner:
-
-```powershell
-$env:PYTHONPATH = "src"
-python -m workflows.runs.run_experiment configs/experiments/smollm2-one-shot-linear.json
-```
-
-An explicit output path is optional:
-
-```powershell
-python -m workflows.runs.run_experiment `
-  configs/experiments/smollm2-one-shot-linear.json `
-  --output data/results/run-001.json
-```
-
-Every execution writes one atomic JSON run record containing the resolved
-configuration, environment, completed-stage metrics, final result, and failure
-details when execution raises an exception. Model weights, captured activation
-tensors, and teacher logits are not embedded in that record.
+## One experiment per process
 
 One experiment per process is deliberate. Process exit releases the model,
 activation data, and CUDA allocator state between runs; a scheduler or job
@@ -79,10 +58,6 @@ The original CLI modules and `swiglu_5.py` compatibility imports remain availabl
 Shared evaluation and model reconstruction belong to `src/mlp_replacement/`;
 historical artifact adaptation stays in the workflow layer. See the model-runner
 README for the source-snapshot and continuation boundary of this refactor.
-
-The older `runs/run_experiment.py` remains the generic configuration-driven
-entry point for one standard replacement experiment. It is not an alias for
-the multi-policy model-study runners.
 
 For executor-specific commands, see [`jobs/local/README.md`](jobs/local/README.md)
 and [`jobs/perun/README.md`](jobs/perun/README.md).

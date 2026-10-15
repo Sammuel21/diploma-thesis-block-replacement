@@ -98,9 +98,11 @@ class ExecutorContracts(unittest.TestCase):
         self.assertIn('data/work/"$WORKFLOW_NAME"/*', source)
         self.assertIn("trap cleanup_work_dir EXIT", source)
 
-    def test_rsync_ignore_is_narrow(self):
-        lines = (ROOT / ".rsyncignore").read_text(encoding="utf-8").splitlines()
-        self.assertEqual(lines, ["/tmp/mlp-replacement/"])
+    def test_whole_repository_staging_excludes_local_temporary_files_inline(self):
+        for launcher in (PERUN_SWIGLU_7, ROOT / "workflows/jobs/perun/scratch_probe.sbatch"):
+            source = launcher.read_text(encoding="utf-8")
+            self.assertIn("--exclude='/tmp/mlp-replacement/'", source)
+            self.assertNotIn(".rsyncignore", source)
 
 
 if __name__ == "__main__":

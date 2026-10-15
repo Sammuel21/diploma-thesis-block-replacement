@@ -1,5 +1,9 @@
 # Behavior-preserving refactor implementation ledger
 
+> **Historical record.** This refactor was completed on 2026-09-23 and is
+> preserved as written. Its statements about pending checks and unavailable
+> Python describe that date, not the current repository.
+
 ## Baseline and scope
 
 - Baseline: `dc11a031a07b217e1661adf0cb1f29b1ccb28393`.

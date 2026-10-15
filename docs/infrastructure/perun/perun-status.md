@@ -5,7 +5,7 @@ type: report
 category: infrastructure/perun
 status: active
 created: 2026-09-25
-modified: 2026-10-10
+modified: 2026-10-15
 authorship:
   created_by: collaborative
 curation:
@@ -41,10 +41,10 @@ usernames, credentials, and secret-bearing paths are not recorded.
 | Manual scratch and PROJECT stage-out | Available | PERUN support confirmed the manual contract; CPU probe 91981 copied PROJECT to SCRATCH, ran there, copied and verified its result in PROJECT, and cleaned only its job directory. |
 | Python/CUDA environment | Available | Job 92265 verified Python 3.12, PyTorch 2.11.0+cu128 on an H200 and completed the exact `HFLM` evaluation path after `accelerate` installation. |
 | Model and dataset availability | Available for preparation | Job 92265 loaded the pinned model, tokenizer, recovery/evaluation data, and benchmark datasets and completed dense evaluation. |
-| SwiGLU-7 runner | Preparation completed | Job 92265 completed and validated the independent `prepare-001` artifact. Training remains unmeasured. |
-| SwiGLU-7 PERUN job | Preparation path validated | Manual staging, resume, execution, PROJECT stage-out, lock removal, and structured completion worked in job 92265. The 12-task training path remains unmeasured. |
+| SwiGLU-7 runner | Completed | Job 92265 completed and validated the independent `prepare-001` artifact; all 12 production runs completed (see the [SwiGLU-7 report](../../experiments/model/swiglu/swiglu-7.md#measured-execution-cost)). |
+| SwiGLU-7 PERUN job | Validated | Manual staging, resume, execution, PROJECT stage-out, lock removal, and structured completion worked in job 92265; the 12-task training array completed and its outputs are in PROJECT. |
 | SwiGLU-7 prerequisite artifacts | None | No SwiGLU-1 through SwiGLU-6 runtime artifact is required. The pinned model and datasets must still be available from the compute allocation. |
-| Recorded Perun execution | Preparation completed | After the earlier infrastructure and dependency failures, resume job 92265 completed SwiGLU-7 preparation and dense evaluation. |
+| Recorded Perun execution | Completed | After the earlier infrastructure and dependency failures, SwiGLU-7, SwiGLU-8, Quantization-1, and Speed-1 completed on PERUN; see the consumption table below. |
 
 ## Available capacity
 
@@ -96,40 +96,10 @@ scheduler records.
 | Quantization-1 five models, failed reloads and four re-evaluations, workflow timing | about 18.9 H200-hours, plus 0.03 h CPU preparation | Dense 0.29, INT8 and INT4 first attempts 0.02, QAT 100M 1.63, QAT 1B 15.83, evaluations 1.10, from the [Quantization-1 page](../../experiments/model/baseline/quantization-1.md#results-2026-10-13) and its artifacts; workflow-timing proxy, not scheduler allocation |
 | Speed-1 one-GPU speed comparison, workflow timing | about 1.7 H200-hours | Job 110219, 24 measurements, from the [Speed-1 page](../../experiments/model/baseline/speed-1.md#results-2026-10-15) and its artifacts; workflow-timing proxy, not scheduler allocation |
 
-## SwiGLU-7 plan
-
-SwiGLU-7 comprises one shared preparation followed by 12 independent
-training/evaluation jobs: three retraining scopes at four compression targets.
-The runner is single-process and single-GPU; more GPUs do not accelerate one
-trajectory.
-
-| Resource | Planned request or location | Current status |
-| --- | --- | --- |
-| GPU | 1 H200-class GPU via `gpu_short` | Python/CUDA execution verified on one H200; training placement remains unmeasured |
-| CPU | 8 CPUs per task | Unmeasured |
-| Host memory | 128 GB | Unmeasured; sized for S7-1 checkpoint and Adam-state assembly |
-| Wall time | 48 hours per task | Equal to the documented `gpu_short` ceiling; estimated above the 8-24 hour trajectory bands, but unmeasured |
-| Temporary work | `/mnt/scratch/$USER/job_<job-key>/tmp/mlp-replacement/...` | Manual directory contract verified by CPU probe |
-| Durable job output | `PROJECT/perun-results/swiglu-7/<run-id>` | Launcher performs and verifies manual stage-out |
-| Output reserve | Trainable state, optimizer state, and final bundle estimate, plus 15% | Exact bytes depend on strategy and target |
-| Prepared data | About 16-20 GB durable plus 15-20 GB temporary fitting state | `prepare-001` completed; exact durable bytes unrecorded |
-| Planned allocation cost | 124-266 H200 GPU-hours for preparation plus all 12 runs | Estimate from recorded RTX 4090 SwiGLU-5/6 timings and the changed 8K workload; not consumption |
-| Expected VRAM | S7-0 25-50 GB; S7-1 35-70 GB; S7-2 30-60 GB | Planning bands only; H200 supplies 141 GB HBM |
-
-Submit preparation first and verify its hashes and stage-out location. A `%12`
-array concurrency cap permits all 12 one-GPU tasks to run simultaneously and
-gives an estimated 12-24 hours of training-grid compute after preparation,
-excluding queue time. Scheduler availability may start fewer than 12 tasks at
-once. See the [SwiGLU-7 experiment
-guide](../../experiments/model/swiglu/swiglu-7.md) for the estimate basis and
-scientific contract.
-
 ## Open questions
 
 - Is the compute-node failure to resolve the numeric user ID related to scratch
   initialization?
-- Are the current memory and wall-time requests sufficient for each SwiGLU-7
-  retraining scope?
 
 ## Update procedure
 

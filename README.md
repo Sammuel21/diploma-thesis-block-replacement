@@ -16,7 +16,7 @@ defined in [docs/annotation.md](docs/annotation.md).
 | `docs/prototype/mvp/` | Frozen documentation and manifest for the completed MVP |
 | `notebooks/mvp/` | Historical MVP execution and analysis notebooks |
 | `scripts/intro/` | Historical MVP helper implementation |
-| `configs/` | Historical MVP configuration and maintained experiment configuration files |
+| `configs/` | Historical MVP configuration |
 | `data/mvp/results/logs/` | Versioned MVP experiment evidence |
 | `src/mlp_replacement/` | Maintained replacement, recovery, and evaluation implementation |
 | `workflows/` | Maintained experiment runners and executor-specific job definitions |
@@ -29,6 +29,9 @@ production architecture.
 ## Navigation
 
 - [Human documentation index](docs/README.md)
+- [Results snapshots](docs/results/): dated comparisons across experiments
+- [Homogeneous SwiGLU experiments](docs/experiments/model/swiglu/README.md) and
+  their [results lookup](docs/experiments/model/swiglu/swiglu-results.md)
 - [Quantization-1 MLP baseline](docs/experiments/model/baseline/quantization-1.md)
 - [Heterogeneous operator experiment area](docs/experiments/model/heterogenous/README.md)
 - [MVP archive](docs/prototype/mvp/README.md)

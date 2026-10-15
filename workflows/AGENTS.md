@@ -33,9 +33,7 @@
 
 ## Workflow reliability
 
-- Keep scientific defaults in a versioned configuration. Do not propose or add
-  smoke overrides, smoke jobs, or reduced-budget smoke workflows unless the
-  user explicitly requests them in the current task.
+- Keep scientific defaults in a versioned configuration.
 - Use repository-relative paths for portable inputs and outputs. Resolve paths
   independently of the launcher's working directory.
 - Give every scientific run a unique output. Refuse accidental overwrites and
@@ -48,16 +46,10 @@
 - Keep scheduler logs operational; they do not replace the structured science
   artifact or crash-aware run state.
 
-## Verification and model routing
+## Verification
 
 - Check configuration ownership and schema, artifact contracts, path handling,
   and failure behavior through code inspection and the intended scientific run.
-  Do not suggest or execute an existing smoke configuration unless the user
-  explicitly requests it in the current task.
-- Before delegating an implementation, classify it as low, medium, or high
-  risk using the linked standard and recommend a model tier. If the user has
-  not chosen a model, explicitly ask whether they want the cheaper eligible
-  model or the stronger recommended model.
 - Treat recovery, checkpoint/resume, artifact-schema, memory-lifetime, and
   Perun-launch changes as high risk by default.
 

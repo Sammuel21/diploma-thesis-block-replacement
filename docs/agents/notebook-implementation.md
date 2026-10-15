@@ -5,7 +5,7 @@ type: architecture
 category: agents/notebooks
 status: active
 created: 2026-09-18
-modified: 2026-09-18
+modified: 2026-10-15
 authorship:
   created_by: collaborative
 curation:
@@ -67,7 +67,7 @@ Keep the notebook readable from top to bottom:
 
 Use the nearest relevant notebook as a concrete reference. Name the exact
 reference cells in an implementation handoff. “Follow the repository style” is
-too vague for a cheaper implementation model.
+too vague to act on.
 
 Keep code direct and locally understandable:
 
@@ -116,32 +116,12 @@ verification normally consists of:
 - confirming that existing Markdown, cell IDs, and unrelated outputs were
   preserved.
 
-Run a cheap reporting cell or existing smoke path when it materially checks the
-change. Do not load a model or start fitting solely to verify a presentation
-change.
+Run a cheap reporting cell when it materially checks the change. Do not load a
+model or start fitting solely to verify a presentation change.
+
+Risk depends on how much unresolved judgment remains, not on how many lines
+change. A small cell that chooses the wrong denominator or checkpoint can
+still be high risk.
 
 When reading notebooks for implementation, extract the relevant cell sources.
 Avoid returning the complete notebook JSON or embedded outputs to the model.
-
-## Implementation-agent suitability
-
-Rate the proposed implementation before delegation:
-
-| Rating | Typical notebook change | Suggested model |
-| --- | --- | --- |
-| Low | One or more reporting cells with exact artifact fields and reference cells | GPT-5.6 Luna Max |
-| Medium | Multi-cell computation with settled methodology but some dependency tracing | GPT-5.6 Terra, high |
-| High | New methodology, model mutation, fitting/recovery behavior, or ambiguous artifact semantics | GPT-5.6 Sol, high or above |
-
-The rating measures how much unresolved judgment remains, not how many lines
-will change. A small cell that chooses the wrong denominator or checkpoint can
-still be high risk.
-
-Delegation is a user choice. Supply the selected agent with the scoped
-instructions, exact target cells, allowed Markdown changes, reference cells,
-artifact fields, and completion checks. Review the resulting diff once; avoid
-continuous high-cost supervision of routine implementation.
-
-Astra is reserved for manual selection by the researcher as the primary
-session model. An agent must not recommend, select, or spawn Astra for delegated
-implementation or review.

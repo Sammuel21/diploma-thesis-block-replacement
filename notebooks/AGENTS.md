@@ -51,19 +51,4 @@
 - Verify the notebook parses as JSON, inspect only the changed cells and their
   immediate dependencies, and check referenced artifact fields or imports.
 - Do not execute expensive model loading, fitting, or recovery merely to test a
-  reporting change. Do not suggest, implement, or execute a smoke path unless
-  the user explicitly requests one in the current task.
-
-## Model suitability
-
-- Reporting-only work with exact source cells and artifact fields is a
-  low-risk candidate for GPT-5.6 Luna Max.
-- Multi-cell experiment logic or changes that require scientific judgment are
-  a medium-risk candidate for GPT-5.6 Terra.
-- New methodology, model mutation, recovery, or ambiguous artifact semantics
-  require GPT-5.6 Sol for delegated work unless the user explicitly chooses
-  another delegation model.
-- Astra is reserved for manual selection by the user as the primary session
-  model. Do not recommend or spawn it as a delegated agent.
-- A model rating is a recommendation, not authority to spawn an agent. Follow
-  the root delegation rule.
+  reporting change.

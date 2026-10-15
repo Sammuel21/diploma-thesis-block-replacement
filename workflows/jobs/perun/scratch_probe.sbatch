@@ -53,7 +53,7 @@ rsync -a \
     --exclude='*.out' \
     --exclude='*.err' \
     --exclude='results_job_*/' \
-    --exclude-from="$SUBMIT_DIR/.rsyncignore" \
+    --exclude='/tmp/mlp-replacement/' \
     "$SUBMIT_DIR/" "$SCRATCH_DIR/"
 
 cd "$SCRATCH_DIR"

@@ -42,7 +42,8 @@
 - Do not suggest, implement, or run smoke tests, smoke jobs, or reduced-budget
   smoke workflows unless I explicitly request one in the current task. Use
   code inspection and the intended scientific run as the default validation
-  path for experiment workflows.
+  path for experiment workflows. A requested smoke path stays separate from
+  scientific defaults, and its metrics are never thesis results.
 - If the provided context, prompt, or codebase state is ambiguous, incomplete, or contradictory, do not force an answer.
 - Explicitly state what is unclear and ask for the missing details, files, notes, sources, or constraints.
 - Do not invent assumptions silently.
@@ -111,6 +112,10 @@
   runs, restate the goal, key assumptions, and up to five blocking questions
   with recommended answers, then wait for my confirmation. Skip this for small
   tasks.
+- At a phase boundary (plan, build, deploy, analyse), or when the session
+  context passes about 250k tokens, suggest a handoff: update the experiment
+  document's status and next step, propose decision-log rows, update the
+  tool's memory if it has one, and then recommend a fresh session.
 
 ## Knowledge-maintenance advisory
 - Recommend a targeted wiki update when work introduces or changes thesis
@@ -118,22 +123,14 @@
   a meaningful contradiction, or completes findings that change the working
   baseline. Identify the missing knowledge and affected pages briefly.
 - Do not recommend a full wiki lint after routine code, formatting, or minor
-  documentation edits. Keep detailed results in reports/artifacts; the wiki
-  retains compact conclusions, methodology boundaries, and evidence links.
+  documentation edits. Experiment results belong in `docs/` and artifacts;
+  the wiki holds sources, method attribution, and methodology boundaries.
 - This is an advisory trigger, not permission to ingest sources or edit the
   wiki automatically. Obtain approval unless the current request includes it.
 
-## Implementation-agent routing
-- Do not delegate implementation automatically. If the user has not selected a
-  model and delegation would be useful, state the task's implementation-risk
-  rating and recommended model tier before asking whether to delegate.
-- Astra is reserved for manual selection by the user as the primary session
-  model. Do not recommend, select, or spawn Astra as a delegated agent.
-- Use the scoped model-suitability rules in `notebooks/AGENTS.md`,
-  `src/AGENTS.md`, and `workflows/AGENTS.md`. A cheaper model is suitable only
-  when the design, file scope, reference implementation, and completion checks
-  are concrete.
-- Give an implementation agent the relevant scoped instructions, exact files or
+## Delegation
+- Do not delegate to sub-agents or other models unless I ask.
+- When I ask, give the agent the relevant scoped instructions, exact files or
   cells, reference examples, allowed changes, and completion checks. Do not use
   an active high-cost supervising agent for routine polling.
 
