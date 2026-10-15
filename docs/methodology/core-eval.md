@@ -27,7 +27,7 @@ records support the comparison.
 
 | Metric | Meaning | Priority |
 | --- | --- | --- |
-| FLOPs or MACs | Estimated arithmetic for a declared workload; weight-only quantization preserves matrix dimensions and logical MAC count | Core |
+| FLOPs | Estimated arithmetic for a declared workload (1 multiply-accumulate = 2 FLOPs); weight-only quantization preserves matrix dimensions and FLOP count | Core |
 | TTFT on a long prompt (ms) | Time until the first output token; dominated by prompt processing | Core |
 | Batched throughput (tokens/s) | Total output rate at batch 4 | Core |
 | Subsequent-token latency (ms/token) | Average generation time per token after the first, batch 1 | Supporting |

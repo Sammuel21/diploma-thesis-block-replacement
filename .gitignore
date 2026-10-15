@@ -42,3 +42,4 @@ llm-wiki/*.canvas
 .agents
 .claude
 plans/
+docs/plans

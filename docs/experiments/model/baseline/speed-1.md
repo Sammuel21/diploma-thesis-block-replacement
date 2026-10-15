@@ -22,7 +22,7 @@ Quantization-1 speeds came from a different H200 for each model, so they are
 not comparable (decision log, 2026-10-11). Speed-1 removes that limitation.
 Nothing is trained; the existing model bundles are only loaded and timed.
 
-**Status (2026-10-15):** implemented, not yet submitted.
+**Status (2026-10-15):** completed (job 110219); see [Results](#results-2026-10-15).
 
 **Scope.** The decision log (2026-07-18) treats latency and throughput as
 optional descriptive measurements. Whether speed becomes a Core axis, as the
@@ -116,6 +116,62 @@ measurements are kept; an unfinished one is repeated.
 - One GPU model (H200) and one software stack. The results describe this
   setup, not other hardware or inference engines.
 
-## Results
+## Results (2026-10-15)
 
-Not yet run.
+Job 110219 at commit `b60371d`, one H200 on node gpu01, 2026-10-15
+16:27-18:08 UTC. All 24 measurements share one execution fingerprint and one
+GPU. Values are means of the two pass medians, from
+`data/results/workflows/model/speed-1/speed-001/`.
+
+| Model | TTFT 1 × 2,048 (ms) | TTFT 4 × 2,048 (ms) | TTFT 1 × 7,936 (ms) | Tokens/s 1 × 2,048 | Tokens/s 4 × 2,048 | Tokens/s 1 × 7,936 | Peak VRAM (GiB) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Dense BF16 | 19.8 | 72.4 | 80.2 | 163.6 | 648.6 | 162.2 | 5.22 |
+| INT8 PTQ | 25.0 | 83.2 | 90.5 | 135.0 | 453.9 | 118.3 | 4.19 |
+| INT4 PTQ | 20.5 | 75.0 | 82.8 | 153.5 | 624.5 | 152.8 | 3.70 |
+| INT4 QAT 1B | 20.4 | 74.9 | 82.7 | 159.4 | 629.2 | 154.2 | 3.70 |
+| SwiGLU 20% | 19.7 | 71.3 | 79.0 | 166.0 | 656.6 | 160.9 | 4.81 |
+| SwiGLU 30% | 18.3 | 65.8 | 73.6 | 161.5 | 640.5 | 157.2 | 4.60 |
+| SwiGLU 40% | 17.5 | 62.8 | 70.7 | 167.4 | 662.9 | 162.9 | 4.39 |
+| SwiGLU 50% | 16.5 | 59.1 | 67.1 | 167.7 | 667.0 | 163.6 | 4.19 |
+| SwiGLU 60% | 17.2 | 61.4 | 69.5 | 167.9 | 666.8 | 163.6 | 3.98 |
+| SwiGLU 70% | 16.0 | 57.0 | 65.0 | 164.4 | 669.4 | 163.8 | 3.78 |
+| SwiGLU 75% | 14.9 | 52.6 | 60.8 | 168.5 | 673.7 | 165.0 | 3.67 |
+| SwiGLU 80% | 14.9 | 52.1 | 60.2 | 164.7 | 673.9 | 165.4 | 3.57 |
+
+Peak VRAM is the largest workload (4 × 2,048 or 1 × 7,936, including the KV
+cache). Tokens/s counts all 256 generated tokens per request.
+
+| Check | Result |
+| --- | --- |
+| Same GPU and execution fingerprint for all 24 measurements | Yes |
+| Time to first token, forward vs reverse pass | Within 0.5% for every model and workload |
+| Tokens per second, forward vs reverse pass | Within 6.2%; differences below about 6% are noise |
+
+**Findings.**
+
+- **SwiGLU cuts time to first token.** At 1 × 7,936 tokens it is 16% faster
+  than dense at 50% and 25% faster at 80%; at 4 × 2,048 it is 18% and 28%
+  faster. The prompt-processing step is the most compute-bound one, so it
+  follows the removed FLOPs.
+- **SwiGLU does not speed up token generation.** Tokens per second stay within
+  -3% to +4% of dense at every target, inside the 6% noise.
+- **Quantization is never faster.** INT4 is 3-4% slower to first token and
+  4-6% lower in tokens per second; INT8 is 13-26% slower to first token and
+  17-30% lower in tokens per second.
+- **SwiGLU 60% is slightly slower than 50%** on every workload (for example
+  69.5 vs 67.1 ms). Observed, cause not investigated; its layer widths differ
+  in shape from the neighbouring targets.
+
+**Why generation does not speed up (inference, not measured).** Dense decodes
+at about 6 ms per token. Reading its 3.2 GiB of weights once takes well under
+1 ms on an H200, so decoding in this setup is limited by per-token overhead
+(eager PyTorch, one kernel launch per operation, batch 1-4), not by FLOPs or
+weight bytes. That overhead is the same for every model. An optimized engine
+(CUDA graphs, fused kernels, larger batches) could change this for both
+SwiGLU and INT4; Speed-1 does not test that.
+
+**Measured resources.** Workflow time 1.69 h (6,067 s) against the planned
+0.8-1.2 h. Each measurement took about 4.2 min instead of 2-3: generation
+about 1-1.3 min, loading 10-15 s for quantized and 43-50 s for BF16 bundles,
+and the rest in process start-up and input checks, which are not timed
+separately. Peak process RSS 2.9-7.3 GiB. Output 72 KB compressed.

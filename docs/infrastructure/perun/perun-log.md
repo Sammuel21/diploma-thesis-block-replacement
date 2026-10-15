@@ -318,3 +318,19 @@ Entries are appended below in submission order.
 - Variance: none against the plan
 - Experiment document: [Quantization-1](../../experiments/model/baseline/quantization-1.md#results-2026-10-13)
 - Notes: The runtime fingerprints include each GPU's UUID, so speeds across these jobs are not comparable by rule; they are reported raw.
+
+## [2026-10-15 16:26 UTC] 110219 | Speed-1 one-GPU speed comparison
+
+- Plan: 24 sequential measurements (12 models × 2 passes); 0.8-1.2 h expected; 3-hour limit
+- Outcome: COMPLETED; reason none
+- Submission: `workflows.runs.model.baseline.speed`; `speed_1.sbatch speed-001`
+- Provenance: commit `b60371d`; Quantization-1 `prepare-001` prompts and 12 bundles pinned by manifest sha256
+- Allocation: `gpu_short`; 1 NVIDIA H200 on gpu01, 8 CPUs, 64 GB requested memory
+- Consumption: workflow elapsed 1.69 h (6,067 s); requested GPU-hour ceiling 3; allocation GPU-hours Unknown; peak process RSS 7.3 GiB; peak generation VRAM 5.22 GiB
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
+- Outputs: PROJECT `perun-results/speed-1/speed-001/` (JSON only, 72 KB compressed)
+- Continuation: completed
+- Verification: structured status `completed`; one execution fingerprint and one GPU UUID across all 24 measurements; staged out and checksum-verified
+- Variance: 1.69 h against 0.8-1.2 h; about 4.2 min per measurement instead of 2-3, mostly untimed process start-up and BF16 bundle loading (43-50 s)
+- Experiment document: [Speed-1](../../experiments/model/baseline/speed-1.md#results-2026-10-15)
+- Notes: The job prints no per-measurement progress; progress is visible only in the scratch `result.json`.
