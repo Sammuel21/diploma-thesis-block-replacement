@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: TUKE Perun Resource Planning and Accounting
-type: procedure
-category: infrastructure/perun
 status: active
-created: 2026-09-29
 modified: 2026-10-11
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # TUKE Perun Resource Planning and Accounting

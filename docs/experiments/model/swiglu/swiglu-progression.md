@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Homogeneous SwiGLU Experimental Progression
-type: experiment-synthesis
-category: experiments/model/swiglu
 status: active
-created: 2026-09-20
 modified: 2026-10-12
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 sources:
   notebooks:
     - notebooks/model/swiglu/swiglu.ipynb

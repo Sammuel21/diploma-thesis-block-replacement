@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Documentation
-type: index
-category: documentation
 status: active
-created: 2026-07-17
 modified: 2026-10-11
-authorship:
-  created_by: unknown
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # Documentation

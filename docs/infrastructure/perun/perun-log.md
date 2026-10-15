@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: TUKE Perun Experiment Log
-type: report
-category: infrastructure/perun
 status: active
-created: 2026-09-25
 modified: 2026-09-29
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # TUKE Perun Experiment Log

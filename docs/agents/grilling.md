@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Grilling Protocol
-type: architecture
-category: agents/grilling
 status: draft
-created: 2026-10-10
 modified: 2026-10-10
-authorship:
-  created_by: llm
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # Grilling Protocol

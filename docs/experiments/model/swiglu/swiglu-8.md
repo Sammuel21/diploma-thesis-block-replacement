@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: SwiGLU-8 - Local-Fitting Attribution and Homogeneous Control Spectrum
-type: experiment-workflow
-category: experiments/model/swiglu
 status: draft
-created: 2026-10-10
 modified: 2026-10-12
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 reference_artifacts:
   - data/results/workflows/model/swiglu-7/prepare-001/result.json
   - data/results/workflows/model/swiglu-7/S7-0-target-0.2-run-001/result.json

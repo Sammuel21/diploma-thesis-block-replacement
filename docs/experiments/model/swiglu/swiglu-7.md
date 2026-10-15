@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: SwiGLU-7 - Retraining-Scope Analysis
-type: experiment
-category: experiments/model/swiglu
 status: active
-created: 2026-09-24
 modified: 2026-09-29
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 sources:
   notebooks:
     - notebooks/model/swiglu/swiglu-7.ipynb

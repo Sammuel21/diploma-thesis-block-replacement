@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Block Operator Experiments
-type: index
-category: experiments/block/operator
 status: active
-created: 2026-09-19
 modified: 2026-09-19
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # Block Operator Experiments

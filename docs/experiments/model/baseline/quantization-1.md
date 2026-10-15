@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Quantization-1 MLP Compression Baseline
-type: experiment-workflow
-category: experiments/model/baseline
 status: active
-created: 2026-10-02
 modified: 2026-10-15
-authorship:
-  created_by: llm
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # Quantization-1

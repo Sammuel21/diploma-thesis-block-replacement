@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: SwiGLU-5 Efficient Global-Recovery Search and Confirmation
-type: experiment-workflow
-category: experiments/model/swiglu
 status: draft
-created: 2026-09-19
 modified: 2026-09-20
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 sources:
   notebooks:
     - notebooks/model/swiglu/swiglu-5.ipynb

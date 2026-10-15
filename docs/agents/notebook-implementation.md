@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Notebook Implementation Standard
-type: architecture
-category: agents/notebooks
 status: active
-created: 2026-09-18
 modified: 2026-10-15
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # Notebook Implementation Standard

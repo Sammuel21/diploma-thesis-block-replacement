@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: TUKE Perun Project Status
-type: report
-category: infrastructure/perun
 status: active
-created: 2026-09-25
 modified: 2026-10-15
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # TUKE Perun Project Status

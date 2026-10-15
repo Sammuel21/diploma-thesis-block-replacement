@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Compression Baseline Workflow
-type: experiment-workflow
-category: experiments/model/baseline
 status: active
-created: 2026-09-10
 modified: 2026-09-19
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 sources:
   notebooks:
     - notebooks/model/baseline/compression-baseline.ipynb

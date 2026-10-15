@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Block Baseline Experiments
-type: index
-category: experiments/block/baseline
 status: active
-created: 2026-09-19
 modified: 2026-09-19
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # Block Baseline Experiments

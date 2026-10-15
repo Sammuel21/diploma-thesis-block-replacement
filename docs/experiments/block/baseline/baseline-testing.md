@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Single-Block Replacement Baseline Workflow
-type: experiment-workflow
-category: experiments/block/baseline
 status: draft
-created: 2026-09-11
 modified: 2026-09-19
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 sources:
   notebooks:
     - notebooks/block/baseline/baseline-testing.ipynb

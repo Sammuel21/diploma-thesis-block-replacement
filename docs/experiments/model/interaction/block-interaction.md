@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Block Interaction Analysis
-type: experiment-workflow
-category: experiments/model/interaction
 status: active
-created: 2026-09-18
 modified: 2026-09-19
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 sources:
   notebooks:
     - notebooks/model/interaction/block-interaction.ipynb

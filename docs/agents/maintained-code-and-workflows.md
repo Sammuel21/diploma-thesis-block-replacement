@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Maintained Code and Workflow Implementation Standard
-type: architecture
-category: agents/code-and-workflows
 status: active
-created: 2026-09-18
 modified: 2026-10-15
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # Maintained Code and Workflow Implementation Standard

@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Heterogeneous Operator Experiments
-type: index
-category: experiments/model/heterogenous
 status: active
-created: 2026-10-01
 modified: 2026-10-11
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # Heterogeneous Operator Experiments

@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: TUKE Perun Workflow Infrastructure
-type: architecture
-category: infrastructure/perun
 status: active
-created: 2026-09-11
 modified: 2026-10-11
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # TUKE Perun Workflow Infrastructure

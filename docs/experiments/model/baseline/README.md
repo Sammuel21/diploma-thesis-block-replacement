@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Model Baseline Experiments
-type: index
-category: experiments/model/baseline
 status: active
-created: 2026-10-02
 modified: 2026-10-15
-authorship:
-  created_by: llm
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # Model Baseline Experiments

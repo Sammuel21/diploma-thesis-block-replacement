@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: Block Experiment Workflows
-type: index
-category: experiments/block
 status: active
-created: 2026-09-11
 modified: 2026-09-19
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 ---
 
 # Block Experiment Workflows

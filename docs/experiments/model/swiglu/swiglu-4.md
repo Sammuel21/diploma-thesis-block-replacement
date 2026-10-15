@@ -1,17 +1,7 @@
 ---
-metadata_version: 1
 title: SwiGLU Global-Recovery Analysis
-type: experiment-workflow
-category: experiments/model/swiglu
 status: draft
-created: 2026-09-18
 modified: 2026-09-19
-authorship:
-  created_by: collaborative
-curation:
-  status: unreviewed
-  reviewed_by: null
-  reviewed_on: null
 sources:
   reference_artifacts:
     - data/results/workflows/model/swiglu-3/run-001.json
