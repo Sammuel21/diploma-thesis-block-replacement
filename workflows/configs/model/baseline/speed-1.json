@@ -1,0 +1,38 @@
+{
+  "workflow": "speed-1",
+  "schema_version": 1,
+  "description": "Generation speed of saved dense, quantized, and SwiGLU-8 bundles, measured in one job on one GPU with the Quantization-1 runtime protocol.",
+  "measurement": {
+    "protocol_config": "workflows/configs/model/baseline/quantization-1.json",
+    "prepared": "quantization-1/prepare-001/result.json",
+    "prepared_sha256": "88f1abb9506ee87cce470061cefc5c06923b18dd47c53ffb7bc2f31f37f9476e"
+  },
+  "passes": ["forward", "reverse"],
+  "reference_label": "dense-bf16",
+  "models": [
+    {"label": "dense-bf16", "bundle": "quantization-1/dense-001/model",
+     "bundle_manifest_sha256": "2c1b8fe63478fb79ba9f510914649c8366a0a1fe7fe255e4f6e494d5fdd4307c"},
+    {"label": "ptq-int8", "bundle": "quantization-1/int8-001/model",
+     "bundle_manifest_sha256": "d9490bec0e01822f53c5988aa5bdd98710ca8df0b9492b6fac7a68d814bef8e1"},
+    {"label": "ptq-int4", "bundle": "quantization-1/int4-001/model",
+     "bundle_manifest_sha256": "66a6f40aa70a97fd643e1f90c69661d7a3364764984fb441e3abf02e2ed24098"},
+    {"label": "qat-int4-1b", "bundle": "quantization-1/qat-int4-1b-001/model",
+     "bundle_manifest_sha256": "72a98a0a6fe1884652884bc6ab6f4caff85bfb8ef61b063c0a76c7dd3d54f626"},
+    {"label": "swiglu-8-fitted-0.2", "bundle": "swiglu-8/fitted-target-0.2-run-001/model",
+     "bundle_manifest_sha256": "21e328cce9231a1776c018b9801e34dd8fb8fcf6823ec1012d9cfa1a29b006da"},
+    {"label": "swiglu-8-fitted-0.3", "bundle": "swiglu-8/fitted-target-0.3-run-001/model",
+     "bundle_manifest_sha256": "18d2044d3d31c8fe621f33bd62eab97ffb1f142f7ed5530d5e431a0adc3885aa"},
+    {"label": "swiglu-8-fitted-0.4", "bundle": "swiglu-8/fitted-target-0.4-run-001/model",
+     "bundle_manifest_sha256": "1bf2ac848393be6371a0ed29c3da9fbdffd8216ae440a7c192d6a7a69343134a"},
+    {"label": "swiglu-8-fitted-0.5", "bundle": "swiglu-8/fitted-target-0.5-run-001/model",
+     "bundle_manifest_sha256": "c7c2b361287def38a94e83ec2263f522033e82f79ea4d09d958e41258b647555"},
+    {"label": "swiglu-8-fitted-0.6", "bundle": "swiglu-8/fitted-target-0.6-run-001/model",
+     "bundle_manifest_sha256": "f688b84ffd3da6e6f4d8a9ec0d3ae59c67389b8bdffebebe4028b49646ab38d0"},
+    {"label": "swiglu-8-fitted-0.7", "bundle": "swiglu-8/fitted-target-0.7-run-001/model",
+     "bundle_manifest_sha256": "0a02b1a7685a954b34492bf2117ce74ee88af561c8e4a46d410821942b9a8f5a"},
+    {"label": "swiglu-8-fitted-0.75", "bundle": "swiglu-8/fitted-target-0.75-run-001/model",
+     "bundle_manifest_sha256": "7e065cb561ed4a3b3f82695be6817203f52dfbebc3e243ca0ca37ef610619613"},
+    {"label": "swiglu-8-fitted-0.8", "bundle": "swiglu-8/fitted-target-0.8-run-001/model",
+     "bundle_manifest_sha256": "4f3556693148971cbbc5c4b20f3358fc97bfb56de23d04fb6bc73dc407321a09"}
+  ]
+}

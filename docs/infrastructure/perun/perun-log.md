@@ -254,3 +254,67 @@ Entries are appended below in submission order.
 - Variance: none against the plan
 - Experiment document: [SwiGLU-8](../../experiments/model/swiglu/swiglu-8.md)
 - Notes: While the 4 tasks ran, every new `sbatch` (including `--test-only`) was refused with "your total limit is 4 nodes". This is a submission-time check separate from MaxJobs=12 and MaxSubmitJobs=48; see the status page.
+
+## [2026-10-12 19:00 UTC] 106650 | Quantization-1 preparation
+
+- Plan: CPU tokenization only; expected minutes; 1-hour limit; 4 CPU core-hours ceiling
+- Outcome: COMPLETED; exit code Unknown; reason none
+- Submission: `workflows.runs.model.baseline.quantization`; `prepare prepare-001`
+- Provenance: commit `a16d776` (version-only preflight on CPU nodes)
+- Allocation: `cpu_short`; 1 node; 4 CPUs; 32 GB requested memory; no GPU (`--gres=none`)
+- Consumption: workflow elapsed 0.03 h (artifact timestamps 19:00-19:02 UTC); CPU core-hours Unknown; MaxRSS Unknown
+- Efficiency: CPU Unknown; memory Unknown
+- Outputs: PROJECT `perun-results/quantization-1/prepare-001/` (5 MB)
+- Continuation: completed
+- Verification: structured status `completed`; output staged out and checksum-verified
+- Variance: none against the plan
+- Experiment document: [Quantization-1](../../experiments/model/baseline/quantization-1.md)
+- Notes: The five model tasks were submitted without a dependency after preparation had left the queue.
+
+## [2026-10-12 19:22 UTC] 106658 | Quantization-1 models, tasks 0-3 (dense, INT8, INT4, QAT 100M)
+
+- Plan: 0.5-2 h for each of tasks 0-2 and 1.5-3 h for task 3; 8-hour limit each
+- Outcome: task 0 (dense) COMPLETED. Tasks 1-3 FAILED with `RuntimeError` at the fresh-process reload of the saved quantized bundle (`"cuda:0"` against `"cuda"` storage device in `load_quantized_bundle`), after the bundle was saved
+- Submission: `workflows.runs.model.baseline.quantization`; `run-array --array=0-3`
+- Provenance: commit `a16d776`; prepared input `prepare-001/result.json`
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, and 128 GB requested memory per task; nodes Unknown
+- Consumption: workflow elapsed: dense 0.29 h; INT8 and INT4 0.01 h each; QAT 100M 1.63 h (training 1.51 h for 100M tokens); requested GPU-hour ceiling 32; allocation GPU-hours Unknown; peak GPU memory 15.4 GiB for dense, Unknown for the failed tasks
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
+- Outputs: PROJECT `perun-results/quantization-1/{dense,int8,int4,qat-int4-100m}-001/`; the QAT folder keeps its 100M checkpoint (about 13 GB)
+- Continuation: the three saved quantized bundles were evaluated by jobs 108470-108472; a resume was impossible because the run fingerprint hashes all of `src/`
+- Verification: dense status `completed`; QAT 100M training stream identical to SwiGLU-8's 100M stream (sha256)
+- Variance: three tasks failed at evaluation start because of a loader bug; their models are intact
+- Experiment document: [Quantization-1](../../experiments/model/baseline/quantization-1.md#results-2026-10-13)
+- Notes: The loader bug had no test coverage; quantized reload was first exercised on GPU here.
+
+## [2026-10-12 19:22 UTC] 106659 | Quantization-1 model, task 4 (QAT 1B)
+
+- Plan: 13-20 h, about 25 h if fake quantization doubled the cost; 36-hour limit
+- Outcome: FAILED with the same reload `RuntimeError` as tasks 1-3, after 1B training and bundle export
+- Submission: `workflows.runs.model.baseline.quantization`; `run-array --array=4`
+- Provenance: commit `a16d776`; prepared input `prepare-001/result.json`
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, 128 GB requested memory; node Unknown
+- Consumption: workflow elapsed 15.83 h (training 14.98 h for 1B tokens, about 18.5k tokens/s); requested GPU-hour ceiling 36; allocation GPU-hours Unknown; peak GPU memory Unknown
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
+- Outputs: PROJECT `perun-results/quantization-1/qat-int4-1b-001/` (15 GB, including the 1B checkpoint of about 13 GB)
+- Continuation: the saved bundle was evaluated by job 108473
+- Verification: training stream identical to SwiGLU-7's 1B stream (sha256); training completed to exactly 1B tokens
+- Variance: training time within the planned 13-20 h; failed at evaluation start
+- Experiment document: [Quantization-1](../../experiments/model/baseline/quantization-1.md#results-2026-10-13)
+- Notes: none
+
+## [2026-10-13 18:32 UTC] 108470-108473 | Quantization-1 evaluation of the four saved quantized bundles
+
+- Plan: final evaluation only, about 0.3 h each; 4-hour limit each
+- Outcome: all 4 COMPLETED
+- Submission: `workflows.runs.model.baseline.quantization`; `evaluate <name>-eval-001 --bundle <name>-001/model --label <variant>`, one job per bundle (INT8, INT4, QAT 100M, QAT 1B)
+- Provenance: commit `461ee53` (loader uses an indexed CUDA device); prepared input `prepare-001/result.json`
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, and 128 GB requested memory per job; nodes Unknown
+- Consumption: workflow elapsed 0.27-0.29 h each, 1.10 h in total; requested GPU-hour ceiling 16; peak GPU memory 13.9-14.4 GiB
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
+- Outputs: PROJECT `perun-results/quantization-1/{int8,int4,qat-int4-100m,qat-int4-1b}-eval-001/` (64 MB each)
+- Continuation: completed; the report was built on the PC (`report-001`)
+- Verification: structured status `completed`; staged out and checksum-verified
+- Variance: none against the plan
+- Experiment document: [Quantization-1](../../experiments/model/baseline/quantization-1.md#results-2026-10-13)
+- Notes: The runtime fingerprints include each GPU's UUID, so speeds across these jobs are not comparable by rule; they are reported raw.

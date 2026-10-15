@@ -5,7 +5,7 @@ type: experiment-workflow
 category: experiments/model/baseline
 status: active
 created: 2026-10-02
-modified: 2026-10-11
+modified: 2026-10-15
 authorship:
   created_by: llm
 curation:
@@ -20,25 +20,15 @@ Quantization-1 asks how architectural MLP replacement compares with ordinary
 weight quantization at similar storage budgets. It is a separate baseline
 family. Existing SwiGLU configurations, runners, and results are preserved.
 
-**Implementation status:** implemented; scientific execution and GPU backend
-validation are pending. No numerical quality, memory, or speed benefit is
-claimed from code inspection.
+**Status (2026-10-15):** completed on PERUN. All five models are evaluated;
+see [Results](#results-2026-10-13). The quantized models needed a loader fix
+and a separate evaluation step, described there.
 
 ## Status and open issues
 
-Recorded 2026-10-10 from the implementing session's handoff and a repository
-check. No Quantization-1 file has changed since commit `791517a`
-(2026-10-02), and the [Perun log](../../../infrastructure/perun/perun-log.md)
-has no Quantization-1 job.
+The runs are recorded in the [Perun log](../../../infrastructure/perun/perun-log.md)
+(jobs 106650, 106658, 106659, and 108470-108473).
 
-- **Checked:** eight contract tests passed. Two tensor-dependent tests were
-  skipped because that environment lacked PyTorch. Python and Bash syntax
-  checks passed, and backend compatibility and APIs were inspected.
-- **Not yet executed:** the Perun environment install, any GPU job, INT8/INT4
-  conversion, packed serialization round trips, kernel execution, memory
-  needs, generation timing, and QAT training or resume. The first full run is
-  therefore also the first backend validation. INT4 is the most likely failure
-  point because it depends on the MSLK kernel.
 - **Decided 2026-10-11: speed is reported raw only.** The runtime fingerprint
   includes the physical GPU UUID, and the array tasks run on different H200s,
   so speeds are marked not comparable. Quantization-1 reports speed only as
@@ -59,8 +49,10 @@ has no Quantization-1 job.
   (`f78bf805d7a03e693f2573e3c3d1b664ec91af09dcc28ae0803daf50c7f0b9cd`), and
   `qat-int4-100m-001`'s with SwiGLU-8's 100M stream. Record the outcome here.
   A mismatch means the QAT-versus-replacement comparison needs a data caveat.
-- **Not measurements:** the run-time estimates in the resource plan are
-  extrapolated from SwiGLU-7 measurements, not measured for Quantization-1.
+  **Checked 2026-10-13: both are identical** (equal sha256): QAT 1B used
+  SwiGLU-7's 1B stream and QAT 100M used SwiGLU-8's 100M stream.
+- **Pre-run estimates:** the run times in the resource plan below were
+  extrapolated from SwiGLU-7; the measured times are in the results.
 - **Shared 8K KL (decided 2026-10-10, moved 2026-10-11):** the KL stream
   builder and evaluator now live in
   [`teacher_kl.py`](../../../../src/mlp_replacement/evaluation/teacher_kl.py),
@@ -71,6 +63,94 @@ has no Quantization-1 job.
   tests cover the stream definition, the zero KL of the teacher against itself,
   and the runner's argument plumbing. No GPU run has exercised it yet. See the
   [decision log](../../../agents/decisions.md).
+
+## Results (2026-10-13)
+
+Numbers come from the comparison report `report-001`, built on the PC on
+2026-10-14 from the downloaded artifacts under
+`data/results/workflows/model/quantization-1/`. The cross-experiment comparison
+with SwiGLU is in the [results snapshot](../../../results/2026-10-15-results.md).
+
+**What happened.** Prepare and the dense model completed in the first
+submission. INT8, INT4, and both QAT models were built and saved, then failed
+at the fresh-process reload that starts their evaluation. `load_quantized_bundle`
+loaded the packed TorchAO tensors with `map_location="cuda"`, and PyTorch 2.11
+refused to combine `cuda` and `cuda:0` storage. The loader now uses an indexed
+CUDA device. A resume was impossible, because every run fingerprint hashes all
+of `src/`. The four saved bundles were therefore evaluated with `evaluate` into
+`*-eval-001` (jobs 108470-108473). QAT training was not repeated; its record
+stays in `qat-int4-{100m,1b}-001`.
+
+| Variant | Eligible-MLP byte saving | Whole-model byte saving | Weight GiB | 8K KL | Test PPL 128 / 2K / 8K | Macro accuracy | Training tokens |
+| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: |
+| Dense BF16 | 0.0% | 0.0% | 3.19 | 0.0000 | 11.98 / 7.27 / 6.933 | 67.14% | 0 |
+| INT8 (PTQ) | 49.9% | 32.3% | 2.16 | 0.0030 | 12.00 / 7.27 / 6.939 | 66.99% | 0 |
+| INT4 (PTQ) | 73.4% | 47.5% | 1.67 | 0.0896 | 13.20 / 7.79 / 7.419 | 64.95% | 0 |
+| INT4 QAT 100M | 73.4% | 47.5% | 1.67 | 0.0360 | 12.60 / 7.58 / 7.214 | 65.84% | 100M |
+| INT4 QAT 1B | 73.4% | 47.5% | 1.67 | 0.0352 | 12.59 / 7.61 / 7.241 | 66.64% | 1,000M |
+
+Logical parameters are unchanged at 1,711,376,384. Resident GPU memory equals
+the weight bytes (`fresh-process-model-only-no-forward`, the same protocol as
+SwiGLU-8).
+
+Task accuracy minus dense, in percentage points, with the paired 95% bootstrap
+interval; `*` marks an interval that excludes zero:
+
+| Variant | PIQA | ARC-Easy | ARC-Challenge | WinoGrande | HellaSwag |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| INT8 (PTQ) | +0.2 [-0.1, +0.5] | -0.2 [-0.6, +0.2] | +0.1 [-0.6, +0.8] | -1.0 [-2.2, +0.2] | +0.2 [+0.0, +0.4] * |
+| INT4 (PTQ) | -1.0 [-2.0, +0.0] | -1.9 [-2.9, -0.9] * | -3.4 [-5.2, -1.6] * | -2.6 [-4.5, -0.6] * | -2.0 [-2.5, -1.6] * |
+| INT4 QAT 100M | -0.4 [-1.4, +0.5] | -1.6 [-2.5, -0.7] * | -1.6 [-3.1, -0.2] * | -1.6 [-3.5, +0.3] | -1.3 [-1.6, -0.9] * |
+| INT4 QAT 1B | +0.3 [-0.5, +1.0] | +0.9 [+0.0, +1.8] * | -2.0 [-3.6, -0.5] * | -0.9 [-2.6, +0.9] | -0.8 [-1.1, -0.5] * |
+
+**Findings.**
+
+- INT8 is lossless within the paired intervals.
+- QAT removes about 60% of the INT4 KL damage (0.0896 to 0.0360).
+- QAT plateaus early. Monitoring KL on the 8K KL stream (fake-quantized model)
+  fell from 0.0897 at token 0 to 0.0286 at 100M. The 1B run was lowest at 275M
+  (0.0272) and drifted to 0.0295 by 1B under the constant learning rate.
+  Validation PPL at 8K was lowest at 100M (7.410) and 7.459 at 1B. Converting
+  to real INT4 adds 0.006-0.007 KL.
+- QAT 1B against 100M: about the same KL, slightly worse perplexity, mixed
+  tasks (ARC-Easy better, ARC-Challenge worse). One run each, constant learning
+  rate.
+
+**Speed (raw; not a claim).** Each variant ran on a different H200, so the
+runtime fingerprints differ and the decided rule reports speed raw only
+(decision log, 2026-10-11). Medians of 10 repetitions after 2 warm-ups:
+
+| Variant | TTFT, b1 2,048 (ms) | TTFT, b1 7,936 (ms) | Tokens/s, b1 2,048 | Tokens/s, b4 2,048 | Peak VRAM, b4 (GiB) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Dense BF16 | 19.9 | 80.3 | 158 | 628 | 5.22 |
+| INT8 (PTQ) | 25.0 | 90.4 | 135 | 454 | 4.19 |
+| INT4 (PTQ) | 20.4 | 82.8 | 160 | 631 | 3.70 |
+| INT4 QAT 100M | 20.4 | 82.8 | 156 | 620 | 3.70 |
+| INT4 QAT 1B | 20.4 | 82.8 | 164 | 650 | 3.70 |
+
+Every workload generates 256 tokens. INT4 stayed within about 4% of dense on
+every workload; INT8 was 15-28% slower. Quantization saved memory here, not
+time.
+
+**Measured resources** (workflow timing on one H200 per job; scheduler records
+had expired, so allocation is Unknown):
+
+| Stage | Plan | Measured |
+| --- | --- | --- |
+| Prepare (CPU) | minutes | 0.03 h |
+| Dense | 0.5-2 h | 0.29 h |
+| INT8 and INT4, first attempts (failed at reload) | 0.5-2 h each | 0.01 h each |
+| QAT 100M, training and export (failed at reload) | 1.5-3 h | 1.63 h; training 1.51 h, about 18.4k tokens/s |
+| QAT 1B, training and export (failed at reload) | 13-20 h | 15.83 h; training 14.98 h, about 18.5k tokens/s |
+| Four evaluations of the saved bundles | - | 0.27-0.29 h each, 1.10 h in total |
+| **Total GPU** | **16-34 GPU-h** | **18.9 H200-hours** |
+
+Peak evaluation VRAM was 13.9-15.4 GiB. Peak QAT training VRAM is Unknown,
+because the failed runs did not record their resource summary. PROJECT holds
+about 37.6 GB: the dense, INT8, and INT4 folders (3.3, 2.2, and 1.7 GB), the
+two QAT folders (15 GB each: a 1.7 GB bundle plus a checkpoint of about 13 GB,
+kept because the runs ended as failed), and four 64 MB evaluation folders. The
+QAT checkpoints can be deleted once this write-up is final.
 
 ## What is compared
 

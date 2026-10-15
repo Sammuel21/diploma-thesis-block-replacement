@@ -28,7 +28,7 @@ local/
 /docs/llm/
 /docs/design/llm/
 /docs/vault/
-/docs/results/
+#/docs/results/
 /docs/meetings/
 
 .codex_plot_previews

@@ -21,6 +21,7 @@ Slurm job or resource request is defined yet.
 | `run_model.sbatch` | Runs the historical allow-listed model-wide workflows that still depend on the unavailable automatic-scratch helper. It is not the SwiGLU-7 launcher. |
 | `swiglu_7.sbatch` | Runs the independent SwiGLU-7 preparation or maps array tasks `0-11` onto its fixed three-scope/four-target grid. |
 | `swiglu_8.sbatch` | Runs the SwiGLU-8 block check or preparation, or maps array tasks `0-15` onto its two arms at eight targets. |
+| `speed_1.sbatch` | Times the saved dense, quantized, and SwiGLU-8 bundles in one job on one GPU, so their speeds are comparable. |
 
 `smoke.sbatch` defaults to `gpu_short`, 48 GB of CPU memory, and one hour. The
 generic and array launchers default to `gpu_long`, 64 GB, and 72 hours.
@@ -319,6 +320,13 @@ Conda environment with TorchAO and MSLK added, and does not rely on
 `.rsyncignore`. See the
 [Quantization-1 guide](../../../docs/experiments/model/baseline/quantization-1.md)
 for submission, resource-planning, and resume requirements.
+
+[speed_1.sbatch](speed_1.sbatch) runs Speed-1 as one job, never an array,
+because comparable speeds need one GPU. It reads the bundles in place from
+`PROJECT/perun-results/quantization-1/` and `swiglu-8/` and stages out to
+`PROJECT/perun-results/speed-1/<output>`, with the same lock and verified
+stage-out as Quantization-1. See the
+[Speed-1 guide](../../../docs/experiments/model/baseline/speed-1.md).
 
 The documented submission commands override the tracked fallback paths and
 write single-job logs as `%x_%j` and array-task logs as `%x_%A_%a` below

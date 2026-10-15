@@ -93,6 +93,7 @@ scheduler records.
 | Project GPU-hours consumed, PERUN dashboard | About 150 | Researcher-reported dashboard value on 2026-10-10; project-level billing total |
 | SwiGLU-7 preparation plus 12 runs, workflow timing | 156.99 H200-hours | Preparation 10.21 hours plus the 12 runs, from the [SwiGLU-7 report](../../experiments/model/swiglu/swiglu-7.md) and its result artifacts; workflow-timing proxy, not scheduler allocation |
 | SwiGLU-8 block check, preparation, 16 runs and 4 stopped attempts, workflow timing | about 32.1 H200-hours | Block check 7.91, preparation 3.36, runs 20.18, stopped attempts 0.68, from the [SwiGLU-8 page](../../experiments/model/swiglu/swiglu-8.md) and its artifacts; workflow-timing proxy, not scheduler allocation |
+| Quantization-1 five models, failed reloads and four re-evaluations, workflow timing | about 18.9 H200-hours, plus 0.03 h CPU preparation | Dense 0.29, INT8 and INT4 first attempts 0.02, QAT 100M 1.63, QAT 1B 15.83, evaluations 1.10, from the [Quantization-1 page](../../experiments/model/baseline/quantization-1.md#results-2026-10-13) and its artifacts; workflow-timing proxy, not scheduler allocation |
 
 ## SwiGLU-7 plan
 
