@@ -1,6 +1,7 @@
 ---
 title: Single-Block Replacement Baseline Workflow
 status: draft
+created: 2026-09-11
 modified: 2026-09-19
 sources:
   notebooks:

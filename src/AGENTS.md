@@ -18,8 +18,8 @@
   registry, wrapper hierarchy, or duplicate configuration object for one use.
 - Reusable global-recovery loops, teacher caches, and allocation solvers belong
   under `compression/`; replacement initialization and local fitting belong
-  under `operators/`. Experiment-specific SwiGLU-5 assembly stays in its
-  workflow package.
+  under `operators/`. Experiment-specific assembly stays in its workflow
+  package.
 
 ## Scientific and runtime behavior
 

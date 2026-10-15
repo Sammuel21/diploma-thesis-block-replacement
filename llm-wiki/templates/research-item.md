@@ -7,21 +7,11 @@ status: draft
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 
-authorship:
-  created_by: researcher
-  contributors:
-    - researcher
-
 epistemic:
   role: hypothesis
   confidence: medium
   verification:
     - unverified
-
-scope:
-  topics: []
-  granularities: []
-  pipeline_stages: []
 
 sources: []
 related: []

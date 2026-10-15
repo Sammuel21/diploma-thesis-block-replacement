@@ -7,38 +7,11 @@ status: review
 created: 2026-07-17
 updated: 2026-07-27
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: prior-work
   confidence: high
   verification:
     - source-checked
-
-scope:
-  topics:
-    - structured-pruning
-    - activation-based-importance
-    - block-importance
-    - knowledge-distillation
-    - architecture-search
-    - compression-recovery
-  granularities:
-    - neuron
-    - transformer-layer
-    - model
-    - cross-level
-  pipeline_stages:
-    - screening
-    - selection
-    - integration
-    - recovery
-    - evaluation
-    - analysis
 
 sources:
   - source_id: src-minitron-2024

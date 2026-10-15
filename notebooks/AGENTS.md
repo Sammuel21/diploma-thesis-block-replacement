@@ -6,9 +6,12 @@
   the repository-root `AGENTS.md`.
 - Before modifying a notebook, read
   [`../docs/agents/notebook-implementation.md`](../docs/agents/notebook-implementation.md).
-- When reporting an experiment executed on TUKE Perun, also read
-  [`../docs/infrastructure/perun/perun-resources.md`](../docs/infrastructure/perun/perun-resources.md)
-  and include its compact post-run compute and storage analysis.
+- Before editing a notebook, ask whether the requested material should be
+  implemented in the `.ipynb` file or supplied as code blocks in the chat,
+  unless the user has already made that choice explicitly.
+- When reporting an experiment executed on TUKE Perun, include the compact
+  post-run compute and storage analysis from
+  [`perun-resources.md`](../docs/infrastructure/perun/perun-resources.md).
 - Treat `notebooks/mvp/` as a frozen historical path. Do not modernize it while
   changing a maintained notebook.
 
@@ -30,9 +33,7 @@
   `model/swiglu/swiglu-2.ipynb`; for local-fitting methodology, prefer
   `block/operator/operator-distillation.ipynb`. Do not use
   `block/analysis/activation-analysis.ipynb` as a style source.
-- Route homogeneous SwiGLU reports to `model/swiglu/`, model baselines to
-  `model/baseline/`, model interaction studies to `model/interaction/`, and
-  block work to `block/{baseline,operator,analysis}/`.
+- Place notebooks by experiment class, as listed in the root repository map.
 - Keep the experiment readable in execution order: setup, configuration and
   data, experiment or artifact loading, reporting, then artifact handling.
 - Prefer direct cells, plain dictionaries and DataFrames, and a small local

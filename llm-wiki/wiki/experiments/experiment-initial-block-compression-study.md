@@ -1,48 +1,17 @@
 ---
 id: experiment-initial-block-compression-study
 title: Initial Block-Compression Study
-summary: Defines the working activation, practical single-block replacement, and multi-block degradation studies with an optional quantization baseline.
+summary: Defines the working activation, practical single-block replacement, and multi-block degradation studies; links the separate Quantization-1 baseline.
 type: experiment
 status: draft
 created: 2026-07-27
-updated: 2026-10-02
-
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
+updated: 2026-10-15
 
 epistemic:
   role: mixed
   confidence: not-assessed
   verification:
     - unverified
-
-scope:
-  topics:
-    - activation-analysis
-    - baseline-evaluation
-    - block-importance
-    - effective-rank
-    - error-propagation
-    - mlp-block-replacement
-    - operator-comparison
-    - pca
-    - quantization
-  granularities:
-    - mlp-block
-    - transformer-layer
-    - model
-    - cross-level
-  pipeline_stages:
-    - data
-    - screening
-    - selection
-    - replacement
-    - integration
-    - evaluation
-    - analysis
 
 sources: []
 related:
@@ -65,13 +34,13 @@ superseded_by: []
 ## Overview
 
 **Working umbrella design.** This page connects the initial block-level
-notebooks; it does not duplicate their numerical evidence. Artifact-backed
-singleton results belong to [[experiment-baseline-operator-analysis]] and
-[[experiment-swiglu-operator-design-progression]]. Activation analysis and the
-separate generic multi-block interaction stage remain unverified here. The
-completed homogeneous model-level SwiGLU-1 through SwiGLU-7 family is recorded
-in [[synthesis-homogeneous-swiglu-findings]], not duplicated on this initial
-design page.
+notebooks; it does not duplicate their numerical evidence. The design of the
+artifact-backed singleton studies is on [[experiment-baseline-operator-analysis]]
+and [[experiment-swiglu-operator-design-progression]]; their results are in
+`docs/experiments/block/`. Activation analysis and the separate generic
+multi-block interaction stage remain unverified here. The completed homogeneous
+model-level SwiGLU family is recorded in `docs/experiments/model/swiglu/`, with
+its attribution in [[synthesis-homogeneous-swiglu-findings]].
 
 ## Objective and Hypotheses
 
@@ -90,10 +59,10 @@ from simultaneous replacements may be non-additive. These are not established
 results.
 
 The separate [Quantization-1 baseline](../../../docs/experiments/model/baseline/quantization-1.md)
-is now implemented for uniform eligible-MLP weight-only INT8/INT4 comparison;
-its scientific GPU run remains pending. It measures stored-byte reduction,
-not parameter removal, and is not a fourth required stage of this initial
-study. The guide owns its library attribution and project-defined protocol.
+(uniform eligible-MLP weight-only INT8/INT4) is complete; its results are in
+that doc. It measures stored-byte reduction, not parameter removal, and is not
+a fourth required stage of this initial study. The doc owns its library
+attribution and project-defined protocol.
 
 ## Configuration and Inputs
 
@@ -149,8 +118,8 @@ simultaneous replacement behavior.
   not the final interaction protocol.
 - The multi-block operator set, subset construction, order, and recovery
   controls have not yet been frozen.
-- Quantization-1 is implemented but has no completed scientific result to
-  promote as evidence.
+- Quantization-1 is a separate baseline; its completed results are in
+  [`quantization-1.md`](../../../docs/experiments/model/baseline/quantization-1.md).
 - Latency and downstream benchmark claims remain outside this initial study.
 
 Status: draft and mixed. Downstream singleton pages are experiment-backed for

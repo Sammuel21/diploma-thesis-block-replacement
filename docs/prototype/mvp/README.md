@@ -1,6 +1,7 @@
 ---
 title: Block Replacement MVP Archive
 status: archived
+created: 2026-07-17
 modified: 2026-09-11
 ---
 

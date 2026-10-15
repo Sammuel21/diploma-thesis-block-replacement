@@ -1,6 +1,7 @@
 ---
 title: SwiGLU-6 — Long Recovery and Final Evaluation
 status: active
+created: 2026-09-21
 modified: 2026-09-29
 sources:
   notebooks:

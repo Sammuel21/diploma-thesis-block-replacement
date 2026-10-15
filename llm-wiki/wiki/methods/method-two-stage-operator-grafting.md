@@ -5,13 +5,7 @@ summary: Initializes replacement operators through local activation regression a
 type: method
 status: review
 created: 2026-07-17
-updated: 2026-10-12
-
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
+updated: 2026-10-15
 
 epistemic:
   role: mixed
@@ -19,24 +13,6 @@ epistemic:
   verification:
     - source-checked
     - experiment-backed
-
-scope:
-  topics:
-    - operator-grafting
-    - activation-distillation
-    - replacement-error-propagation
-    - self-grafting
-  granularities:
-    - mlp-block
-    - transformer-layer
-    - model
-    - cross-level
-  pipeline_stages:
-    - data
-    - replacement
-    - integration
-    - recovery
-    - evaluation
 
 sources:
   - source_id: src-grafting-2025
@@ -119,18 +95,19 @@ importance-ranked teacher slice at the same widths:
 - the slice-only arm skips it.
 
 Both then recover only the replacement MLPs with teacher-logit KL for 100M
-tokens. Before recovery, skipping Stage 1 leaves the model 2-5 times worse in
-KL. After 100M tokens, the slice-only arm's 8K KL is still 10.4-23.5% higher
-at every target from 20% to 80% eligible-MLP removal. That residual gap was
-still shrinking between 50M and 100M, so whether it persists is open. See
-[[synthesis-homogeneous-swiglu-findings]] and the
-[SwiGLU-8 report](../../../docs/experiments/model/swiglu/swiglu-8.md).
+tokens. Before recovery, skipping Stage 1 leaves the model several times worse
+in KL. After 100M tokens, the slice-only arm's 8K KL is still higher at every
+target from 20% to 80% eligible-MLP removal. That residual gap was still
+shrinking between 50M and 100M, so whether it persists is open. The numbers
+are in the [SwiGLU-8 report](../../../docs/experiments/model/swiglu/swiglu-8.md)
+(Part B results).
 
 **Empirical finding.** SwiGLU-8's block-level study found SwiGLU-7's Stage 1
-recipe on a plateau, with no tested change better by 5%. Fitting on 8K-context
-activations instead of 128-token ones traded about 4% better 8K KL for about
-6% worse 128-token KL. Solving the down projection exactly by least squares
-was worse than gradient fitting with early stopping. The source's finding that
+recipe on a plateau, with no tested change better by the required 5%. Fitting
+on 8K-context activations instead of 128-token ones traded better 8K KL for
+worse 128-token KL. Solving the down projection exactly by least squares was
+worse than gradient fitting with early stopping. The numbers are in the same
+report (Part A results). The source's finding that
 L2 suits MLP regression is consistent with the project's MSE objective, but
 the two studies are not directly comparable. [src-grafting-2025, Section 3.3;
 Table 1]

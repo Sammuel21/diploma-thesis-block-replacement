@@ -1,6 +1,7 @@
 ---
 title: SwiGLU Allocation Study Workflow
 status: draft
+created: 2026-09-10
 modified: 2026-09-19
 sources:
   notebooks:

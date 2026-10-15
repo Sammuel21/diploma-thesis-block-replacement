@@ -5,9 +5,6 @@
 - Do not modify code unless I explicitly approve the change.
 - Prefer analysis, suggestions, and minimal patch plans first.
 - Prioritize explanations when suggesting changes.
-- Before editing a Jupyter notebook, ask whether the requested material should
-  be implemented in the `.ipynb` file or supplied as code blocks in the chat,
-  unless the user has already made that choice explicitly.
 - Do not ingest sources, promote wiki content, or distill documentation merely
   because files are available; perform those operations when I request them.
 - give praise where praise is due
@@ -66,7 +63,7 @@
 - `src/` contains maintained reusable implementation; `workflows/` contains
   maintained process entry points and executor-specific job definitions.
 - Maintained experiments are grouped by class: `model/swiglu/` owns the
-  homogeneous SwiGLU progression (including SwiGLU-5), `model/baseline/` owns
+  homogeneous SwiGLU progression, `model/baseline/` owns
   model baselines, `model/interaction/` owns block-interaction studies, and
   `block/{baseline,operator,analysis}/` own the corresponding block studies.
 
@@ -88,9 +85,6 @@
 - When I ask to grill or stress-test a plan, follow `docs/agents/grilling.md`.
 - Treat scoped instructions as additions to these global approval and quality
   rules, not permission to bypass them.
-- Route reusable recovery and allocation behavior to `src/mlp_replacement/`;
-  keep SwiGLU-5 orchestration and source-artifact adaptation in
-  `workflows/runs/model/swiglu/`.
 - Keep this root file as a navigation and governance map; detailed wiki rules
   belong in `llm-wiki/SCHEMA.md`.
 
@@ -119,9 +113,10 @@
 
 ## Knowledge-maintenance advisory
 - Recommend a targeted wiki update when work introduces or changes thesis
-  methodology, relies on a new prior-work method needing attribution, resolves
-  a meaningful contradiction, or completes findings that change the working
-  baseline. Identify the missing knowledge and affected pages briefly.
+  methodology, relies on a new prior-work method needing attribution, or
+  resolves a meaningful contradiction. New findings go to `docs/`; the wiki
+  changes only if their methodology or attribution does. Identify the missing
+  knowledge and affected pages briefly.
 - Do not recommend a full wiki lint after routine code, formatting, or minor
   documentation edits. Experiment results belong in `docs/` and artifacts;
   the wiki holds sources, method attribution, and methodology boundaries.

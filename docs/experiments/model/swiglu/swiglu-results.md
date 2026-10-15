@@ -1,6 +1,7 @@
 ---
 title: Homogeneous SwiGLU Results Overview
 status: active
+created: 2026-09-21
 modified: 2026-10-12
 sources:
   artifacts:

@@ -1,11 +1,14 @@
 # Thesis LLM Wiki Schema
 
-- Schema version: 1.1
-- Effective date: 2026-08-03
+- Schema version: 2.0
+- Effective date: 2026-10-15
 - Status: active
 
 This file is the canonical specification for the thesis knowledge base. It
-defines structure, metadata, provenance, and maintenance workflows. Human
+defines structure, metadata, provenance, and maintenance workflows. The wiki
+is the literature layer: source registry, source summaries, methods, concepts,
+research decisions, and the design and attribution of experiments. Project
+results live in `docs/`, and wiki pages link to them. Human
 guides in `docs/knowledge-base/` explain the same system, but this file governs
 wiki operations when the two disagree.
 
@@ -14,7 +17,8 @@ wiki operations when the two disagree.
 1. **Provenance before fluency.** A polished claim without traceable origin is
    less useful than an explicitly uncertain claim.
 2. **Separate authorship from evidence.** Who wrote a page is different from
-   where its claims came from.
+   where its claims came from. Git history records who wrote a page; claim
+   labels and `sources` record where claims came from.
 3. **Separate source authority from research priority.** A paper supplied by
    the supervisor is `core` because of curation, while its academic evidence
    kind is recorded independently.
@@ -23,6 +27,7 @@ wiki operations when the two disagree.
 5. **The wiki compounds.** Ingestion updates existing pages and relationships,
    not only a disconnected source summary.
 6. **Human documentation is distilled.** `docs/` is not a working-note inbox.
+   It owns experiment results; each result has one home there.
 7. **Ambiguity is visible.** Contradictions, uncertainty, and missing evidence
    are recorded rather than resolved by invention.
 
@@ -45,15 +50,15 @@ llm-wiki/
     |-- concepts/            stable concepts and definitions
     |-- entities/            models, datasets, software, and named artifacts
     |-- methods/             algorithms, metrics, and procedures
-    |-- implementations/     maintained software components and pipelines
+    |-- implementations/     pointers to maintained code documentation
     |-- research/            questions, hypotheses, and decisions
-    |-- experiments/         experiments and evidence-bound findings
+    |-- experiments/         experiment design and attribution; results in docs/
     `-- syntheses/           comparisons and cross-source synthesis
 ```
 
-The physical hierarchy stays deliberately small. Page metadata expresses
-granularity, pipeline stage, verification, and topic without multiplying
-folders for every possible classification axis.
+The physical hierarchy stays deliberately small. Page type, epistemic status,
+and relationships classify pages without multiplying folders for every
+possible classification axis.
 
 ## 3. Page types and placement
 
@@ -63,12 +68,12 @@ folders for every possible classification axis.
 | `concept` | Stable terminology, definitions, or theoretical object | `wiki/concepts/` |
 | `entity` | Model, dataset, software package, organization, or named artifact | `wiki/entities/` |
 | `method` | Algorithm, metric, loss, architecture, or workflow | `wiki/methods/` |
-| `implementation` | Maintained project software component or pipeline linked to methods and evidence | `wiki/implementations/` |
+| `implementation` | Pointer from the wiki graph to the README that documents a maintained component | `wiki/implementations/` |
 | `research-question` | Explicit question the thesis may answer | `wiki/research/` |
 | `hypothesis` | Testable researcher proposition | `wiki/research/` |
 | `decision` | Project or methodology decision with rationale | `wiki/research/` |
-| `experiment` | Design, configuration, execution, and direct results | `wiki/experiments/` |
-| `finding` | Evidence-backed interpretation tied to experiments | `wiki/experiments/` |
+| `experiment` | Design, hypotheses, methodology, and attribution; links the `docs/` results | `wiki/experiments/` |
+| `finding` | Evidence-backed interpretation that links the `docs/` results it relies on | `wiki/experiments/` |
 | `comparison` | Structured comparison across methods or evidence | `wiki/syntheses/` |
 | `synthesis` | Integrated understanding across several sources or results | `wiki/syntheses/` |
 
@@ -77,12 +82,16 @@ link to. Update an existing page when adding evidence, qualification, or an
 attribute of the same object. Do not create a second page merely because a new
 source discusses an existing concept.
 
-Implementation pages use architectural granularity. Create them for stable
-components, pipelines, or complete workflows that connect research methods to
-code and experiments. Do not create a page for every file, class, or function.
-An implementation page documents what exists and where; it does not by itself
-verify that the implementation is scientifically correct or empirically
-effective.
+Implementation pages are pointers. Create one only for a stable component or
+pipeline that methods and experiments need to link to in the graph. The page
+links the README that documents the code and does not repeat module lists.
+Implementation presence does not verify that the code is scientifically correct
+or empirically effective.
+
+Experiment and finding pages hold design, hypotheses, methodology, metric
+provenance, and the prior-work boundary. Result numbers, configuration tables,
+and artifact inventories live in the owning `docs/` experiment page, which the
+wiki page links.
 
 ## 4. Canonical page frontmatter
 
@@ -99,27 +108,11 @@ status: draft
 created: 2026-07-17
 updated: 2026-07-17
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: synthesis
   confidence: medium
   verification:
     - source-checked
-
-scope:
-  topics:
-    - block-importance
-  granularities:
-    - mlp-block
-    - model
-  pipeline_stages:
-    - screening
-    - selection
 
 sources:
   - source_id: src-example-2026
@@ -165,22 +158,7 @@ limits.
 
 Optional identity fields are `aliases`, `reviewed`, and `reviewers`.
 
-### 5.2 Authorship
-
-`authorship` records who produced the wiki text, not who originated the
-underlying scientific idea.
-
-Allowed `created_by` values:
-
-- `researcher`: primarily written by the thesis author;
-- `llm`: primarily drafted by an LLM and not yet collaboratively rewritten;
-- `collaborative`: materially shaped by both researcher and LLM.
-
-`contributors` is a list using the roles `researcher`, `llm`, `supervisor`, or
-an explicit human/tool identifier when useful. Never infer that the researcher
-authored LLM-generated prose merely because it is stored in this repository.
-
-### 5.3 Epistemic status
+### 5.2 Epistemic status
 
 `epistemic` records what kind of knowledge the page claims to contain.
 
@@ -208,41 +186,14 @@ Allowed `verification` values:
 not appear with another verification value.
 
 An experiment draft remains `unverified` until its referenced artifacts exist
-and have been checked. Use `experiment-backed` only after the page identifies
-the preserved configuration and result artifacts on which its claims depend.
+and have been checked. Use `experiment-backed` only when the page links the
+`docs/` experiment page that identifies the preserved configuration and result
+artifacts on which its claims depend.
 
-### 5.4 Research scope
+Schema 2.0 removed the `authorship` and `scope` blocks. Git history records who
+wrote a page; `index.md` and `related` links support discovery.
 
-`scope` supports discovery without imposing a deep folder hierarchy.
-
-- `topics`: open-ended lowercase kebab-case terms. Reuse existing terms before
-  introducing synonyms.
-- `granularities`: one or more controlled research levels.
-- `pipeline_stages`: one or more controlled workflow stages.
-
-Allowed `granularities`:
-
-- `weight`
-- `neuron`
-- `mlp-block`
-- `transformer-layer`
-- `model`
-- `moe`
-- `cross-level`
-
-Allowed `pipeline_stages`:
-
-- `data`
-- `screening`
-- `selection`
-- `replacement`
-- `integration`
-- `recovery`
-- `evaluation`
-- `analysis`
-- `infrastructure`
-
-### 5.5 Evidence links
+### 5.3 Evidence links
 
 `sources` links page claims to entries in `raw/sources.yml`.
 
@@ -267,7 +218,7 @@ Allowed `relation` values:
 
 A bare URL in a wiki page is not a substitute for source registration.
 
-### 5.6 Wiki relationships
+### 5.4 Wiki relationships
 
 - `related`: Obsidian wikilinks to conceptually related pages.
 - `supersedes`: pages whose role this page explicitly replaces.
@@ -400,8 +351,9 @@ Page-level metadata is insufficient for a mixed page. Apply these body rules:
    changes their status.
 3. Label an interpretation produced during synthesis as **Synthesis.** when a
    reader could otherwise mistake it for a source claim.
-4. Label project results as **Empirical finding.** and link the experiment page
-   or preserved log.
+4. Label project results as **Empirical finding.** and link the `docs/`
+   experiment page that owns the numbers. Do not restate result numbers in the
+   wiki; state what was tested and link the result.
 5. Label unresolved issues as **Open question.**
 6. Use quotation marks and exact locators for direct quotations. Prefer
    paraphrase and never reproduce copyrighted material excessively.
@@ -444,15 +396,14 @@ Source-summary pages additionally contain bibliographic identity, research
 question, method, evidence, findings, limitations, relevance to this thesis,
 and claims that require independent verification.
 
-Experiment pages additionally contain objective, hypotheses, configuration,
-inputs, procedure, metrics, direct results, interpretation, limitations,
-artifact paths, and reproducibility status.
+Experiment pages additionally contain objective, hypotheses, procedure, the
+provenance of metric definitions, the prior-work boundary, design limitations,
+and a short direct-results section that links the `docs/` page holding the
+results, configuration, artifacts, and reproducibility status.
 
-Implementation pages additionally contain purpose, implemented methods and
-decisions, architecture and responsibilities, interfaces and data flow,
-repository locations and entry points, version and maturity, validation,
-limitations, and experiments that use the implementation. Repository links
-identify artifacts; they are not evidence citations.
+Implementation pages contain a short overview, links to the READMEs that
+document the component, and the methods and experiments it connects. Repository
+links identify artifacts; they are not evidence citations.
 
 ## 10. Operations
 
@@ -490,7 +441,9 @@ identify artifacts; they are not evidence citations.
 2. Add new evidence without erasing prior disagreement or limitations.
 3. Update `updated`, index summaries, reciprocal links, and verification.
 4. Use supersession metadata when a page or decision is genuinely replaced.
-5. Append the operation to `wiki/log.md`.
+5. Write new project results to the owning `docs/` experiment page only, and
+   link them from the wiki.
+6. Append the operation to `wiki/log.md`.
 
 ### Distill
 
@@ -509,7 +462,7 @@ Check four levels:
 - **Graph:** broken links, missing reciprocal relationships, duplicates, and
   orphan pages.
 - **Provenance:** unregistered sources, missing locators, unsupported claims,
-  mixed authorship presented incorrectly, and invalid verification states.
+  result numbers restated instead of linked, and invalid verification states.
 - **Semantic:** contradictions, stale summaries, ambiguous terminology,
   superseded decisions, and gaps requiring user or supervisor judgment.
 

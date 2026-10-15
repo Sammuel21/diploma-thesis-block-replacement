@@ -7,24 +7,11 @@ status: draft
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: mixed
   confidence: not-assessed
   verification:
     - unverified
-
-scope:
-  topics: []
-  granularities: []
-  pipeline_stages:
-    - evaluation
-    - analysis
 
 sources: []
 related: []
@@ -34,35 +21,28 @@ superseded_by: []
 
 # Experiment Title
 
+Results, configuration, artifacts, compute use, and reproducibility status
+belong in the owning `docs/experiments/` page. This page holds design and
+attribution and links that page.
+
 ## Objective
 
 ## Hypotheses
 
-## Configuration
-
-## Inputs and Artifacts
+**Researcher hypothesis.**
 
 ## Procedure
 
-## Metrics
+## Metrics and Project Definitions
+
+## Prior-Work Boundary
 
 ## Direct Results
 
-## Compute and Deployment
+**Empirical finding.** One or two sentences stating what was tested, with a
+link to the results section of the `docs/` page.
 
-### Pre-run Resource Plan
-
-### Measured Resource Use
-
-### Estimate Variance
-
-## Interpretation
-
-**Empirical finding.**
-
-## Limitations
-
-## Reproducibility Status
+## Design Limitations
 
 ## Relationships
 

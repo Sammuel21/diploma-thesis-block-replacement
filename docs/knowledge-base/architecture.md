@@ -1,7 +1,8 @@
 ---
 title: LLM-Wiki Architecture
 status: active
-modified: 2026-09-11
+created: 2026-07-17
+modified: 2026-10-15
 ---
 
 # LLM-Wiki Architecture
@@ -18,9 +19,12 @@ The architecture adapts the three-layer LLM-wiki pattern to academic work:
 2. the wiki integrates knowledge incrementally; and
 3. the schema governs how that integration happens.
 
-This repository adds a separate `docs/` publication layer and a frozen MVP
-archive because research continuity and implementation history have different
-lifecycles from the knowledge graph.
+This repository adds a separate `docs/` layer and a frozen MVP archive
+because research continuity and implementation history have different
+lifecycles from the knowledge graph. Since schema 2.0 (2026-10-15), the wiki is
+the literature layer: sources, methods, concepts, research decisions, and the
+design and attribution of experiments. Project results live only in `docs/`,
+and wiki pages link to them.
 
 ## System map
 
@@ -44,9 +48,9 @@ development/llm-wiki/wiki/
 |-- concepts/               stable terminology and objects
 |-- entities/               models, datasets, software, and named artifacts
 |-- methods/                metrics, architectures, and procedures
-|-- implementations/        project software components and pipelines
+|-- implementations/        pointers to maintained code documentation
 |-- research/               questions, hypotheses, and decisions
-|-- experiments/            designs, results, and findings
+|-- experiments/            experiment design and attribution
 `-- syntheses/              comparisons and integrated analyses
             |
             | explicit review and distillation
@@ -61,7 +65,7 @@ development/docs/           coherent documentation for human readers
 | External source library | PDFs, books, raw ideas | LLM read-only | Original evidence or input |
 | `llm-wiki/raw/` | Registries and legacy snapshots | Append/register; do not rewrite sources | Provenance boundary |
 | `llm-wiki/wiki/` | Maintained Markdown knowledge | Collaborative, schema-governed | Synthesis and research memory |
-| `docs/` | Distilled explanations | Deliberate human-facing edits | Communication, not replacement evidence |
+| `docs/` | Distilled explanations and experiment reports | Deliberate human-facing edits | Owns project results; links the preserved artifacts |
 | `docs/prototype/mvp/` | Frozen prototype record | Historical corrections only | Implementation and empirical history |
 
 ## Why sources can remain outside Git
@@ -122,11 +126,9 @@ process entry points and executor-specific submission files belong under
 `workflows/`. This boundary keeps the historical MVP intact and does not imply
 that every notebook workflow has already been migrated or productionized.
 
-Stable implementations also receive wiki graph nodes. These nodes explain
-which methods and decisions a component implements, where its code and
-configuration live, and which experiments used it. They operate at component
-or pipeline granularity; individual files and functions remain ordinary code
-references unless they have an independently meaningful architectural role.
+Stable implementations may also receive wiki graph nodes. Since schema 2.0
+these nodes are pointers: they link the README that documents the code and the
+methods and experiments it connects, without repeating module lists.
 
 ## Wiki lifecycle
 

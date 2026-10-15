@@ -7,35 +7,11 @@ status: draft
 created: 2026-08-09
 updated: 2026-09-19
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: hypothesis
   confidence: not-assessed
   verification:
     - unverified
-
-scope:
-  topics:
-    - mlp-block-replacement
-    - hybrid-operator
-    - low-rank-linear
-    - nonlinear-residual
-    - operator-budget
-  granularities:
-    - mlp-block
-    - transformer-layer
-    - model
-  pipeline_stages:
-    - replacement
-    - integration
-    - recovery
-    - evaluation
-    - analysis
 
 sources: []
 related:

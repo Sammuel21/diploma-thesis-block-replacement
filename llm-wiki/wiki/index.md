@@ -6,13 +6,15 @@ substantive update, archive, or distillation operation.
 
 ## Current Research Focus
 
-The homogeneous SwiGLU-1 through SwiGLU-7 progression is complete. SwiGLU-8
-(2026-10-12) adds the local-fitting attribution: local fitting still lowers 8K
-KL by 10-24% after 100M recovery tokens, with the gap still shrinking. It also
-adds a 20-80% control spectrum. Start from
-[[synthesis-homogeneous-swiglu-findings]] for the working discrete-width,
-replacement-only recovery control, its attribution, and its limits. Detailed
-tables and plots remain in the linked experiment reports and notebooks.
+The wiki is the literature layer: sources, methods, concepts, research
+decisions, and the design and attribution of experiments. Project results live
+only in `docs/` (schema 2.0, 2026-10-15).
+
+The homogeneous SwiGLU-1 through SwiGLU-8 family is complete; its results are
+in [`docs/experiments/model/swiglu/`](../../docs/experiments/model/swiglu/).
+Start from [[synthesis-homogeneous-swiglu-findings]] for what the working
+discrete-width, replacement-only recovery control borrows from prior work and
+what is project-defined.
 
 Baseline and generic operator-family singleton profiles are also preserved.
 Heterogeneous replacement and generic multi-block interactions remain separate
@@ -22,7 +24,7 @@ Its subset construction, operator controls, interaction metric, ordering, and
 recovery protocol remain to be designed. Singleton KL profiles must not be
 assumed to compose additively. The separate
 [Quantization-1](../../docs/experiments/model/baseline/quantization-1.md)
-baseline was submitted on PERUN on 2026-10-12, and its results are pending.
+baseline is complete; its results are in that doc.
 
 ## Sources
 
@@ -120,13 +122,14 @@ No model, dataset, software, or other entity pages have been created yet.
 
 ## Implementations
 
+Implementation pages are pointers to the documentation next to the code.
+
 - [[implementation-maintained-mlp-replacement-package|Maintained MLP replacement package]]:
-  Separates reusable scientific code, top-level experiment runners, and
-  executor-specific jobs; records completed dedicated SwiGLU-7 execution
-  without certifying generic launchers or pending quantization runs.
+  Points to the READMEs for `src/`, `workflows/`, the model runners, and the
+  PERUN jobs.
 - [[implementation-compute-environments|Research compute environments]]:
-  Records the local MVP and shared remote experiment capacity, setup, and
-  constraints without identifying the remote host or its owner.
+  Points to `docs/infrastructure/compute-environments.md` (local MVP and shared
+  remote GPU) and the PERUN docs.
 
 ## Research
 
@@ -135,27 +138,28 @@ No model, dataset, software, or other entity pages have been created yet.
   optional controlled observations.
 - [[decision-working-experiment-code-standards|Working experiment code standards]]:
   Separates researcher-structured notebook work from reliable maintained code
-  and workflows, and routes implementation agents by unresolved judgment and
-  failure cost.
+  and workflows. Its agent-routing section is superseded by `decisions.md`.
 
 ## Experiments and Findings
+
+Experiment pages hold design, hypotheses, methodology, and attribution. Their
+results are in the linked `docs/experiments/` pages.
 
 - [[experiment-initial-block-compression-study|Initial block-compression study]]:
   Working design covering activation geometry, a fixed six-condition
   single-block baseline protocol with a draft reusable runner, independent
   dense-linear degradation, and links to completed homogeneous work and the
-  implemented-but-unexecuted quantization baseline. Status: `draft`; numerical
-  evidence remains on downstream pages and reports.
+  completed Quantization-1 baseline. Status: `draft`.
 - [[experiment-baseline-operator-analysis|Baseline operator analysis]]:
-  Artifact-backed single-run evidence for calibration scaling, reduced-SwiGLU
-  capacity, replacement-only recovery, and full-depth isolated replacement
-  sensitivity. Status: `draft`; schema-2 evidence is checked, while newer
-  notebook additions remain pending rerun.
+  Design, hypotheses, and metric provenance for calibration scaling,
+  reduced-SwiGLU capacity, replacement-only recovery, and full-depth isolated
+  replacement sensitivity. Results: `docs/experiments/block/baseline/baseline-experiments.md`.
+  Status: `draft`.
 - [[experiment-swiglu-operator-design-progression|SwiGLU operator-design progression]]:
-  Artifact-backed full-depth comparison of ten generic operator
-  configurations. Status: `draft`; preserves the checked singleton results,
-  links the completed homogeneous family, and leaves branch/factorization/
-  nested-topology proposals unverified.
+  Design, prior-work boundary, and operator accounting for the full-depth
+  comparison of ten generic operators. Results:
+  `docs/experiments/block/operator/operator.md`. Status: `draft`;
+  branch/factorization/nested-topology proposals remain unverified.
 
 No MVP evidence has been ingested into canonical experiment pages. The
 historical archive remains available at `docs/prototype/mvp/`.
@@ -164,16 +168,16 @@ historical archive remains available at `docs/prototype/mvp/`.
 
 - [[comparison-recovery-objective-trainable-scope|Recovery objective and trainable scope]]:
   Separates loss placement from parameter scope, including all three completed
-  S7 variants and their Minitron, Grafting, and LoRA attribution.
+  S7 variants and their Minitron, Grafting, and LoRA attribution; results link
+  to `swiglu-7.md`.
 - [[synthesis-homogeneous-swiglu-findings|Homogeneous SwiGLU findings and methodology boundary]]:
-  Compact SwiGLU-1 through SwiGLU-8 decisions, evidence anchors, borrowed-method
-  boundaries, the measured value of local fitting after recovery, and
-  limitations. Status: `review`; experiment-backed, not independently
-  reproduced or a claim of literature novelty.
+  What the SwiGLU-1 through SwiGLU-8 family borrows from prior work and what is
+  project-defined, with links to the docs that hold the results. Status:
+  `review`; not a claim of literature novelty.
 
 ## Maintenance
 
-- Schema version: 1.1
+- Schema version: 2.0 (2026-10-15)
 - Last structural lint: 2026-10-02 (all maintained pages and source registries)
 - Last focused scientific/provenance review: 2026-10-02 (homogeneous SwiGLU)
 - Orphan pages: none detected

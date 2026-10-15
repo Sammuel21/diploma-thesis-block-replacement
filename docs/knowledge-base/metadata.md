@@ -1,24 +1,24 @@
 ---
 title: LLM-Wiki Metadata Reference
 status: active
-modified: 2026-09-11
+created: 2026-07-17
+modified: 2026-10-15
 ---
 
 # LLM-Wiki Metadata Reference
 
 This document explains the YAML metadata used by maintained pages under
 `llm-wiki/wiki/`. The authoritative specification is
-`llm-wiki/SCHEMA.md`; this guide is optimized for readers and page authors.
+`llm-wiki/SCHEMA.md` (version 2.0, effective 2026-10-15); this guide is
+optimized for readers and page authors.
 
 ## Why metadata is divided into blocks
 
 Academic provenance requires several independent questions:
 
 - What page is this and where is it in its lifecycle?
-- Who wrote the wiki text?
 - What kind of knowledge does it claim to contain?
 - How was it verified?
-- Which research areas does it concern?
 - Which original sources support it?
 - Which other wiki pages are related?
 
@@ -39,27 +39,11 @@ status: draft
 created: 2026-07-17
 updated: 2026-07-17
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: synthesis
   confidence: medium
   verification:
     - source-checked
-
-scope:
-  topics:
-    - block-importance
-  granularities:
-    - mlp-block
-    - model
-  pipeline_stages:
-    - screening
-    - selection
 
 sources:
   - source_id: src-example-2026
@@ -112,31 +96,11 @@ Allowed lifecycle states are:
 Lifecycle status and scientific confidence are separate. A hypothesis can be a
 well-maintained `verified` page while the hypothesis itself remains uncertain.
 
-An `implementation` page represents a stable project component, pipeline, or
-workflow. Its common metadata describes provenance and research scope, while
-its body records repository paths, version, maturity, interfaces, validation,
-and related experiments. The page documents the artifact but does not itself
-prove correctness or effectiveness.
-
-## Authorship
-
-```yaml
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-```
-
-`created_by` describes who produced the wiki prose:
-
-- `researcher`
-- `llm`
-- `collaborative`
-
-This does not describe the origin of a scientific idea. A page written by an
-LLM can faithfully summarize prior work; a page written by the researcher can
-still contain source-derived claims.
+An `implementation` page is a pointer: it places a maintained component in
+the wiki graph and links the README that documents the code. An `experiment`
+page holds design, hypotheses, methodology, and attribution; results,
+configuration, and artifacts live in the owning `docs/experiments/` page.
+Neither page type proves correctness or effectiveness.
 
 ## Epistemic status
 
@@ -171,32 +135,8 @@ judgment and never replaces evidence.
 `unverified` cannot be combined with another verification value.
 
 An experiment plan starts as `unverified`. It becomes `experiment-backed` only
-after the recorded configuration and result artifacts exist and are linked
-from the page.
-
-## Research scope
-
-```yaml
-scope:
-  topics:
-    - block-importance
-  granularities:
-    - mlp-block
-  pipeline_stages:
-    - screening
-```
-
-`topics` is an extensible list of reused kebab-case terms.
-
-Controlled granularities are `weight`, `neuron`, `mlp-block`,
-`transformer-layer`, `model`, `moe`, and `cross-level`.
-
-Controlled pipeline stages are `data`, `screening`, `selection`,
-`replacement`, `integration`, `recovery`, `evaluation`, `analysis`, and
-`infrastructure`.
-
-These dimensions overlap intentionally. A BI method can concern an MLP block
-as the scored object and model-level behavior as the downstream consequence.
+after the recorded configuration and result artifacts exist and the page links
+the `docs/` experiment page that identifies them.
 
 ## Evidence links
 
@@ -249,6 +189,13 @@ Collection `storage` is one of `repository-tracked`,
 `mixed`. These operational fields determine how an agent may access and record
 the source; they do not determine scientific quality.
 
+## Removed in schema 2.0
+
+Schema 2.0 removed two blocks. `authorship` recorded who wrote the wiki prose;
+git history records that now. `scope` (`topics`, `granularities`,
+`pipeline_stages`) supported discovery; `wiki/index.md` and `related` links do
+that now. No Obsidian plugin read either block.
+
 ## Claim-level provenance
 
 Page metadata cannot disambiguate every sentence on a mixed page. Use explicit
@@ -256,7 +203,8 @@ body labels when needed:
 
 - **Researcher hypothesis.** for an original testable proposition.
 - **Synthesis.** for an interpretation assembled across inputs.
-- **Empirical finding.** for an interpretation tied to preserved results.
+- **Empirical finding.** for an interpretation tied to preserved results; link
+  the `docs/` page that owns the numbers instead of restating them.
 - **Open question.** for an unresolved issue.
 
 Source-derived claims still require registered source IDs and locators. Legacy
@@ -269,7 +217,7 @@ Before moving a page to `review` or `verified`, check:
 
 1. filename and `id` agree;
 2. required metadata is present and uses allowed values;
-3. authorship and epistemic role are not conflated;
+3. result numbers link to `docs/` rather than being restated;
 4. every cited source is individually registered;
 5. important claims have useful locators;
 6. original hypotheses and synthesis are visibly distinguished;

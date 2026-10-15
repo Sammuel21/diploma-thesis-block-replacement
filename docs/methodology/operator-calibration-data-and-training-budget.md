@@ -1,6 +1,7 @@
 ---
 title: Operator Calibration Data and Training Budget
 status: draft
+created: 2026-09-04
 modified: 2026-10-11
 ---
 

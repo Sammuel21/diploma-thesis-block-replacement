@@ -21,7 +21,9 @@
 - `raw/` is an immutable source boundary; corrections belong in a new source
   version or wiki annotation.
 - `wiki/` is the maintained, collaborative research knowledge base.
-- Update `docs/` only during an explicitly requested distillation.
+- Project experiment results live only in `docs/`; wiki pages link to them
+  (schema 2.0). Otherwise, write wiki material into `docs/` only during an
+  explicitly requested distillation.
 - Treat `docs/prototype/mvp/` and `notebooks/mvp/` as historical evidence, not
   the current methodology specification.
 - Do not modify code as part of a wiki operation unless explicitly approved.
@@ -32,8 +34,9 @@
   and empirical findings using the schema's epistemic labels.
 - Support source-derived claims with individually registered original sources;
   collection entries and LLM summaries are discovery aids, not evidence.
-- Link empirical claims to preserved experiment artifacts. Do not infer
-  findings from planned or unexecuted experiments.
+- Link empirical claims to the `docs/` experiment page that owns the numbers
+  instead of restating them. Do not infer findings from planned or unexecuted
+  experiments.
 - Preserve uncertainty, contradictions, negative results, and historical
   context. Ask the researcher when provenance or intended meaning is unclear.
 - Do not ingest sources, promote wiki material, or distill documentation merely

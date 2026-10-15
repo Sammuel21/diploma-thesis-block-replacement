@@ -1,6 +1,7 @@
 ---
 title: Operator Distillation Workflow
 status: active
+created: 2026-09-11
 modified: 2026-10-11
 sources:
   notebooks:

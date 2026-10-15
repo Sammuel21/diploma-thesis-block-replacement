@@ -879,3 +879,70 @@ This file is append-only. Entries use the format:
 - Mechanical check of the three edited pages and the index: frontmatter
   parses, controlled values are valid, `id` matches the filename, and
   wikilinks and relative paths resolve. This is not a full lint.
+
+## [2026-10-15] update | Experiment results moved to docs
+
+- Moved the block-study results, which existed only in the wiki, into the
+  owning docs pages before slimming the wiki:
+  - [[experiment-baseline-operator-analysis]]: metric definitions, findings,
+    artifact contents, and result limits went to
+    `docs/experiments/block/baseline/baseline-experiments.md`;
+  - [[experiment-swiglu-operator-design-progression]]: the results table, its
+    six findings, artifact contents, and result limits went to
+    `docs/experiments/block/operator/operator.md`.
+- Slimmed both pages to design, hypotheses, procedure, metric provenance,
+  prior-work boundary, design limitations, and links. Configuration tables
+  became links after every value was confirmed in the docs configuration
+  appendix.
+- Corrected a limitation on [[experiment-baseline-operator-analysis]]. It said
+  the local error is on C4 while KL is on WikiText-2. The notebook version that
+  produced the artifact (commit `5f7daae`) measures the full-depth local error
+  and the ratio on the same WikiText-2 batches as the KL; only the calibration
+  and width tables use C4.
+- [[experiment-initial-block-compression-study]]: replaced the stale
+  "Quantization-1 pending" lines with a link to its completed results.
+- [[synthesis-homogeneous-swiglu-findings]]: kept the overview and the
+  borrowed-versus-project-defined table; replaced the progression table, final
+  evidence, SwiGLU-8 sections, and limitations with links to the SwiGLU docs.
+- [[method-two-stage-operator-grafting]] and
+  [[method-post-pruning-knowledge-distillation]]: replaced restated SwiGLU-8
+  numbers with links; the labelled sentences and prior-work text are unchanged.
+  [[method-discrete-width-curve-allocation]],
+  [[method-global-to-local-operator-budget-allocation]], and
+  [[comparison-recovery-objective-trainable-scope]] now link the docs instead of
+  the synthesis for results.
+- [[implementation-maintained-mlp-replacement-package]] became a pointer; its
+  package map moved to `src/README.md`, which also clears the links to the
+  deleted `operators/baselines.py`, `analysis/interactions.py`, and
+  `run_experiment.py`.
+- [[implementation-compute-environments]] became a pointer; its content moved
+  to `docs/infrastructure/compute-environments.md` with the privacy boundary
+  kept.
+- [[decision-working-experiment-code-standards]]: marked the agent-routing
+  section superseded by the 2026-10-10 entries in `docs/agents/decisions.md`;
+  the text is kept as history.
+- Evidence: a script compared every number and code identifier removed from
+  each page with the destination docs. The only items not found were rounded
+  ranges whose finer values are in the docs (for example 7-19% versus
+  6.9-18.8%) and links to deleted modules.
+
+## [2026-10-15] schema | Schema 2.0: wiki as the literature layer
+
+- Raised the schema from 1.1 to 2.0 under the 2026-10-15 decision-log entries
+  (researcher-approved WP5 and WP6 plan).
+- Breaking changes: page front matter drops `authorship` and `scope` (former
+  sections 5.2 and 5.4; section 5 is renumbered). Experiment and finding pages
+  hold design and attribution and link the `docs/` results. Implementation
+  pages are pointers. New project results are written to `docs/` only.
+- Updated the five templates and the human references
+  `docs/knowledge-base/metadata.md` and `docs/knowledge-base/architecture.md`.
+- Migration: a script removed both blocks from all 30 pages and 5 templates.
+  The front matter still parses with PyYAML, the other keys are unchanged, and
+  each body is byte-identical.
+
+## [2026-10-15] update | Agent rules aligned with schema 2.0
+
+- `llm-wiki/AGENTS.md`: results are written to `docs/` only, and empirical
+  claims link the owning `docs/` page; replaces the distillation-only rule.
+- [[decision-working-experiment-code-standards]]: the testing policy no longer
+  recommends smoke paths; it defers to the root `AGENTS.md` smoke rule.

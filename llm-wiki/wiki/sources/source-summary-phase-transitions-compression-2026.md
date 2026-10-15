@@ -7,38 +7,11 @@ status: draft
 created: 2026-08-11
 updated: 2026-08-11
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: prior-work
   confidence: medium
   verification:
     - source-checked
-
-scope:
-  topics:
-    - combined-compression
-    - low-rank-decomposition
-    - model-compression
-    - phase-transition-point
-    - pruning
-    - quantization
-    - redundancy
-  granularities:
-    - weight
-    - transformer-layer
-    - model
-    - cross-level
-  pipeline_stages:
-    - selection
-    - replacement
-    - integration
-    - evaluation
-    - analysis
 
 sources:
   - source_id: src-phase-transitions-compression-2026

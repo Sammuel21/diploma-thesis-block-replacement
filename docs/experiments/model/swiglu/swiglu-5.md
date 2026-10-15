@@ -1,6 +1,7 @@
 ---
 title: SwiGLU-5 Efficient Global-Recovery Search and Confirmation
 status: draft
+created: 2026-09-19
 modified: 2026-09-20
 sources:
   notebooks:

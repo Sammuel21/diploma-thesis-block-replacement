@@ -5,13 +5,7 @@ summary: Allocates homogeneous SwiGLU widths by minimizing a summed singleton-KL
 type: method
 status: review
 created: 2026-10-02
-updated: 2026-10-02
-
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
+updated: 2026-10-15
 
 epistemic:
   role: mixed
@@ -19,23 +13,6 @@ epistemic:
   verification:
     - source-checked
     - experiment-backed
-
-scope:
-  topics:
-    - swiglu
-    - global-sparsity-allocation
-    - discrete-operator-sizing
-    - replacement-sensitivity
-    - operator-budget
-  granularities:
-    - neuron
-    - mlp-block
-    - model
-  pipeline_stages:
-    - selection
-    - replacement
-    - integration
-    - evaluation
 
 sources:
   - source_id: src-modegpt-2025
@@ -115,7 +92,8 @@ short-budget recovery over the legacy ranked allocator. The C2 confirmations
 at [20%](../../../data/results/workflows/model/swiglu-5/confirmation/run-001-target-0.2.json)
 and [50%](../../../data/results/workflows/model/swiglu-5/confirmation/run-001-target-0.5.json)
 preserved useful quality through 100M tokens. The 20% selection-label defect
-and its limits are recorded in [[synthesis-homogeneous-swiglu-findings]].
+and its limits are recorded in
+[`swiglu-5.md`](../../../docs/experiments/model/swiglu/swiglu-5.md).
 
 ## Limitations
 

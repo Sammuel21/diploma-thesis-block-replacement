@@ -1,6 +1,7 @@
 ---
 title: Compression Reporting Framework
 status: active
+created: 2026-09-07
 modified: 2026-09-11
 ---
 

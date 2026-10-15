@@ -1,50 +1,17 @@
 ---
 id: experiment-swiglu-operator-design-progression
 title: SwiGLU Operator-Design Progression
-summary: Preserves the generic singleton operator comparison, links completed homogeneous SwiGLU findings, and separates remaining branch/topology proposals.
+summary: Design, prior-work boundary, and accounting of the generic singleton operator comparison (results in docs), plus remaining branch/topology proposals.
 type: experiment
 status: draft
 created: 2026-08-11
-updated: 2026-10-02
-
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
+updated: 2026-10-15
 
 epistemic:
   role: mixed
   confidence: medium
   verification:
     - experiment-backed
-
-scope:
-  topics:
-    - activation-analysis
-    - capacity-sweep
-    - compression-boundary
-    - hybrid-operator
-    - mlp-block-replacement
-    - neuron-importance
-    - operator-comparison
-    - replacement-sensitivity
-    - structured-pruning
-    - swiglu
-    - teacher-tailored-operator
-  granularities:
-    - neuron
-    - mlp-block
-    - transformer-layer
-    - model
-    - cross-level
-  pipeline_stages:
-    - screening
-    - selection
-    - replacement
-    - integration
-    - evaluation
-    - analysis
 
 sources:
   - source_id: src-minitron-2024
@@ -191,15 +158,9 @@ prescription.
 
 ## Configuration, Inputs, and Procedure
 
-| Component | Recorded setting |
-| --- | --- |
-| Model | SmolLM2-1.7B, revision `effd688a12921b4cc83e3312b6feb579f70f9c71` |
-| Layers | 1-22; first and final excluded |
-| Candidates | zero, mean, linear, affine, rank-$0.5d$ factorized linear, width-$0.5d$ compact MLP, SwiGLU 0.25/0.50/0.75, rank/width-$0.25d$ hybrid |
-| Data | 48 C4 calibration, 24 C4 local-validation, and 24 WikiText-2 KL batches |
-| Learned fit | at most 64 epochs; minibatch 2,048; learning rate $10^{-3}$; patience 3 |
-| Recovery | 64 streamed updates; temperature 1; learning rate $10^{-5}$; replacement parameters only |
-| Seed | 21 |
+The recorded configuration and the ten candidates are in
+[`operator.md`](../../../docs/experiments/block/operator/operator.md)
+(operator design space and configuration appendix).
 
 Each candidate was fitted independently from dense-teacher activations and
 inserted at one layer at a time. The comparison records local fidelity,
@@ -215,38 +176,11 @@ the validated executor of these notebook results.
 
 ## Direct Results and Interpretation
 
-The following are **empirical findings from one configured run** in
-[`operator-experiments.json`](../../../data/results/notebook-block-study/operator-experiments.json),
-schema version 1. Values average over independent singleton replacements at
-layers 1-22.
-
-| Operator | Original-MLP parameters | Mean pre-KL | Mean post-KL |
-| --- | ---: | ---: | ---: |
-| zero | 0% | 0.7354 | 0.7354 |
-| mean | 0% | 0.7365 | 0.7365 |
-| linear | 8.33% | 0.5960 | 0.5962 |
-| affine | 8.34% | 0.5912 | 0.5907 |
-| rank-$0.5d$ factorized linear | 8.33% | 0.5985 | 0.5979 |
-| width-$0.5d$ compact MLP | 8.33% | 0.3466 | 0.3371 |
-| rank/width-$0.25d$ hybrid | 8.33% | 0.4956 | 0.4804 |
-| 0.25-width SwiGLU | 25% | 0.2007 | 0.1943 |
-| 0.50-width SwiGLU | 50% | 0.1766 | 0.1608 |
-| 0.75-width SwiGLU | 75% | 0.1684 | 0.1413 |
-
-- In the approximately-$d^2$ group, the compact MLP had the lowest post-KL at
-  18 of 22 layers and beat dense linear at 21 of 22. This is evidence for a
-  nonlinearity benefit under this budget, not a universal family ranking.
-- Wider SwiGLU generally reduced KL, but post-recovery width order was
-  non-monotonic at three layers.
-- Mean learned-operator post-KL was concentrated at layers 22 (2.4374), 1
-  (2.2194), and 7 (1.7966); the next layer mean was 0.1965.
-- Learned-row local relative MSE and pre-KL had Spearman association -0.09;
-  good local approximation did not imply globally safe replacement.
-- Pre/post layer rankings were nearly unchanged under 64 recovery updates
-  (per-family Spearman 0.993-1.000), making pre-KL a useful ranking proxy only
-  under this protocol.
-- At layer 22, zero and mean had lower KL than every learned substitute. This
-  is an anomaly requiring confirmation.
+**Empirical findings** from one configured Stage 1 run (artifact
+`operator-experiments.json`, schema 1) are recorded in the Results section of
+[`operator.md`](../../../docs/experiments/block/operator/operator.md). In short,
+under this budget a nonlinear operator beat the linear references, and good
+local approximation did not imply a globally safe replacement.
 
 Interpretation must separate architecture from footprint, local fit from model
 effect, singleton sensitivity from intrinsic layer importance, and
@@ -267,23 +201,18 @@ separately; their errors are not assumed additive or orthogonal.
 
 ## Limitations and Reproducibility
 
+Result-specific limits and the artifact contents are in
+[`operator.md`](../../../docs/experiments/block/operator/operator.md). Design
+limits:
+
 - One model, seed, and data partition do not establish stability or transfer.
-- Many learned fits reached the 64-epoch ceiling, so comparisons are
-  fixed-budget rather than demonstrated-convergence results.
-- The artifact records KL but not full-model loss/perplexity for every case.
-- Zero and mean have no trainable parameters; their recorded 64 recovery
-  updates denote shared-stream traversal, not optimizer updates.
 - Branch and channel effects may interact, so singleton component scores need
   not compose.
 - Every result in this artifact replaces one MLP independently; it does not
   measure simultaneous cross-family interactions. Separate homogeneous
   multi-block evidence does not answer that broader question.
 
-Status: draft and experiment-backed for Stage 1 only. The checked local,
-ignored schema-1 artifact contains 220 unique fitting rows and 220 matching
-sensitivity rows with verified `pre - post` KL arithmetic. It excludes fitted
-weights, activations, logits, optimizer state, histories, perplexity, and
-hardware telemetry. No independent seed or model replication exists.
+Status: draft and experiment-backed for Stage 1 only.
 
 ## Relationships
 

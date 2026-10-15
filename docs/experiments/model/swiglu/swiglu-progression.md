@@ -1,6 +1,7 @@
 ---
 title: Homogeneous SwiGLU Experimental Progression
 status: active
+created: 2026-09-20
 modified: 2026-10-12
 sources:
   notebooks:

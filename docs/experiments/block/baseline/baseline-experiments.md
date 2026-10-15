@@ -1,7 +1,8 @@
 ---
 title: Baseline Experiments Workflow
 status: active
-modified: 2026-09-19
+created: 2026-09-11
+modified: 2026-10-15
 sources:
   notebooks:
     - notebooks/block/baseline/baseline-experiments.ipynb
@@ -34,6 +35,9 @@ The model is SmolLM2-1.7B. Capture sequences contain 128 tokens and the capture
 batch contains two sequences. The first and last Transformer blocks are
 excluded from the depth study, leaving layers 1 through 22.
 
+Calibration data, local validation, and recovery use document-disjoint C4
+windows; model evaluation uses WikiText-2.
+
 Learned nonlinear operators use AdamW, activation MSE, an operator batch of
 2,048 pairs, at most 64 epochs, and validation-based early stopping. Linear
 and affine candidates use ridge regression. Nonlinear candidates start from
@@ -41,7 +45,9 @@ random weights; teacher-derived initialization is not part of this workflow.
 
 Recovery freezes the dense model and updates only the temporarily inserted
 replacement using teacher-to-student KL at learning rate `1e-5`. One streamed
-C4 batch is one optimizer update.
+C4 batch is one optimizer update. Recovery streams one teacher-logit batch
+across all active width candidates before discarding it; the smaller read-only
+validation-logit cache remains in memory.
 
 ## 1. Calibration-data scaling
 
@@ -129,7 +135,100 @@ The available
 is schema version 2. It stores the dense baseline, calibration scaling, width
 scaling, width recovery, and 110-row full-depth KL analyses.
 
+## Results (artifact baseline-experiments.json, schema 2)
+
+These results were moved here from the wiki page
+`experiment-baseline-operator-analysis` on 2026-10-15; this section is now
+their single source.
+
+### Metric definitions
+
+**Project definition; no external citation required.** For teacher MLP $f_i$,
+fitted substitute $g_i$, and held-out teacher input $h_i$:
+
+$$
+E_i^{\mathrm{local}}
+=
+\frac{\mathbb{E}\lVert g_i(h_i)-f_i(h_i)\rVert_2^2}
+{\mathbb{E}\lVert f_i(h_i)\rVert_2^2+\varepsilon}.
+$$
+
+**Project evaluation definition using standard KL notation; no external
+citation required.** If $S_i$ has only MLP $i$ replaced after local fitting:
+
+$$
+K_i^{\mathrm{pre}}
+=
+\mathbb{E}_x\left[D_{\mathrm{KL}}\left(
+p_T(\cdot\mid x)\parallel p_{S_i}(\cdot\mid x)
+\right)\right].
+$$
+
+**Project-proposed diagnostic; no external citation required.**
+
+$$
+R_i=\frac{K_i^{\mathrm{pre}}}{E_i^{\mathrm{local}}+\varepsilon}.
+$$
+
+$R_i$ is unbounded and has no universal threshold; it expresses global change
+per unit of remaining local error only within a shared operator and evaluation
+protocol. The two original quantities must remain visible. Additional metrics
+include parameter/byte footprint, local MSE and cosine similarity, model loss,
+perplexity, and pre/post-recovery KL. `global_to_local_ratio` in the artifact
+is $R_i$ with $\varepsilon = 10^{-8}$.
+
+### Findings
+
+The following are **empirical findings from one configured run** in
+[baseline-experiments.json](../../../../data/results/notebook-block-study/baseline-experiments.json),
+schema version 2:
+
+- Untouched validation loss was 2.66997 and perplexity 14.4396 over 6,096
+  predicted WikiText-2 tokens.
+- Increasing calibration from 2,048 to 12,288 tokens reduced local relative
+  MSE for all three tested families, but also increased learned-operator
+  updates.
+- At layer 11, increasing SwiGLU ratio from 0.25 to 0.90 reduced local relative
+  MSE from 0.6471 to 0.6097; pre-recovery perplexity stayed between 15.1392 and
+  15.1687 without a monotonic width ordering.
+- After 1,024 replacement-only recovery updates, width-candidate perplexity was
+  15.1169-15.1250, still above the untouched reference.
+- Across 110 isolated operator-layer cases, mean post-recovery KL was highest
+  at layers 1 (2.1012), 22 (1.8350), and 7 (1.4468); layer 20 was next at
+  0.1941.
+- Local relative MSE did not rank pre-recovery KL reliably across depth in
+  this run.
+
+These results separate local imitation, pre-recovery singleton sensitivity,
+and fixed-protocol repairability. Pre-recovery KL is operator-conditioned; it
+is not a universal block-importance or intrinsic-linearity score.
+
+### Artifact contents
+
+The checked local, ignored schema-2 artifact (created 2026-08-18, checked
+2026-08-20) records configuration and result tables but excludes activations,
+logits, fitted weights, optimizer state, plots, and hardware telemetry. It
+contains four width rows, 24 recovery rows, and 110 rows per full-depth KL
+table. Newer notebook additions expecting schema 3 remain pending rerun. The
+stage-level run/load path has not received an independent numerical-parity
+test.
+
 ## Current limitations and Perun handoff
+
+Limits on interpreting the results above:
+
+- One model and seed do not establish stability.
+- Calibration quantity is confounded with update count.
+- Operator families are not parameter-matched.
+- The calibration and width tables measure local error on held-out C4
+  operator-validation pairs, while KL uses WikiText-2. The full-depth local
+  error and $R_i$ use the same WikiText-2 batches as the KL (notebook at
+  commit `5f7daae`, which produced this artifact).
+- Every full-depth row replaces one block independently; simultaneous errors
+  may interact.
+- Recovery matches update count, not computation per update.
+- Candidate modules and activation sets still contribute substantial memory;
+  streaming addresses only the large recovery-logit cache.
 
 The artifact records the historical 48-batch, random-initialization method. It
 is useful for exploratory comparisons but is not the optimized 384-batch,

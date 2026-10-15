@@ -5,13 +5,7 @@ summary: Recovers a structurally pruned student by matching outputs and optional
 type: method
 status: review
 created: 2026-07-17
-updated: 2026-10-12
-
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
+updated: 2026-10-15
 
 epistemic:
   role: mixed
@@ -19,21 +13,6 @@ epistemic:
   verification:
     - source-checked
     - experiment-backed
-
-scope:
-  topics:
-    - knowledge-distillation
-    - compression-recovery
-    - recovery-budget
-    - loss-design
-  granularities:
-    - transformer-layer
-    - model
-    - cross-level
-  pipeline_stages:
-    - integration
-    - recovery
-    - evaluation
 
 sources:
   - source_id: src-minitron-2024
@@ -106,9 +85,10 @@ KL from the dense teacher. It differs from Minitron in three ways:
 - the budget is 100M tokens.
 
 Adding a local operator fit before the same distillation lowered the 8K KL at
-100M tokens by 10.4-23.5% at 20-80% eligible-MLP removal. The gap was still
-shrinking at 100M. See [[synthesis-homogeneous-swiglu-findings]] and the
-[SwiGLU-8 report](../../../docs/experiments/model/swiglu/swiglu-8.md).
+100M tokens at every target from 20% to 80% eligible-MLP removal. The gap was
+still shrinking at 100M. The numbers are in the
+[SwiGLU-8 report](../../../docs/experiments/model/swiglu/swiglu-8.md) (Part B
+results).
 
 **Synthesis.** The evidence suggests that, at short and moderate recovery
 budgets, a local reconstruction stage is a cheap complement to post-pruning

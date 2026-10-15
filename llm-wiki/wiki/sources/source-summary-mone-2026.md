@@ -7,39 +7,11 @@ status: review
 created: 2026-07-17
 updated: 2026-07-17
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: prior-work
   confidence: high
   verification:
     - source-checked
-
-scope:
-  topics:
-    - mixture-of-experts
-    - expert-redundancy
-    - novice-replacement
-    - structured-pruning
-    - parameter-accounting
-    - calibration-robustness
-  granularities:
-    - mlp-block
-    - moe
-    - model
-    - cross-level
-  pipeline_stages:
-    - data
-    - screening
-    - selection
-    - replacement
-    - recovery
-    - evaluation
-    - analysis
 
 sources:
   - source_id: src-mone-2026

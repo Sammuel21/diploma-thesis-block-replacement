@@ -1,6 +1,7 @@
 ---
 title: Shared Decision Log
 status: active
+created: 2026-10-10
 modified: 2026-10-15
 ---
 
@@ -90,7 +91,8 @@ log only links to them.
 | 2026-10-15 | Code and configuration that never produced a result and has no caller are deleted; git history keeps them. This applies to `evaluation/benchmarks.py`, `operators/baselines.py`, `analysis/interactions.py`, and the `run_experiment` path (the runner, its three job scripts, and `configs/experiments/`). | Researcher decision; complements the 2026-10-10 rule that keeps code for finished experiments |
 | 2026-10-15 | Notebook contract tests check that a notebook is load-only and uses the decided constants; once real results exist, they no longer require empty outputs. | Researcher decision. The SwiGLU-7 and SwiGLU-8 notebook tests failed only because the notebooks had been run on real results |
 | 2026-10-15 | *Superseded on 2026-10-15 by the entry that keeps `sources`.* Front matter in `docs/` keeps only `title`, `status`, and `modified`. Wiki front matter stays unchanged until the schema is simplified. | Researcher decision; no code reads front matter, and `curation` was never updated in 50 docs |
-| 2026-10-15 | Front matter in `docs/` keeps `title`, `status`, `modified`, and, where present, `sources` and `reference_artifacts`. `authorship`, `curation`, `type`, `category`, `created`, and `metadata_version` are dropped. | Researcher decision; supersedes the earlier 2026-10-15 front-matter entry. `sources` records the notebook and result artifacts behind 16 experiment docs |
+| 2026-10-15 | *Superseded on 2026-10-15 by the entry that restores `created`.* Front matter in `docs/` keeps `title`, `status`, `modified`, and, where present, `sources` and `reference_artifacts`. `authorship`, `curation`, `type`, `category`, `created`, and `metadata_version` are dropped. | Researcher decision; supersedes the earlier 2026-10-15 front-matter entry. `sources` records the notebook and result artifacts behind 16 experiment docs |
+| 2026-10-15 | Front matter in `docs/` keeps `title`, `status`, `created`, `modified`, and, where present, `sources` and `reference_artifacts`. `authorship`, `curation`, `type`, `category`, and `metadata_version` are dropped. The `created` dates were restored from commit `25a5d90`. | Researcher decision; supersedes the previous front-matter entry |
 | 2026-10-15 | Wiki experiment pages keep their design, hypotheses, attribution, and prior-work sections; their results move to the owning `docs/` experiment page. Wiki implementation pages become pointers: the package map points to the READMEs, and the compute-environment content moves to `docs/infrastructure/compute-environments.md`. | Researcher decision (wiki plan). The block-study results existed only in the wiki |
 | 2026-10-15 | Wiki schema 2.0: page front matter drops `scope` and `authorship` and keeps identity, `epistemic`, `sources`, and relations. New project results are written to `docs/` only; wiki pages link to them. | Researcher decision (wiki plan); no Obsidian plugin reads the dropped fields |
 | 2026-10-15 | Job launchers state their copy exclusions inline. `.rsyncignore` stays deleted; `swiglu_7.sbatch` and `scratch_probe.sbatch` exclude `/tmp/mlp-replacement/` directly. | Researcher decision; copy behavior is unchanged, and the SwiGLU-7 launcher works again |

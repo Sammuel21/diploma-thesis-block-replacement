@@ -1,7 +1,8 @@
 ---
 title: Documentation
 status: active
-modified: 2026-10-11
+created: 2026-07-17
+modified: 2026-10-15
 ---
 
 # Documentation
@@ -64,6 +65,8 @@ Markdown files in this directory follow the
 - [TUKE Perun experiment log](infrastructure/perun/perun-log.md) is the append-only
   record of submitted jobs, allocations, outcomes, resource measurements, and
   artifact locations.
+- [Research compute environments](infrastructure/compute-environments.md)
+  records the local MVP machine and the shared remote GPU environment.
 
 ## Experiment workflows
 

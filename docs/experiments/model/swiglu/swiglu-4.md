@@ -1,6 +1,7 @@
 ---
 title: SwiGLU Global-Recovery Analysis
 status: draft
+created: 2026-09-18
 modified: 2026-09-19
 sources:
   reference_artifacts:

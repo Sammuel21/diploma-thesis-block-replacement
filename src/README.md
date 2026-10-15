@@ -10,6 +10,40 @@ and reusable experiment orchestration is isolated in
 `compression/workflows.py`. Crash-aware run logging and atomic artifact
 persistence are provided by `runlog.py` and the maintained workflow layer.
 
+## Package layout
+
+Reusable code is grouped by the research operation it performs. This is a
+maintainability decision, not a scientific claim, and the layout is not a
+final public API.
+
+| Area | Modules | Responsibility |
+| --- | --- | --- |
+| `operators/` | `modules.py`, `training.py` | Replacement architectures and local fitting |
+| `compression/` | `allocation.py`, `selection.py`, `surgery.py`, `recovery.py`, `continuation.py`, `reconstruction.py`, `teacher_cache.py`, `adapters.py`, `quantization.py`, `workflows.py` | Width budgets, model mutation, recovery and checkpoint contracts, state reconstruction, teacher targets, LoRA, library-backed quantization, and reusable replacement flows |
+| `analysis/` | `activations.py`, `screening.py`, `sensitivity.py` | Activation geometry, BI-style screening, and isolated replacement sensitivity |
+| `evaluation/` | `operator.py`, `language_model.py`, `footprint.py`, `final_quality.py`, `teacher_kl.py`, `bundles.py`, `mixed_precision.py`, `generation.py`, `quantized_bundles.py` | Local fidelity, pinned likelihood and tasks, long-context teacher KL, footprint, inference bundles, dtype handling, and controlled generation measurements |
+| Package root | `config.py`, `data.py`, `data_streams.py`, `model.py`, `capture.py`, `artifacts.py`, `runlog.py` | Configuration, finite streams, model loading, activation capture, artifact hashes, and JSON run records |
+
+The typical flow is below. It lists responsibilities, not one universal job
+sequence; curve-based allocation, for example, fits candidate widths before
+choosing the joint topology.
+
+1. Root configuration, model, and data modules prepare the experiment.
+2. `analysis/screening.py` may produce model- or MLP-level screening scores.
+3. `compression/selection.py` resolves the selected layer indices.
+4. `capture.py` and `operators/training.py` fit local replacement operators.
+5. `compression/surgery.py` integrates the fitted modules.
+6. Recovery helpers and the selected runner apply the declared teacher-logit
+   objective, trainable scope, stream, and checkpoint protocol.
+7. `evaluation/` records quality and footprint outcomes.
+
+Experiment-specific phases live in the runners under `../workflows/runs/`.
+Exact continuation (`compression/continuation.py`) needs complete durable
+states, not the reduced analysis exports; a hard node loss or an uncatchable
+kill can bypass the final stage-out. Notebook imports are coupled to these module paths and must be checked when a
+module moves. A future reusable model-compression baseline orchestrator would
+belong at `compression/baselines.py`; none exists yet.
+
 Scoped implementation instructions are in [`AGENTS.md`](AGENTS.md); the fuller
 code and workflow standard is in
 [`../docs/agents/maintained-code-and-workflows.md`](../docs/agents/maintained-code-and-workflows.md).

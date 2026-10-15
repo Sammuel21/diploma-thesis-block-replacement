@@ -7,31 +7,11 @@ status: review
 created: 2026-07-18
 updated: 2026-07-18
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: synthesis
   confidence: medium
   verification:
     - source-checked
-
-scope:
-  topics:
-    - quality-preservation
-    - perplexity
-    - zero-shot-evaluation
-    - benchmark-suite
-    - reproducibility
-  granularities:
-    - model
-    - cross-level
-  pipeline_stages:
-    - evaluation
-    - analysis
 
 sources:
   - source_id: src-modegpt-2025

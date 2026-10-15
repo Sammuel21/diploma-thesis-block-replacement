@@ -7,32 +7,11 @@ status: review
 created: 2026-07-17
 updated: 2026-08-08
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: synthesis
   confidence: high
   verification:
     - source-checked
-
-scope:
-  topics:
-    - mixture-of-experts
-    - total-parameters
-    - active-parameters
-    - model-memory
-    - evaluation
-  granularities:
-    - moe
-    - model
-    - cross-level
-  pipeline_stages:
-    - evaluation
-    - analysis
 
 sources:
   - source_id: src-mone-2026

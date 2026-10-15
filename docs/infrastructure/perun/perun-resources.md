@@ -1,6 +1,7 @@
 ---
 title: TUKE Perun Resource Planning and Accounting
 status: active
+created: 2026-09-29
 modified: 2026-10-11
 ---
 

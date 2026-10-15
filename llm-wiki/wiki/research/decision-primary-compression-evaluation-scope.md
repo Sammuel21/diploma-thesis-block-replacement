@@ -7,33 +7,11 @@ status: review
 created: 2026-07-18
 updated: 2026-08-08
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: decision
   confidence: high
   verification:
     - supervisor-reviewed
-
-scope:
-  topics:
-    - evaluation-scope
-    - model-compression
-    - parameter-count
-    - model-size
-    - memory
-    - quality-preservation
-  granularities:
-    - model
-    - moe
-    - cross-level
-  pipeline_stages:
-    - evaluation
-    - analysis
 
 sources:
   - source_id: src-modegpt-2025

@@ -7,35 +7,11 @@ status: review
 created: 2026-07-17
 updated: 2026-07-17
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: mixed
   confidence: high
   verification:
     - source-checked
-
-scope:
-  topics:
-    - novice-replacement
-    - expert-pruning
-    - constant-operator
-    - model-memory
-  granularities:
-    - mlp-block
-    - moe
-    - model
-    - cross-level
-  pipeline_stages:
-    - selection
-    - replacement
-    - integration
-    - recovery
-    - evaluation
 
 sources:
   - source_id: src-mone-2026

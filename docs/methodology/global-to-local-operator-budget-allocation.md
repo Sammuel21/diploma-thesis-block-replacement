@@ -1,6 +1,7 @@
 ---
 title: Global-to-Local MLP Operator Budget Allocation
 status: draft
+created: 2026-08-08
 modified: 2026-09-11
 ---
 

@@ -5,42 +5,13 @@ summary: Adapts MoDeGPT's importance-weighted softmax allocation into bounded pe
 type: method
 status: draft
 created: 2026-08-08
-updated: 2026-10-02
-
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
+updated: 2026-10-15
 
 epistemic:
   role: mixed
   confidence: not-assessed
   verification:
     - unverified
-
-scope:
-  topics:
-    - global-sparsity-allocation
-    - importance-screening
-    - operator-budget
-    - nonuniform-compression
-    - budget-reconciliation
-    - parameter-reduction-accounting
-    - discrete-operator-sizing
-  granularities:
-    - mlp-block
-    - transformer-layer
-    - model
-    - cross-level
-  pipeline_stages:
-    - screening
-    - selection
-    - replacement
-    - integration
-    - recovery
-    - evaluation
-    - analysis
 
 sources:
   - source_id: src-modegpt-2025
@@ -560,8 +531,9 @@ empirical finding. Any future claim about correlation, predictive validity, or
 allocation performance requires a preserved experiment configuration and
 result artifact.
 
-**Bounded project evidence.** [[synthesis-homogeneous-swiglu-findings]] records
-the completed homogeneous tests: BI-derived allocations did not beat uniform
+**Bounded project evidence.** The
+[SwiGLU progression](../../../docs/experiments/model/swiglu/swiglu-progression.md)
+records the completed homogeneous tests: BI-derived allocations did not beat uniform
 in SwiGLU-1; operator-conditioned ranked widths improved SwiGLU-2; discrete
 width curves improved the matched-recipe SwiGLU-5 comparison. This supports
 the current homogeneous control, not rejection of every importance-based

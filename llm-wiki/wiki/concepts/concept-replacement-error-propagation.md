@@ -7,33 +7,12 @@ status: review
 created: 2026-07-17
 updated: 2026-10-02
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: mixed
   confidence: high
   verification:
     - source-checked
     - experiment-backed
-
-scope:
-  topics:
-    - replacement-error-propagation
-    - distribution-shift
-    - compression-recovery
-  granularities:
-    - mlp-block
-    - model
-    - cross-level
-  pipeline_stages:
-    - replacement
-    - integration
-    - recovery
-    - evaluation
 
 sources:
   - source_id: src-grafting-2025

@@ -7,33 +7,11 @@ status: review
 created: 2026-07-18
 updated: 2026-07-27
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: synthesis
   confidence: high
   verification:
     - source-checked
-
-scope:
-  topics:
-    - model-compression
-    - parameter-count
-    - model-size
-    - memory
-    - compute-complexity
-    - quality-preservation
-  granularities:
-    - model
-    - moe
-    - cross-level
-  pipeline_stages:
-    - evaluation
-    - analysis
 
 sources:
   - source_id: src-minitron-2024

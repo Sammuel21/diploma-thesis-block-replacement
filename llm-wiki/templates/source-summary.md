@@ -7,22 +7,11 @@ status: draft
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: prior-work
   confidence: not-assessed
   verification:
     - source-checked
-
-scope:
-  topics: []
-  granularities: []
-  pipeline_stages: []
 
 sources:
   - source_id: src-source-slug

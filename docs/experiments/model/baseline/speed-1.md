@@ -1,6 +1,7 @@
 ---
 title: Speed-1 One-GPU Generation Speed Comparison
 status: active
+created: 2026-10-15
 modified: 2026-10-15
 ---
 

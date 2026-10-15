@@ -7,32 +7,11 @@ status: review
 created: 2026-07-17
 updated: 2026-07-17
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: prior-work
   confidence: high
   verification:
     - source-checked
-
-scope:
-  topics:
-    - expert-redundancy
-    - routing-frequency
-    - output-variance
-    - calibration-robustness
-  granularities:
-    - moe
-    - model
-  pipeline_stages:
-    - data
-    - screening
-    - selection
-    - analysis
 
 sources:
   - source_id: src-mone-2026

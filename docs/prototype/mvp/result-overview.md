@@ -1,6 +1,7 @@
 ---
 title: Diploma Thesis MVP Result Overview
 status: archived
+created: 2026-07-17
 modified: 2026-09-11
 ---
 

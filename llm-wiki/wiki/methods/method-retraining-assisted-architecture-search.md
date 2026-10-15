@@ -7,32 +7,11 @@ status: review
 created: 2026-07-17
 updated: 2026-07-17
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: prior-work
   confidence: high
   verification:
     - source-checked
-
-scope:
-  topics:
-    - architecture-search
-    - parameter-budget
-    - compression-recovery
-    - candidate-ranking
-  granularities:
-    - model
-    - cross-level
-  pipeline_stages:
-    - selection
-    - recovery
-    - evaluation
-    - analysis
 
 sources:
   - source_id: src-minitron-2024

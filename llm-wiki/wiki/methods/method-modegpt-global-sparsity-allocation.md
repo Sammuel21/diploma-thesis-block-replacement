@@ -7,34 +7,11 @@ status: review
 created: 2026-07-17
 updated: 2026-08-08
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: prior-work
   confidence: high
   verification:
     - source-checked
-
-scope:
-  topics:
-    - global-sparsity-allocation
-    - block-importance
-    - compression-budget
-    - nonuniform-compression
-  granularities:
-    - transformer-layer
-    - model
-    - cross-level
-  pipeline_stages:
-    - screening
-    - selection
-    - integration
-    - evaluation
-    - analysis
 
 sources:
   - source_id: src-modegpt-2025

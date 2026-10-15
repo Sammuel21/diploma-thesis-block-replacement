@@ -5,13 +5,7 @@ summary: Separates model-level loss placement from replacement-only, transformer
 type: comparison
 status: review
 created: 2026-08-15
-updated: 2026-10-02
-
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
+updated: 2026-10-15
 
 epistemic:
   role: mixed
@@ -19,22 +13,6 @@ epistemic:
   verification:
     - source-checked
     - experiment-backed
-
-scope:
-  topics:
-    - compression-recovery
-    - knowledge-distillation
-    - operator-grafting
-    - trainable-parameter-scope
-  granularities:
-    - mlp-block
-    - model
-    - cross-level
-  pipeline_stages:
-    - integration
-    - recovery
-    - evaluation
-    - analysis
 
 sources:
   - source_id: src-minitron-2024
@@ -112,11 +90,12 @@ Relevant project artifacts:
 - [`workflows/configs/model/swiglu/swiglu-7.json`](../../../workflows/configs/model/swiglu/swiglu-7.json)
   fixes scope, native-8K recovery, seed, optimizer, and token budget.
 
-**Empirical finding.** The completed runs summarized in
-[[synthesis-homogeneous-swiglu-findings]] favor S7-0 on likelihood at lower
-resource use; broader scopes give small, mixed downstream gains. This is
-evidence under the fixed 1B-token, single-seed protocol, not proof that
-replacement-only updates always outperform broader adaptation.
+**Empirical finding.** The completed SwiGLU-7 runs, reported in
+[`swiglu-7.md`](../../../docs/experiments/model/swiglu/swiglu-7.md), favor S7-0
+on likelihood at lower resource use; broader scopes give small, mixed
+downstream gains. This is evidence under the fixed 1B-token, single-seed
+protocol, not proof that replacement-only updates always outperform broader
+adaptation.
 
 ## Interpretation Boundary
 
@@ -150,8 +129,9 @@ would obscure its frozen tied embeddings/head.
   fitting and integrated fine-tuning stages.
 - [[experiment-baseline-operator-analysis]] applies the project's
   replacement-only model-level KD scope to reduced-SwiGLU recovery curves.
-- [[synthesis-homogeneous-swiglu-findings]] owns the completed family evidence
-  and the working replacement-only control.
+- [[synthesis-homogeneous-swiglu-findings]] records the attribution boundary of
+  the completed family and the working replacement-only control; its results
+  are in `docs/experiments/model/swiglu/`.
 
 ## Sources
 
@@ -161,4 +141,4 @@ would obscure its frozen tied embeddings/head.
 - `src-lora-2021` - Sections 4.1-4.2
 - Project implementation - `src/mlp_replacement/compression/recovery.py` and
   the linked SwiGLU-7 runner/configuration, inspected 2026-10-02; preserved
-  production results linked from the family synthesis.
+  production results linked from `swiglu-7.md`.

@@ -6,11 +6,8 @@
   `AGENTS.md`.
 - Before modifying a maintained workflow, read
   [`../docs/agents/maintained-code-and-workflows.md`](../docs/agents/maintained-code-and-workflows.md).
-- Before proposing or modifying a workflow intended to execute on TUKE Perun,
-  read [`../docs/infrastructure/perun/perun.md`](../docs/infrastructure/perun/perun.md).
-- Before estimating, requesting, or reporting Perun resources, also read
-  [`../docs/infrastructure/perun/perun-resources.md`](../docs/infrastructure/perun/perun-resources.md).
-- Before modifying a Perun Slurm file, also read
+- For Perun work, the root routing rule applies. Before modifying a Perun
+  Slurm file, also read
   [`jobs/perun/README.md`](jobs/perun/README.md).
 
 ## Boundaries
@@ -19,10 +16,9 @@
 - Keep explicit migrated-workflow choices and budgets under `configs/`, split
   by `model/` and `block/` granularity.
 - Keep concrete block and model experiment orchestration under `runs/`.
-- Group model runners and configs by experiment class. `model/swiglu/` owns
-  the homogeneous SwiGLU progression, `model/baseline/` owns model baselines,
-  and `model/interaction/` owns block-interaction workflows. SwiGLU-5 artifact
-  adaptation and tournament orchestration stay in its SwiGLU workflow package.
+- Group model runners and configs by experiment class, as listed in the root
+  repository map. SwiGLU-5 artifact adaptation and tournament orchestration
+  stay in its SwiGLU workflow package.
 - Keep executor-specific resource requests and process launching under `jobs/`.
 - Do not put scientific selection, fitting, recovery, or evaluation logic in a
   scheduler file.
@@ -50,8 +46,8 @@
 
 - Check configuration ownership and schema, artifact contracts, path handling,
   and failure behavior through code inspection and the intended scientific run.
-- Treat recovery, checkpoint/resume, artifact-schema, memory-lifetime, and
-  Perun-launch changes as high risk by default.
+- Recovery, checkpoint/resume, artifact-schema, memory-lifetime, and
+  Perun-launch changes are never mechanical, however short the diff.
 
 ## Perun requirements
 

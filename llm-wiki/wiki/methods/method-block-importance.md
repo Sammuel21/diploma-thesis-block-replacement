@@ -7,31 +7,11 @@ status: review
 created: 2026-07-17
 updated: 2026-08-20
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: mixed
   confidence: medium
   verification:
     - source-checked
-
-scope:
-  topics:
-    - block-importance
-    - importance-screening
-    - depth-pruning
-    - activation-based-importance
-  granularities:
-    - mlp-block
-    - transformer-layer
-    - model
-  pipeline_stages:
-    - screening
-    - selection
 
 sources:
   - source_id: src-minitron-2024

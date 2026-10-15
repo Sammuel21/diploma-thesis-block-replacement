@@ -1,7 +1,8 @@
 ---
 title: Operator Study Workflow
 status: active
-modified: 2026-09-19
+created: 2026-09-11
+modified: 2026-10-15
 sources:
   notebooks:
     - notebooks/block/operator/operator.ipynb
@@ -110,7 +111,67 @@ Results are stored in
 schema version 1. It contains 220 local-fitting rows and 220 singleton
 sensitivity rows: 22 layers times ten operators.
 
+## Results (operator-experiments.json, schema 1)
+
+These results were moved here from the wiki page
+`experiment-swiglu-operator-design-progression` on 2026-10-15; this section is
+now their single source.
+
+The following are **empirical findings from one configured run** in
+[operator-experiments.json](../../../../data/results/notebook-block-study/operator-experiments.json),
+schema version 1. Values average over independent singleton replacements at
+layers 1-22.
+
+| Operator | Original-MLP parameters | Mean pre-KL | Mean post-KL |
+| --- | ---: | ---: | ---: |
+| zero | 0% | 0.7354 | 0.7354 |
+| mean | 0% | 0.7365 | 0.7365 |
+| linear | 8.33% | 0.5960 | 0.5962 |
+| affine | 8.34% | 0.5912 | 0.5907 |
+| rank-$0.5d$ factorized linear | 8.33% | 0.5985 | 0.5979 |
+| width-$0.5d$ compact MLP | 8.33% | 0.3466 | 0.3371 |
+| rank/width-$0.25d$ hybrid | 8.33% | 0.4956 | 0.4804 |
+| 0.25-width SwiGLU | 25% | 0.2007 | 0.1943 |
+| 0.50-width SwiGLU | 50% | 0.1766 | 0.1608 |
+| 0.75-width SwiGLU | 75% | 0.1684 | 0.1413 |
+
+- In the approximately-$d^2$ group, the compact MLP had the lowest post-KL at
+  18 of 22 layers and beat dense linear at 21 of 22. This is evidence for a
+  nonlinearity benefit under this budget, not a universal family ranking.
+- Wider SwiGLU generally reduced KL, but post-recovery width order was
+  non-monotonic at three layers.
+- Mean learned-operator post-KL was concentrated at layers 22 (2.4374), 1
+  (2.2194), and 7 (1.7966); the next layer mean was 0.1965.
+- Learned-row local relative MSE and pre-KL had Spearman association -0.09;
+  good local approximation did not imply globally safe replacement.
+- Pre/post layer rankings were nearly unchanged under 64 recovery updates
+  (per-family Spearman 0.993-1.000), making pre-KL a useful ranking proxy only
+  under this protocol.
+- At layer 22, zero and mean had lower KL than every learned substitute. This
+  is an anomaly requiring confirmation.
+
+Interpretation must separate architecture from footprint, local fit from model
+effect, singleton sensitivity from intrinsic layer importance, and
+pre-recovery ranking from repairability.
+
+The checked local, ignored schema-1 artifact (created and checked 2026-08-20)
+contains 220 unique fitting rows and 220 matching sensitivity rows with
+verified `pre - post` KL arithmetic. It excludes fitted weights, activations,
+logits, optimizer state, histories, perplexity, and hardware telemetry. No
+independent seed or model replication exists.
+
 ## Limits and Perun handoff
+
+Limits on interpreting the results above:
+
+- One model, seed, and data partition do not establish stability or transfer.
+- Many learned fits reached the 64-epoch ceiling, so comparisons are
+  fixed-budget rather than demonstrated-convergence results.
+- The artifact records KL but not full-model loss/perplexity for every case.
+- Zero and mean have no trainable parameters; their recorded 64 recovery
+  updates denote shared-stream traversal, not optimizer updates.
+- Every result in this artifact replaces one MLP independently; it does not
+  measure simultaneous cross-family interactions.
 
 This is a broad historical screen, not the final operator-selection protocol.
 It uses only 48 calibration batches and randomly initializes the nonlinear

@@ -1,6 +1,7 @@
 ---
 title: Grilling Protocol
 status: draft
+created: 2026-10-10
 modified: 2026-10-10
 ---
 

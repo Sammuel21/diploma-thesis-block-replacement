@@ -1,6 +1,7 @@
 ---
 title: Documentation Metadata Profile
 status: active
+created: 2026-09-11
 modified: 2026-10-15
 ---
 
@@ -15,7 +16,7 @@ Obsidian shows the block as "Properties"; no repository code reads it.
 
 Ignored personal material under `docs/vault/` and `docs/meetings/` is outside
 this profile. Frozen non-Markdown prototype files also retain their original
-formats. Git history records who changed a document and when it was created.
+formats. Git history records who changed a document.
 
 ## Required metadata
 
@@ -23,6 +24,7 @@ formats. Git history records who changed a document and when it was created.
 ---
 title: Operator Distillation Workflow
 status: active
+created: 2026-09-11
 modified: 2026-09-11
 ---
 ```
@@ -31,6 +33,7 @@ modified: 2026-09-11
 | --- | --- |
 | `title` | Human-readable document name |
 | `status` | Current document lifecycle state |
+| `created` | Date the document was first created, as `YYYY-MM-DD` |
 | `modified` | Date of the latest intentional content change, as `YYYY-MM-DD` |
 
 Lifecycle status is one of:

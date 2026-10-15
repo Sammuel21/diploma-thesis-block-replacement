@@ -13,8 +13,10 @@ and an LLM while remaining readable in ordinary Markdown and Obsidian.
 3. `SCHEMA.md` defines the canonical structure, metadata, provenance rules, and
    workflows. `AGENTS.md` applies those rules to agent behavior in this tree.
 
-Human-oriented, reviewed explanations live separately in `docs/`. Promotion
-from the wiki into `docs/` is an explicit distillation operation.
+Human-oriented, reviewed explanations live separately in `docs/`. Project
+experiment results live only in `docs/`; wiki experiment pages hold design and
+attribution and link there. Promotion from the wiki into `docs/` is an
+explicit distillation operation.
 
 ## Start here
 
@@ -37,5 +39,5 @@ from the wiki into `docs/` is an explicit distillation operation.
 - **Distill:** turn reviewed wiki material into coherent human documentation.
 
 The first controlled pilot begins with individually reviewed source ingestion.
-Implementation nodes are added only for stable architectural components, not
-for every source file or function.
+Implementation nodes are pointers to the READMEs that document stable
+components, not a copy of module lists.

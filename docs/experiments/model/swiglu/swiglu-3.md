@@ -1,6 +1,7 @@
 ---
 title: SwiGLU Calibration and Token-Budget Recovery Study
 status: draft
+created: 2026-09-15
 modified: 2026-09-19
 sources:
   notebooks:

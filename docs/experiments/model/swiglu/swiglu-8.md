@@ -1,6 +1,7 @@
 ---
 title: SwiGLU-8 - Local-Fitting Attribution and Homogeneous Control Spectrum
 status: draft
+created: 2026-10-10
 modified: 2026-10-12
 reference_artifacts:
   - data/results/workflows/model/swiglu-7/prepare-001/result.json

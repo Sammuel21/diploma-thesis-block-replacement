@@ -5,33 +5,13 @@ summary: Separates direct notebook implementation from reliable maintained code 
 type: decision
 status: review
 created: 2026-07-27
-updated: 2026-09-18
-
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
+updated: 2026-10-15
 
 epistemic:
   role: decision
   confidence: high
   verification:
     - unverified
-
-scope:
-  topics:
-    - coding-standards
-    - exploratory-experiments
-    - implementation-scope
-    - notebook-workflow
-    - workflow-reliability
-    - agent-routing
-  granularities:
-    - cross-level
-  pipeline_stages:
-    - analysis
-    - infrastructure
 
 sources: []
 related:
@@ -212,8 +192,9 @@ researcher explicitly asks for them.
 
 For maintained source and workflows, verification is proportional to risk. Add
 or run focused coverage when it protects a stable scientific invariant,
-artifact contract, failure boundary, or continuation behavior. Use a reduced
-smoke path for integration checks when one exists. Do not create a broad test
+artifact contract, failure boundary, or continuation behavior. Use a smoke
+path only when the researcher requests one (root `AGENTS.md`, amended
+2026-10-15). Do not create a broad test
 framework or unrelated lint cleanup for a local change.
 
 Basic runtime errors may still be used at genuine external boundaries when
@@ -237,7 +218,14 @@ not own scientific logic.
 
 ## Implementation-Agent Routing
 
-**Project decision.** Model suitability is based on unresolved judgment and
+**Superseded 2026-10-15.** This section is superseded by the 2026-10-10
+entries in [`docs/agents/decisions.md`](../../../docs/agents/decisions.md):
+Claude Code is the primary agent, there is no delegation to sub-agents or
+smaller models unless the researcher asks, and the GPT model-tier tables are
+removed. The text below is kept as history. `superseded_by` is not set,
+because it names wiki pages and only this section is replaced.
+
+**Project decision (historical).** Model suitability is based on unresolved judgment and
 failure cost rather than diff size. Bounded reporting work with exact reference
 cells defaults to Luna Max; settled multi-file work with moderate dependency
 tracing is eligible for Terra; scientific-method, artifact-schema,

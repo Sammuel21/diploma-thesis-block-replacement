@@ -7,31 +7,11 @@ status: review
 created: 2026-07-17
 updated: 2026-07-17
 
-authorship:
-  created_by: collaborative
-  contributors:
-    - researcher
-    - llm
-
 epistemic:
   role: prior-work
   confidence: high
   verification:
     - source-checked
-
-scope:
-  topics:
-    - activation-based-importance
-    - structured-pruning
-    - calibration-data
-  granularities:
-    - neuron
-    - model
-    - cross-level
-  pipeline_stages:
-    - data
-    - screening
-    - selection
 
 sources:
   - source_id: src-minitron-2024
