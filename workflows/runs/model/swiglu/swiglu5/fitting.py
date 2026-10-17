@@ -82,7 +82,10 @@ def fit_operator(
     validation_pairs,
     neuron_indices,
     context_kind="dense",
+    l2_sp_alpha=0.0,
 ):
+    if l2_sp_alpha and initialization != "legacy_subset":
+        raise ValueError("L2-SP local fitting is defined for teacher-slice starts only")
     fit_identifier = fit_key(initialization, layer, width, context_kind)
     existing = {
         row["fit_key"]: row for row in context.artifact["results"]["local_fitting"]
@@ -112,7 +115,8 @@ def fit_operator(
             module, validation_pairs, context.device, config.batch_size
         )
         fit = fit_operator_fp32_detailed(
-            module, training_pairs, validation_pairs, config, context.device
+            module, training_pairs, validation_pairs, config, context.device,
+            l2_sp_alpha=l2_sp_alpha,
         )
     elif initialization in {"output_aware", "composition_aware"}:
         reconstruction = initialize_gated_mlp_with_output_reconstruction(

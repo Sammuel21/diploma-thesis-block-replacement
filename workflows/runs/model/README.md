@@ -66,6 +66,7 @@ tolerances unchanged.
 | `swiglu/swiglu-5.ipynb` | `workflows.runs.model.swiglu.swiglu_5_confirmation` | `workflows/configs/model/swiglu/swiglu-5-confirmation.json` | gated 100M confirmation |
 | `swiglu/swiglu-7.ipynb` | `workflows.runs.model.swiglu.swiglu_7` | `workflows/configs/model/swiglu/swiglu-7.json` | shared preparation or one strategy/target production run |
 | `swiglu/swiglu-8.ipynb` (load-only) | `workflows.runs.model.swiglu.swiglu_8` | `workflows/configs/model/swiglu/swiglu-8.json` | explicit `block-check`, `prepare`, or one arm/target `train` run |
+| Not yet written (analysis phase) | `workflows.runs.model.swiglu.swiglu_9` | `workflows/configs/model/swiglu/swiglu-9.json` | explicit per-layer `block-check`, one arm/target 1B `train` run, `reference-kl`, or a login-node merge or summary |
 
 The two older notebooks contain historical and optimized sections. Their
 runners expose `--stage historical`, `--stage optimized`, and `--stage all`.

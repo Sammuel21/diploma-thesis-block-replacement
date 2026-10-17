@@ -358,17 +358,29 @@ def fit_operator(module, training_pairs, validation_pairs, config, device):
     return OperatorFitResult(module, tuple(history), best_epoch, best_validation)
 
 
-def fit_operator_fp32_detailed(module, training_pairs, validation_pairs, config, device):
-    """Fit an operator with FP32 master weights and per-epoch NMSE/cosine."""
+def fit_operator_fp32_detailed(module, training_pairs, validation_pairs, config, device,
+                               l2_sp_alpha=0.0):
+    """Fit an operator with FP32 master weights and per-epoch NMSE/cosine.
+
+    A positive ``l2_sp_alpha`` adds the L2-SP penalty (alpha / 2) * ||w - w0||^2
+    to the training loss, where w0 are the trainable parameters on entry
+    [src-l2-sp-2018, Section 3, Eq. (2)]. The recorded training MSE and early
+    stopping keep using the data term alone. Zero leaves the MSE fit unchanged.
+    """
 
     from ..evaluation.operator import evaluate_operator
 
     if training_pairs.hidden_size != validation_pairs.hidden_size:
         raise ValueError("Training and validation hidden sizes differ")
+    if l2_sp_alpha < 0:
+        raise ValueError("l2_sp_alpha must be non-negative")
     module = module.to(device=device, dtype=torch.float32)
     parameters = tuple(parameter for parameter in module.parameters() if parameter.requires_grad)
     if not parameters:
         raise ValueError("Detailed local fitting requires trainable parameters")
+    starting_point = (
+        tuple(parameter.detach().clone() for parameter in parameters) if l2_sp_alpha > 0 else None
+    )
     torch.manual_seed(config.seed)
     dataset = TensorDataset(training_pairs.inputs, training_pairs.targets)
     generator = torch.Generator().manual_seed(config.seed)
@@ -413,6 +425,11 @@ def fit_operator_fp32_detailed(module, training_pairs, validation_pairs, config,
             targets = targets.to(device=device, dtype=torch.float32)
             errors = module(inputs) - targets
             loss = errors.square().mean()
+            if starting_point is not None:
+                loss = loss + 0.5 * l2_sp_alpha * sum(
+                    (parameter - start).square().sum()
+                    for parameter, start in zip(parameters, starting_point)
+                )
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             if config.gradient_clip_norm is not None:

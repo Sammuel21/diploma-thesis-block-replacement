@@ -2,7 +2,7 @@
 title: PERUN Runbook
 status: active
 created: 2026-10-11
-modified: 2026-10-11
+modified: 2026-10-17
 ---
 
 # PERUN Runbook
@@ -34,7 +34,9 @@ in [perun-log.md](perun-log.md) and [perun-status.md](perun-status.md).
 check, prepare, and the training array of 16 runs (section 3). Quantization-1
 has two: prepare, and the five model runs (section 4). The second is one block
 with two `sbatch` lines, because its tasks need different time limits. The two
-experiments are independent and can run at the same time.
+experiments are independent and can run at the same time. SwiGLU-9
+(section 9) adds three more, submitted back to back in one block: the five 1B
+training runs, the three-task block check, and the reference KL.
 
 **Official PERUN rules these commands follow**, checked against the
 [PERUN wiki](https://wiki.hpc.tuke.sk/perun/perun/) on 2026-10-11:
@@ -221,7 +223,7 @@ def show(result, label):
 
 results = Path(os.environ["PERUN_RESULTS"])
 print("Finished or stopped (PROJECT):")
-for experiment in ("swiglu-8", "quantization-1"):
+for experiment in ("swiglu-8", "quantization-1", "swiglu-9"):
     for result in sorted((results / experiment).glob("*/result.json")):
         show(result, f"{experiment}/{result.parent.name}")
 print("Running now (SCRATCH):")
@@ -249,7 +251,8 @@ for group, summary in result.get("results", {}).get("acceptance", {}).items():
     print(f"  acceptance {group}: {'passed' if summary['passed'] else 'FAILED'}")
 adoption = result.get("results", {}).get("adoption")
 if adoption:
-    print("selected setting:", adoption["selected_recipe"], "| qualifying:", adoption["qualifying"])
+    selected = adoption.get("selected_recipe", adoption.get("selected_setting"))   # SwiGLU-8 or SwiGLU-9
+    print("selected setting:", selected, "| qualifying:", adoption["qualifying"])
     print("stage-2 indicator:", result["results"].get("stage_two_indicator"))
 EOF
 sha256sum "$PERUN_RESULTS/$RUN/result.json"
@@ -710,7 +713,7 @@ records stay on PROJECT.
 **Safe to re-run;** it refreshes the archive.
 
 ```bash
-EXPERIMENT=swiglu-8   # or quantization-1
+EXPERIMENT=swiglu-8   # or quantization-1 or swiglu-9
 STAGE="$PERUN_PROJECT/transfer/$EXPERIMENT"
 mkdir -p "$STAGE/logs/perun-job-logs"
 rsync -a --prune-empty-dirs \
@@ -730,7 +733,7 @@ connected. The values come from `local/perun/runs/session.md`.
 ```bash
 PERUN_LOGIN="<login>"
 PERUN_ACCOUNT="<project-account>"
-EXPERIMENT=swiglu-8   # or quantization-1
+EXPERIMENT=swiglu-8   # or quantization-1 or swiglu-9
 scp "$PERUN_LOGIN@login01.perun.tuke.sk:/mnt/project/$PERUN_ACCOUNT/transfer/$EXPERIMENT-analysis.tar.gz" local/perun/
 mkdir -p data/results/workflows/model
 tar -xzf "local/perun/$EXPERIMENT-analysis.tar.gz" -C data/results/workflows/model
@@ -775,3 +778,199 @@ If `/mnt/scratch/$USER` is missing or not writable, contact PERUN support at
 `hpc@helpdesk.tuke.sk`; do not create it yourself. If a job cannot download a
 model or dataset on its compute node, download it on the login node with the
 same `HF_HOME` first.
+
+## 9. SwiGLU-9
+
+Design, acceptance checks, and resource plan:
+[swiglu-9.md](../../experiments/model/swiglu/swiglu-9.md). Every submission
+needs the researcher's go.
+
+Three submissions, independent of each other, sent back to back in one block
+(9.2). Send them while at most one or two of your jobs are running: with four
+running, PERUN refused every new `sbatch` (perun-status.md).
+
+| Step | Block | Requested per task | Expected per task | Before using the results |
+| --- | --- | --- | --- | --- |
+| Pre-submission checks | 9.1 | - | minutes | Every line OK |
+| **Submission 1:** 1B training, 5 tasks | 9.2 | 14 h, 64 GB | 9.5-11 h | C1 (and B1 for the twin) pass at token 0 |
+| **Submission 2:** block check, 3 tasks | 9.2 | 6 h, 128 GB | 0.8-2.7 h | D1, D2, P5, A1, A2-A3 pass; merge (9.4) |
+| **Submission 3:** reference KL, 1 job | 9.2 | 1 h, 64 GB | 0.1-0.3 h | P5 passes |
+| Part B summary | 9.5 | login node | minutes | Review the flagged B2/C2 values |
+
+Training task map: 0 fitted 0.5 (the noise twin), 1 fitted 0.8, 2 slice-only
+0.2, 3 slice-only 0.5, 4 slice-only 0.8. Block-check task map: 0, 1, 2 are
+layers 3, 11, 19.
+
+Run 1.2, 1.3, and 1.4 first.
+
+### 9.1 Pre-submission checks
+
+**Safe to re-run.** Every line should print OK or a value, never MISSING,
+MISMATCH, or DIFFERS.
+
+```bash
+# Every pinned SwiGLU-7 and SwiGLU-8 input exists and matches the configuration.
+python - <<'EOF'
+import hashlib, json, os
+sources = json.load(open("workflows/configs/model/swiglu/swiglu-9.json"))["sources"]
+expected = {
+    "swiglu-7/prepare-001/result.json": sources["swiglu7_prepare_sha256"],
+    "swiglu-8/prepare-001/result.json": sources["swiglu8_prepare_sha256"],
+    "swiglu-8/block-check-001/result.json": sources["swiglu8_block_check_sha256"],
+}
+expected.update({f"swiglu-7/S7-0-target-{target}-run-001/result.json": digest
+                 for target, digest in sources["swiglu7_runs_sha256"].items()})
+expected.update({f"swiglu-8/{key.replace(':', '-target-')}-run-001/result.json": digest
+                 for key, digest in sources["swiglu8_runs_sha256"].items()})
+for relative, digest in expected.items():
+    path = os.path.join(os.environ["PERUN_RESULTS"], relative)
+    if not os.path.isfile(path):
+        print("MISSING ", relative)
+        continue
+    sha = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            sha.update(block)
+    print("OK      " if sha.hexdigest() == digest else "MISMATCH", relative)
+EOF
+
+# The large inputs the jobs stage; the stream must be 4000000000 bytes.
+stat -c '%s %n' "$PERUN_RESULTS/swiglu-7/prepare-001/prepared/recovery-tokens.int32"
+ls "$PERUN_RESULTS"/swiglu-7/S7-0-target-0.{2,5}-run-001/model/bundle.json
+ls "$PERUN_RESULTS"/swiglu-8/prepare-001/prepared/starts/{fitted-target-0.5,fitted-target-0.8,slice-target-0.2,slice-target-0.5,slice-target-0.8}.pt
+ls "$PERUN_RESULTS/swiglu-8/prepare-001/prepared/kl-tokens.int32"
+
+# The environment matches the one SwiGLU-8's runs recorded (the twin compares across it).
+PYTHONPATH=src python - <<'EOF'
+import json, os
+from mlp_replacement.runlog import environment_record
+recorded = json.load(open(os.path.join(os.environ["PERUN_RESULTS"], "swiglu-8/fitted-target-0.5-run-001/result.json")))["environment"]
+current = environment_record()
+print("python  ", "OK" if recorded["python"] == current["python"] else f"DIFFERS {recorded['python']} -> {current['python']}")
+for name, version in sorted(recorded["packages"].items()):
+    now = current["packages"].get(name)
+    print(f"{name:12}", "OK" if now == version else f"DIFFERS {version} -> {now}")
+EOF
+
+# Storage, launcher syntax, and whether Slurm would accept the jobs (nothing is submitted).
+perunfsusage    # PROJECT needs about 12 GB; SCRATCH up to 25 GB per training task
+bash -n workflows/jobs/perun/swiglu_9.sbatch && echo "launcher syntax OK"
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=14:00:00 --mem=64G --array=0-4 \
+  workflows/jobs/perun/swiglu_9.sbatch train
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --mem=128G --array=0-2 \
+  workflows/jobs/perun/swiglu_9.sbatch block-check
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=01:00:00 --mem=64G \
+  workflows/jobs/perun/swiglu_9.sbatch reference-kl
+ls "$PERUN_RESULTS/swiglu-9" 2>/dev/null || echo "no SwiGLU-9 outputs yet"
+squeue -u "$USER"   # submit 9.2 only while at most one or two of your jobs run
+```
+
+### 9.2 Submit the three jobs
+
+**Submits jobs. Run once.** It writes the three job IDs to
+`$PERUN_LOG_DIR/swiglu-9_submission.txt`, which 9.3 reads. If one of the three
+IDs prints empty, that `sbatch` was refused: submit only that line again once
+fewer jobs run.
+
+```bash
+ROOT="$PERUN_RESULTS/swiglu-9"
+EXISTING=$(find "$ROOT" -mindepth 1 -maxdepth 1 2>/dev/null)
+if [[ -n "$EXISTING" ]] || squeue -u "$USER" -h -n swiglu-9 | grep -q .; then
+    echo "STOP: SwiGLU-9 outputs exist or a swiglu-9 job is queued:"; echo "$EXISTING"
+else
+    TRAIN=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=14:00:00 --mem=64G \
+        --array=0-4 --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        workflows/jobs/perun/swiglu_9.sbatch train)
+    BLOCK=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --mem=128G \
+        --array=0-2 --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        workflows/jobs/perun/swiglu_9.sbatch block-check)
+    REFERENCE=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=01:00:00 --mem=64G \
+        --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+        workflows/jobs/perun/swiglu_9.sbatch reference-kl)
+    printf 'TRAIN=%s\nBLOCK=%s\nREFERENCE=%s\n' "${TRAIN%%;*}" "${BLOCK%%;*}" "${REFERENCE%%;*}" \
+        | tee "$PERUN_LOG_DIR/swiglu-9_submission.txt"
+    echo "<- record these in local/perun/runs/swiglu-9.md"
+fi
+```
+
+### 9.3 Watch the jobs
+
+**Safe to re-run.** Each training task checks token 0 against SwiGLU-8 (C1),
+and the twin also against SwiGLU-7 (B1); a mismatch stops it with
+`AcceptanceFailure` in its `.err` file. Each block-check task stops the same
+way on D1, D2, P5, A1, or A2-A3. Stop and investigate before trusting any
+result.
+
+```bash
+source "$PERUN_LOG_DIR/swiglu-9_submission.txt"
+squeue -u "$USER" -n swiglu-9
+RUNS=("fitted 0.5 (twin)" "fitted 0.8" "slice 0.2" "slice 0.5" "slice 0.8")
+for TASK in 0 1 2 3 4; do
+    LAST=$(grep '^arm=' "$PERUN_LOG_DIR/swiglu-9_${TRAIN}_${TASK}.out" 2>/dev/null | tail -n 1)
+    FAILED=$(grep -l -E 'AcceptanceFailure|Traceback' "$PERUN_LOG_DIR/swiglu-9_${TRAIN}_${TASK}.err" 2>/dev/null)
+    echo "train $TASK, ${RUNS[$TASK]}: ${LAST:-not started}${FAILED:+   <- check its .err}"
+done
+LAYERS=(3 11 19)
+for TASK in 0 1 2; do
+    DONE=$(grep -c '^setting=' "$PERUN_LOG_DIR/swiglu-9_${BLOCK}_${TASK}.out" 2>/dev/null)
+    FAILED=$(grep -l -E 'AcceptanceFailure|Traceback' "$PERUN_LOG_DIR/swiglu-9_${BLOCK}_${TASK}.err" 2>/dev/null)
+    echo "block check, layer ${LAYERS[$TASK]}: ${DONE:-0} of 24 fits${FAILED:+   <- check its .err}"
+done
+grep 'S7-0 target=' "$PERUN_LOG_DIR/swiglu-9_${REFERENCE}.out" 2>/dev/null || echo "reference KL: not finished"
+gpu-status
+```
+
+### 9.4 Merge the block check
+
+**Safe to re-run.** When the three block-check tasks have finished, merge
+them on the login node; it needs no GPU and reads only JSON. It checks that
+the tasks used identical data, joins the 72 fits, applies the adoption rule
+against SwiGLU-8's three seeds, and writes `swiglu-9/block-check-001`.
+Running it again changes nothing.
+
+```bash
+PYTHONPATH=src python -m workflows.runs.model.swiglu.swiglu_9 merge-block-check \
+  --results-root "$PERUN_RESULTS/swiglu-9" --swiglu8-root "$PERUN_RESULTS/swiglu-8"
+```
+
+An adopted setting applies only to later experiments, never to Part B.
+
+### 9.5 Summarize Part B
+
+**Safe to re-run.** When all five training runs and the reference KL are on
+PROJECT, apply the decided verdict on the login node. It prints the twin
+noise, then g and the verdict per target, and writes
+`swiglu-9/part-b-summary-001`.
+
+```bash
+PYTHONPATH=src python -m workflows.runs.model.swiglu.swiglu_9 summarize-part-b \
+  --results-root "$PERUN_RESULTS/swiglu-9" --swiglu7-root "$PERUN_RESULTS/swiglu-7"
+```
+
+Its `flagged_for_review` list holds every B2 and C2 value above 1%. Review
+them before any Part B result is used, as in SwiGLU-8. Then copy the results
+home (section 6, `EXPERIMENT=swiglu-9`).
+
+### 9.6 Resume a stopped task
+
+**Submits a job. Run once, after the cause is understood.** Resume continues
+the same run from its last saved point. It refuses changed code,
+configuration, or environment, and needs the run's `result.json` on PROJECT
+with no lock (see 5.2).
+
+```bash
+# One training task; replace 3 with the task number (0-4):
+sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=14:00:00 --mem=64G --array=3 \
+  --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+  workflows/jobs/perun/swiglu_9.sbatch train --resume
+
+# One block-check task; replace 1 with the task number (0-2):
+sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --mem=128G --array=1 \
+  --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+  workflows/jobs/perun/swiglu_9.sbatch block-check --resume
+
+# The reference KL:
+sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=01:00:00 --mem=64G \
+  --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+  workflows/jobs/perun/swiglu_9.sbatch reference-kl --resume
+```

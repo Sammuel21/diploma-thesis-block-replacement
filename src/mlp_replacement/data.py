@@ -52,11 +52,14 @@ def sample_partitioned_windows(
     seed,
     text_column="text",
     record_indices=None,
+    excluded_records=None,
 ):
     """Sample document-disjoint token windows and divide them by pipeline purpose.
 
     A supplied ``record_indices`` list receives each window's source record
-    index in sampling order, which is also the partition order.
+    index in sampling order, which is also the partition order. Records in
+    ``excluded_records`` are skipped like already used ones, before a window
+    start is drawn, so ``None`` keeps the sampling sequence unchanged.
     """
 
     total = sum(partition_sizes.values())
@@ -68,13 +71,14 @@ def sample_partitioned_windows(
     rng = random.Random(seed)
     sampled = []
     used_records = set()
+    excluded_records = frozenset() if excluded_records is None else excluded_records
     max_attempts = max(1_000, total * 200)
     attempts = 0
 
     while len(sampled) < total and attempts < max_attempts:
         attempts += 1
         record_index = rng.randrange(len(records))
-        if record_index in used_records:
+        if record_index in used_records or record_index in excluded_records:
             continue
         text = str(records[record_index].get(text_column) or "")
         if not text.strip():

@@ -18,6 +18,7 @@ Slurm job or resource request is defined yet.
 | `run_model.sbatch` | Runs the historical allow-listed model-wide workflows that still depend on the unavailable automatic-scratch helper. It is not the SwiGLU-7 launcher. |
 | `swiglu_7.sbatch` | Runs the independent SwiGLU-7 preparation or maps array tasks `0-11` onto its fixed three-scope/four-target grid. |
 | `swiglu_8.sbatch` | Runs the SwiGLU-8 block check or preparation, or maps array tasks `0-15` onto its two arms at eight targets. |
+| `swiglu_9.sbatch` | Runs the SwiGLU-9 block check (tasks `0-2`, one per layer), the five 1B training runs (tasks `0-4`), or the 8K KL of SwiGLU-7's reused 1B bundles. |
 | `speed_1.sbatch` | Times the saved dense, quantized, and SwiGLU-8 bundles in one job on one GPU, so their speeds are comparable. |
 
 `run_model.sbatch` defaults to the documented four-day `gpu_long` ceiling
@@ -235,6 +236,39 @@ point. They stop only on a token-0 mismatch; later differences are recorded
 and reviewed against 1%. A training task stages the shared prepared inputs and only its
 own start file. Resume one task with `train --resume "$S8_PREPARED"` and the
 same `--array` index.
+
+## SwiGLU-9 workflow
+
+`swiglu_9.sbatch` uses the SwiGLU-8 lock, scratch, explicit code staging, and
+verified stage-out contract. Outputs go to `PROJECT/perun-results/swiglu-9/<run-id>`.
+Every mode reads its pinned SwiGLU-7 and SwiGLU-8 sources from
+`PROJECT/perun-results/swiglu-7/` and `swiglu-8/`; nothing there is written.
+Each submission needs the researcher's go. Pass the stage's planned `--time`
+and `--mem` from the
+[SwiGLU-9 resource plan](../../../docs/experiments/model/swiglu/swiglu-9.md#pre-run-resource-plan).
+The copy-paste commands are in the
+[PERUN runbook](../../../docs/infrastructure/perun/perun-runbook.md#9-swiglu-9).
+
+- **`block-check`** runs as an array of three tasks (`--array=0-2`), one per
+  Part A layer (3, 11, 19), with outputs `block-check-001-task-NN`. The
+  runner's `merge-block-check`, run on the login node, joins them into
+  `block-check-001`.
+- **`train`** maps tasks `0-4` to fitted 0.5 (the noise twin), fitted 0.8, and
+  slice-only 0.2, 0.5, and 0.8, with outputs `<arm>-target-<t>-1b-run-001`.
+  A task stages:
+  - SwiGLU-8's `prepare-001`, without its starts and its 100M stream;
+  - its own start file;
+  - SwiGLU-7's 1B recovery stream (4 GB).
+
+  Every run stops only on a token-0 mismatch with SwiGLU-8's 100M run of the
+  same arm and target (C1), or, for the twin, with SwiGLU-7 (B1). Later
+  differences are recorded and reviewed against 1%.
+- **`reference-kl`** is a single job. It stages SwiGLU-8's preparation record,
+  its KL stream, and SwiGLU-7's S7-0 runs at 0.2 and 0.5 with their bundles.
+- **`summarize-part-b`** runs on the login node once all five runs and the
+  reference KL are on PROJECT.
+
+Resume any task with `--resume` after the mode and the same `--array` index.
 
 ## Results and logs
 
