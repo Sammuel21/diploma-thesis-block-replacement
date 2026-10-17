@@ -318,3 +318,42 @@ sources:
       initialization, scaling, and attention placement. Project rank, selected
       projections, and joint MLP/RMSNorm updates are experiment choices, not
       prescriptions from this paper. No full paper ingestion was performed.
+
+  - id: src-l2-sp-2018
+    title: Explicit Inductive Bias for Transfer Learning with Convolutional Networks
+    collection_id: recovery-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Xuhong Li, Yves Grandvalet, Franck Davoine]
+    year: 2018
+    canonical_url: https://arxiv.org/abs/1802.01483
+    sha256: null
+    added: 2026-10-17
+    ingestion_status: registered
+    notes: >-
+      Original L2-SP method (accepted at ICML 2018, per the arXiv record):
+      regularization toward the starting-point weights. Registered for
+      SwiGLU-9 Part A, which tests it as a local-fitting loss option with the
+      copied teacher slice as the starting point; that use and the penalty
+      strengths are project choices. Bibliographic identity checked on arXiv
+      2026-10-17; no locator checked and no paper ingestion performed.
+
+  - id: src-sgdr-2017
+    title: "SGDR: Stochastic Gradient Descent with Warm Restarts"
+    collection_id: recovery-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Ilya Loshchilov, Frank Hutter]
+    year: 2017
+    canonical_url: https://arxiv.org/abs/1608.03983
+    sha256: null
+    added: 2026-10-17
+    ingestion_status: registered
+    notes: >-
+      Original cosine-annealing learning-rate schedule (ICLR 2017 conference
+      paper, per the arXiv record). SwiGLU-8 Part A used one cosine decay over
+      a fixed 32 epochs without warm restarts; that variant is a project
+      choice. Bibliographic identity checked on arXiv 2026-10-17; no locator
+      checked and no paper ingestion performed.

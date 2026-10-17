@@ -946,3 +946,16 @@ This file is append-only. Entries use the format:
   claims link the owning `docs/` page; replaces the distillation-only rule.
 - [[decision-working-experiment-code-standards]]: the testing policy no longer
   recommends smoke paths; it defers to the root `AGENTS.md` smoke rule.
+
+## [2026-10-17] register | L2-SP and SGDR for local-fitting attribution
+
+- Registered `src-l2-sp-2018` (Li, Grandvalet, and Davoine; ICML 2018) and
+  `src-sgdr-2017` (Loshchilov and Hutter; ICLR 2017) in `raw/sources.yml`
+  under `recovery-references`, and extended that collection's notes to cover
+  local-fitting training choices.
+- Reason: SwiGLU-8 Part A used a cosine schedule, and SwiGLU-9 Part A tests
+  L2-SP as a loss option; `swiglu-8.md` had flagged both as unregistered.
+- Evidence: titles, authors, and venues checked on the arXiv abstract pages.
+  No locator checked, no ingestion, and no source-summary page; both stay
+  `registered`.
+- Updated `wiki/index.md`: registered-source note and count (17 to 19).

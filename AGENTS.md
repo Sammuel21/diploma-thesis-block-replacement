@@ -64,7 +64,9 @@
   maintained process entry points and executor-specific job definitions.
 - Maintained experiments are grouped by class: `model/swiglu/` owns the
   homogeneous SwiGLU progression, `model/baseline/` owns
-  model baselines, `model/interaction/` owns block-interaction studies, and
+  model baselines, `model/stacking/` owns chained-method studies such as
+  replacement plus quantization, `model/interaction/` owns block-interaction
+  studies, and
   `block/{baseline,operator,analysis}/` own the corresponding block studies.
 
 ## Instruction routing

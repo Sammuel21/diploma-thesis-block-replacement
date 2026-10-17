@@ -64,6 +64,12 @@ The original LoRA paper (2021 preprint v2) is registered for recovery-scope
 attribution. Sections 4.1-4.2 were selectively checked; the source remains
 `registered`, with no full ingestion or source-summary page implied.
 
+L2-SP (`src-l2-sp-2018`) and SGDR cosine annealing (`src-sgdr-2017`) are
+registered for local-fitting attribution in
+[SwiGLU-8](../../docs/experiments/model/swiglu/swiglu-8.md) and
+[SwiGLU-9](../../docs/experiments/model/swiglu/swiglu-9.md). Only their
+bibliographic identity was checked; both remain `registered`.
+
 ## Concepts
 
 - [[concept-replacement-error-propagation|Replacement error propagation]]:
@@ -182,6 +188,6 @@ historical archive remains available at `docs/prototype/mvp/`.
 - Last focused scientific/provenance review: 2026-10-02 (homogeneous SwiGLU)
 - Orphan pages: none detected
 - Registered source collections: 6
-- Registered individual sources: 17
+- Registered individual sources: 19
 - Ingested individual sources: 4
 - Sources in review: 1

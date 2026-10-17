@@ -133,8 +133,8 @@ epoch budget, so they never stop early.
 leaves the wider widths overfitting:
 
 - a penalty keeping weights near the copied teacher slice, at a weak and a
-  strong setting (the L2-SP method; Li et al., ICML 2018, to be registered
-  before the thesis cites it); and
+  strong setting (the L2-SP method, `src-l2-sp-2018`; Stage 2 was never run
+  and moved into [SwiGLU-9](swiglu-9.md) Part A); and
 - 786,432 calibration pairs, twice the SwiGLU-7 count.
 
 **Evaluation:** single-block KL, meaning the teacher KL when only that block
@@ -443,8 +443,9 @@ its 8K KL evaluated.
 
 ### Possible next work: the fitted/slice-only divergence at 1B
 
-**Status:** proposed by the researcher on 2026-10-12. Not decided,
-implemented, or scheduled.
+**Status:** proposed by the researcher on 2026-10-12. Decided on 2026-10-17
+as [SwiGLU-9](swiglu-9.md) Part B, which supersedes the proposal below; it
+adds a noise twin and a 5% rule. Kept here as the original proposal.
 
 **Question.** Does local fitting's advantage survive to 1B recovery tokens, or
 does it fall to the noise level? How does the answer depend on sparsity? Part
@@ -755,9 +756,10 @@ test.
   fine-tuning; no fine-tuning-only condition.
 - `src-minitron-2024`, Section 2.2; Sections 3 and 4.3: width pruning followed
   by distillation, without local fitting.
-- L2-SP (Li et al., ICML 2018) and cosine learning-rate decay (Loshchilov and
-  Hutter, 2017) are standard published methods. They are not yet registered;
-  register them before the thesis cites them.
+- L2-SP (`src-l2-sp-2018`) and cosine learning-rate decay (`src-sgdr-2017`)
+  are standard published methods, registered on 2026-10-17. Part A used a
+  single cosine decay without warm restarts. Check the locators before the
+  thesis cites them.
 - The exact down-projection refit is ordinary least squares and needs no
   citation. Its relation to MoDeGPT's down-projection reconstruction
   [src-modegpt-2025, Sections 3.1-3.2] is noted when it is reported.
