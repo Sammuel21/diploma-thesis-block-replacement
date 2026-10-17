@@ -2,7 +2,7 @@
 title: SwiGLU-8 - Local-Fitting Attribution and Homogeneous Control Spectrum
 status: draft
 created: 2026-10-10
-modified: 2026-10-12
+modified: 2026-10-17
 reference_artifacts:
   - data/results/workflows/model/swiglu-7/prepare-001/result.json
   - data/results/workflows/model/swiglu-7/S7-0-target-0.2-run-001/result.json
@@ -756,10 +756,14 @@ test.
   fine-tuning; no fine-tuning-only condition.
 - `src-minitron-2024`, Section 2.2; Sections 3 and 4.3: width pruning followed
   by distillation, without local fitting.
-- L2-SP (`src-l2-sp-2018`) and cosine learning-rate decay (`src-sgdr-2017`)
-  are standard published methods, registered on 2026-10-17. Part A used a
-  single cosine decay without warm restarts. Check the locators before the
-  thesis cites them.
+- Cosine learning-rate decay is SGDR's cosine annealing [src-sgdr-2017,
+  Section 3, Eq. (5); checked on arXiv v5 on 2026-10-17]. Part A's variant is
+  a project choice. It ran one decay over a fixed 32 epochs, without warm
+  restarts, stepped once per epoch toward zero (SGDR updates it at every
+  batch), with AdamW, and kept the best validation epoch rather than the
+  solution at the end of the run.
+- L2-SP (`src-l2-sp-2018`) was not run in SwiGLU-8. Its checked locators are
+  in [SwiGLU-9](swiglu-9.md#sources-and-attribution).
 - The exact down-projection refit is ordinary least squares and needs no
   citation. Its relation to MoDeGPT's down-projection reconstruction
   [src-modegpt-2025, Sections 3.1-3.2] is noted when it is reported.

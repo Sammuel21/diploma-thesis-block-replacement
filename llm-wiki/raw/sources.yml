@@ -332,12 +332,21 @@ sources:
     added: 2026-10-17
     ingestion_status: registered
     notes: >-
-      Original L2-SP method (accepted at ICML 2018, per the arXiv record):
-      regularization toward the starting-point weights. Registered for
-      SwiGLU-9 Part A, which tests it as a local-fitting loss option with the
-      copied teacher slice as the starting point; that use and the penalty
-      strengths are project choices. Bibliographic identity checked on arXiv
-      2026-10-17; no locator checked and no paper ingestion performed.
+      Original L2-SP method (ICML 2018, per the arXiv record and the PMLR 80
+      footer of arXiv v2): regularization toward the starting-point weights.
+      Registered for SwiGLU-9 Part A, which tests it as a local-fitting loss
+      option with the copied teacher slice as the starting point; that use and
+      the penalty strengths are project choices. Bibliographic identity checked
+      on arXiv 2026-10-17. Locators checked on arXiv v2 on 2026-10-17:
+      Section 3, paragraph "L2-SP", Eq. (2) for the penalty
+      (alpha / 2) * ||w - w0||^2, with the regularized objective defined in
+      the Section 3 text before Eq. (1); Eq. (3) for the added beta term on
+      parameters without a pre-trained counterpart; Section 4.2 for SGD with
+      momentum 0.9 and alpha chosen by cross-validation with beta = 0.01;
+      Figure 1 for the alpha grid {0, 1e-3, 1e-2, 1e-1, 1}; Section 4.4.2 for
+      the optimum as an affine combination of the unregularized optimum and
+      w0 along Hessian eigenvectors, whose derivation in the supplementary
+      material was not checked. No full paper ingestion was performed.
 
   - id: src-sgdr-2017
     title: "SGDR: Stochastic Gradient Descent with Warm Restarts"
@@ -353,7 +362,15 @@ sources:
     ingestion_status: registered
     notes: >-
       Original cosine-annealing learning-rate schedule (ICLR 2017 conference
-      paper, per the arXiv record). SwiGLU-8 Part A used one cosine decay over
-      a fixed 32 epochs without warm restarts; that variant is a project
-      choice. Bibliographic identity checked on arXiv 2026-10-17; no locator
-      checked and no paper ingestion performed.
+      paper, per the arXiv record and the arXiv v5 header). SwiGLU-8 Part A
+      used one cosine decay over a fixed 32 epochs without warm restarts; that
+      variant is a project choice. Bibliographic identity checked on arXiv
+      2026-10-17. Locators checked on arXiv v5 on 2026-10-17: Section 3,
+      Eq. (5) for the cosine annealing rule
+      eta_t = eta_min + (eta_max - eta_min) * (1 + cos(pi * T_cur / T_i)) / 2
+      within run i, with T_cur updated at each batch iteration and a warm
+      restart after T_i epochs; Section 3 also recommends the solution at the
+      end of a run. SwiGLU-8 instead steps the decay once per epoch toward
+      zero, never restarts, uses AdamW, and keeps the best validation epoch;
+      these differences are project choices. No full paper ingestion was
+      performed.

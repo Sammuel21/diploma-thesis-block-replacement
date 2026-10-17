@@ -12,6 +12,10 @@ only in `docs/` (schema 2.0, 2026-10-15).
 
 The homogeneous SwiGLU-1 through SwiGLU-8 family is complete; its results are
 in [`docs/experiments/model/swiglu/`](../../docs/experiments/model/swiglu/).
+[SwiGLU-9](../../docs/experiments/model/swiglu/swiglu-9.md) reopens the family
+(decision log, 2026-10-17). It measures whether local fitting still matters
+after 1B recovery tokens and how the local fit scales with calibration size and
+L2-SP. It is implemented but not yet run.
 Start from [[synthesis-homogeneous-swiglu-findings]] for what the working
 discrete-width, replacement-only recovery control borrows from prior work and
 what is project-defined.
@@ -67,8 +71,12 @@ attribution. Sections 4.1-4.2 were selectively checked; the source remains
 L2-SP (`src-l2-sp-2018`) and SGDR cosine annealing (`src-sgdr-2017`) are
 registered for local-fitting attribution in
 [SwiGLU-8](../../docs/experiments/model/swiglu/swiglu-8.md) and
-[SwiGLU-9](../../docs/experiments/model/swiglu/swiglu-9.md). Only their
-bibliographic identity was checked; both remain `registered`.
+[SwiGLU-9](../../docs/experiments/model/swiglu/swiglu-9.md). L2-SP's penalty
+equation, training details, and theoretical note were checked at selected
+locators (Section 3, Eq. (2); Section 4.2; Figure 1; Section 4.4.2; arXiv v2).
+SGDR's cosine annealing rule was checked at Section 3, Eq. (5) (arXiv v5).
+Both remain `registered`, with no full ingestion or source-summary page
+implied.
 
 ## Concepts
 

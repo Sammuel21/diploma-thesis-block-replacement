@@ -959,3 +959,42 @@ This file is append-only. Entries use the format:
   No locator checked, no ingestion, and no source-summary page; both stay
   `registered`.
 - Updated `wiki/index.md`: registered-source note and count (17 to 19).
+
+## [2026-10-17] update | L2-SP locators checked for SwiGLU-9
+
+- `raw/sources.yml`: the `src-l2-sp-2018` note now records the checked
+  locators.
+  - Section 3, paragraph "L2-SP", Eq. (2): the penalty.
+  - Eq. (3): the term for new parameters, not used in SwiGLU-9.
+  - Section 4.2: SGD and cross-validated alpha.
+  - Figure 1: the alpha grid.
+  - Section 4.4.2: the optimum as an affine combination along Hessian
+    eigenvectors.
+- Reason: the SwiGLU-9 implementation cites the penalty equation, and its
+  strength rule refers to Figure 1 and Section 4.4.2; the researcher approved
+  this update.
+- Evidence: pages 1-6 of arXiv 1802.01483v2, read on 2026-10-17. The
+  supplementary derivation behind Section 4.4.2 was not checked.
+- Not changed: the source stays `registered`; there is no ingestion or
+  source-summary page. The use on a copied teacher slice and the strength rule
+  are project choices recorded in
+  [`swiglu-9.md`](../../docs/experiments/model/swiglu/swiglu-9.md).
+- Updated `wiki/index.md`: the L2-SP and SGDR note.
+
+## [2026-10-17] update | SGDR locator checked; SwiGLU-9 in the index
+
+- `raw/sources.yml`: the `src-sgdr-2017` note records Section 3, Eq. (5),
+  SGDR's cosine annealing rule, which updates T_cur at every batch and
+  restarts after T_i epochs. It also records how SwiGLU-8 Part A differs: one
+  decay per epoch, no restart, AdamW, and the best validation epoch kept.
+- `wiki/index.md`: the research-focus paragraph now says SwiGLU-9 reopens the
+  homogeneous family (decision log, 2026-10-17). It is implemented but not
+  run; the SGDR note was updated.
+- Outside the wiki: the sources section of
+  [`swiglu-8.md`](../../docs/experiments/model/swiglu/swiglu-8.md) now cites
+  the checked SGDR locator and points to SwiGLU-9 for L2-SP.
+- Evidence: pages 1-4 of arXiv 1608.03983v5, read on 2026-10-17. The source
+  stays `registered`; there is no ingestion or source-summary page.
+- Left unchanged: [[synthesis-homogeneous-swiglu-findings]] and the pages that
+  call SwiGLU-1 to SwiGLU-8 "completed". They describe those eight
+  experiments, which are complete, and the synthesis is dated 2026-10-15.
