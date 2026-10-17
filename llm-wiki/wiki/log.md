@@ -998,3 +998,25 @@ This file is append-only. Entries use the format:
 - Left unchanged: [[synthesis-homogeneous-swiglu-findings]] and the pages that
   call SwiGLU-1 to SwiGLU-8 "completed". They describe those eight
   experiments, which are complete, and the synthesis is dated 2026-10-15.
+
+## [2026-10-17] register | Stacking-1 quantization sources and TorchAO INT3 locators
+
+- `raw/collections.yml`: new collection `quantization-method-references` for
+  original weight-quantization papers. `quantization-references` stays
+  software and official documentation only.
+- `raw/sources.yml`: registered `src-qat-jacob-2018` (simulated-quantization
+  training), `src-ste-bengio-2013` (straight-through estimator),
+  `src-gptq-2023`, and `src-awq-2024`. GPTQ and AWQ are not implemented; they
+  support Stacking-1's stated limit of round-to-nearest INT3 and the
+  conditional GPTQ fallback (decision log, 2026-10-17).
+- `raw/sources.yml`: the `src-torchao-0-17-0` note records the INT3 locators
+  (IntxWeightOnlyConfig, IntxUnpackedToInt8Tensor, the symmetric-only QAT
+  inference assert, IntxFakeQuantizeConfig) and MSLK's INT4 group quantizer.
+- Evidence: bibliographic identity on arXiv (and CVF for Jacob et al.);
+  paper locators from automated fetches of the ar5iv HTML renderings, not yet
+  confirmed in the PDFs; TorchAO and MSLK source read in the v0.17.0 tag and,
+  by the researcher, in the copy installed on PERUN. All four sources stay
+  `registered`; there is no ingestion or source-summary page.
+- Outside the wiki: the sources section of
+  [`stacking-1.md`](../../docs/experiments/model/stacking/stacking-1.md) cites
+  them.

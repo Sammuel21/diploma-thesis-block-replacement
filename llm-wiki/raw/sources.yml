@@ -1,5 +1,5 @@
 schema_version: 1
-updated: 2026-10-02
+updated: 2026-10-17
 
 # Individual sources are added here only when deliberately registered for
 # ingestion. Collection membership alone does not mean a source was reviewed.
@@ -228,6 +228,21 @@ sources:
       qat/fake_quantize_config.py, INT4 config inference; qat/fake_quantizer.py,
       Int4WeightFakeQuantizer. These are library methods, not project inventions.
       Full source ingestion was not performed.
+      Stacking-1 INT3 locators, checked on 2026-10-17 in the v0.17.0 tag and in
+      the copy installed on PERUN (0.17.0+cu128): quant_api.py,
+      IntxWeightOnlyConfig (weight_dtype int1-int8, PerGroup granularity,
+      default packing UNPACKED_TO_INT8) and _intx_weight_only_quantize_tensor;
+      quantize_/workflows/intx/intx_unpacked_to_int8_tensor.py,
+      IntxUnpackedToInt8Tensor (one int8 per value, BF16 scale and int8 zero
+      point per group; linear dequantizes, then calls F.linear);
+      quant_primitives.py, _SUB_BYTE_INT_BOUNDS (int3 range -4 to 3) and
+      _choose_qparams_affine (zero kept in range, integer zero point);
+      qat/fake_quantize_config.py, _infer_fake_quantize_configs, which asserts
+      symmetric mapping for IntxWeightOnlyConfig, and IntxFakeQuantizeConfig;
+      qat/api.py, QATConfig prepare with an explicit weight_config and convert
+      with base_config. MSLK's int4_row_quantize_zp (mslk/quantize/shuffle.py
+      on PERUN) computes INT4 group minima and maxima without forcing zero into
+      the range.
 
   - id: src-torchao-compatibility
     title: TorchAO release compatibility table
@@ -374,3 +389,98 @@ sources:
       zero, never restarts, uses AdamW, and keeps the best validation epoch;
       these differences are project choices. No full paper ingestion was
       performed.
+
+  - id: src-qat-jacob-2018
+    title: Quantization and Training of Neural Networks for Efficient Integer-Arithmetic-Only Inference
+    collection_id: quantization-method-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Benoit Jacob, Skirmantas Kligys, Bo Chen, Menglong Zhu, Matthew Tang, Andrew Howard, Hartwig Adam, Dmitry Kalenichenko]
+    year: 2018
+    canonical_url: https://arxiv.org/abs/1712.05877v1
+    sha256: null
+    added: 2026-10-17
+    ingestion_status: registered
+    notes: >-
+      Original quantization-aware training with simulated quantization (CVPR
+      2018, pp. 2704-2713, per the CVF open-access record; arXiv v1 states no
+      venue). Registered for Stacking-1, whose order B and dense INT3 QAT use
+      TorchAO's implementation of this method family: weights are
+      fake-quantized in the forward pass while FP32 weights are updated. The
+      weight-only scope, groups of 128, and recipe are project choices; the
+      paper also quantizes activations. Bibliographic identity checked on arXiv
+      and CVF on 2026-10-17. Locators found on 2026-10-17 through an automated
+      fetch of the ar5iv HTML rendering, not yet confirmed in the PDF:
+      Section 2.1, Eq. (1) for the affine scheme r = S(q - Z); Section 3,
+      "Training with simulated quantization", Eq. (12) for the simulated
+      quantization function. No full paper ingestion was performed.
+
+  - id: src-ste-bengio-2013
+    title: Estimating or Propagating Gradients Through Stochastic Neurons for Conditional Computation
+    collection_id: quantization-method-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Yoshua Bengio, Nicholas Léonard, Aaron Courville]
+    year: 2013
+    canonical_url: https://arxiv.org/abs/1308.3432v1
+    sha256: null
+    added: 2026-10-17
+    ingestion_status: registered
+    notes: >-
+      Straight-through estimator (arXiv v1, no venue stated). TorchAO's fake
+      quantizers pass gradients through rounding with a straight-through
+      gradient (quant_primitives.py, _Round); registered so Stacking-1's QAT
+      description can attribute that estimator. Bibliographic identity checked
+      on arXiv on 2026-10-17. Locator found on 2026-10-17 through an automated
+      fetch of the ar5iv HTML rendering, not yet confirmed in the PDF: Section
+      4, "Straight-Through Estimator". No full paper ingestion was performed.
+
+  - id: src-gptq-2023
+    title: "GPTQ: Accurate Post-Training Quantization for Generative Pre-trained Transformers"
+    collection_id: quantization-method-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Elias Frantar, Saleh Ashkboos, Torsten Hoefler, Dan Alistarh]
+    year: 2023
+    canonical_url: https://arxiv.org/abs/2210.17323v2
+    sha256: null
+    added: 2026-10-17
+    ingestion_status: registered
+    notes: >-
+      Error-compensating post-training weight quantization (ICLR 2023, per the
+      arXiv v2 comments). Not implemented. Registered as support for
+      Stacking-1's stated limit that round-to-nearest is the weakest standard
+      3-bit method, and as the conditional fallback if INT3 PTQ is much worse
+      than INT3 QAT (decision log, 2026-10-17). Bibliographic identity checked
+      on arXiv on 2026-10-17. Locators found on 2026-10-17 through an automated
+      fetch of the ar5iv HTML rendering, not yet confirmed in the PDF: the
+      abstract on 3 or 4 bits per weight; Section 5, Tables 3-5, comparing
+      GPTQ with round-to-nearest at 3 and 4 bits, including "At 3-bit, RTN
+      collapses completely" for OPT models. No full paper ingestion was
+      performed.
+
+  - id: src-awq-2024
+    title: "AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration"
+    collection_id: quantization-method-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Ji Lin, Jiaming Tang, Haotian Tang, Shang Yang, Wei-Ming Chen, Wei-Chen Wang, Guangxuan Xiao, Xingyu Dang, Chuang Gan, Song Han]
+    year: 2024
+    canonical_url: https://arxiv.org/abs/2306.00978v6
+    sha256: null
+    added: 2026-10-17
+    ingestion_status: registered
+    notes: >-
+      Activation-aware weight-only quantization (MLSys 2024, per the arXiv v6
+      comments). Not implemented. Registered as support for Stacking-1's
+      stated limit that 3-bit weight quantization is usually reported with
+      error-compensating methods. Bibliographic identity checked on arXiv on
+      2026-10-17. Locators found on 2026-10-17 through an automated fetch of
+      the ar5iv HTML rendering, not yet confirmed in the PDF: Section 5.1 for
+      group size 128 throughout; Section 5.2, Table 4, for INT3-g128 results
+      of round-to-nearest, GPTQ, and AWQ on LLaMA models. No full paper
+      ingestion was performed.

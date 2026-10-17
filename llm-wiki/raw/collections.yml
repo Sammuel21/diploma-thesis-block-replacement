@@ -89,3 +89,15 @@ collections:
     mutability: immutable-snapshot
     ingestion_policy: selective-with-source-verification
     notes: Original method citations for implemented recovery variants and local-fitting training choices; selected sections checked, without implying full paper ingestion.
+
+  - id: quantization-method-references
+    title: Original weight-quantization method references
+    locations:
+      - https://arxiv.org
+    storage: remote
+    origin: external-other
+    evidence_kinds: [scholarly-primary]
+    priority: supporting
+    mutability: immutable-snapshot
+    ingestion_policy: selective-with-source-verification
+    notes: Original method citations for Stacking-1's quantization-aware training and for its stated limits of round-to-nearest INT3; selected sections checked, without implying full paper ingestion.

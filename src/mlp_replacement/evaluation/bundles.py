@@ -103,8 +103,11 @@ def load_bundle(directory, device="cuda"):
     return model, tokenizer, manifest
 
 
-def measure_resident_bundle(directory, device="cuda"):
-    """Measure loading only; invoke in a fresh process, never after inference."""
+def measure_resident_bundle(directory, device="cuda", loader=None):
+    """Measure loading only; invoke in a fresh process, never after inference.
+
+    `loader` defaults to the BF16 bundle loader; packed bundles pass their own.
+    """
 
     import psutil
     import torch
@@ -116,10 +119,11 @@ def measure_resident_bundle(directory, device="cuda"):
     torch.cuda.empty_cache()
     before = {"allocated": torch.cuda.memory_allocated(), "reserved": torch.cuda.memory_reserved(),
               "rss": process.memory_info().rss}
-    model, tokenizer, manifest = load_bundle(directory, device)
+    model, tokenizer, manifest = (loader or load_bundle)(directory, device)
     gc.collect()
     torch.cuda.synchronize()
+    parameters = manifest["parameters"] if "parameters" in manifest else manifest["footprint"]["logical_parameters"]
     return {"gpu_allocated_delta_bytes": torch.cuda.memory_allocated() - before["allocated"],
             "gpu_reserved_delta_bytes": torch.cuda.memory_reserved() - before["reserved"],
             "host_rss_delta_bytes": process.memory_info().rss - before["rss"],
-            "parameters": manifest["parameters"], "protocol": "fresh-process-model-only-no-forward"}
+            "parameters": parameters, "protocol": "fresh-process-model-only-no-forward"}

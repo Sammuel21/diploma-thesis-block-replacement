@@ -36,7 +36,9 @@ has two: prepare, and the five model runs (section 4). The second is one block
 with two `sbatch` lines, because its tasks need different time limits. The two
 experiments are independent and can run at the same time. SwiGLU-9
 (section 9) adds three more, submitted back to back in one block: the five 1B
-training runs, the three-task block check, and the reference KL.
+training runs, the three-task block check, and the reference KL. Stacking-1
+(section 10) runs from a second clone in three blocks: QAT and dense, order A
+at 100M, and order A at 1B after SwiGLU-9.
 
 **Official PERUN rules these commands follow**, checked against the
 [PERUN wiki](https://wiki.hpc.tuke.sk/perun/perun/) on 2026-10-11:
@@ -713,7 +715,7 @@ records stay on PROJECT.
 **Safe to re-run;** it refreshes the archive.
 
 ```bash
-EXPERIMENT=swiglu-8   # or quantization-1 or swiglu-9
+EXPERIMENT=swiglu-8   # or quantization-1, swiglu-9, or stacking-1
 STAGE="$PERUN_PROJECT/transfer/$EXPERIMENT"
 mkdir -p "$STAGE/logs/perun-job-logs"
 rsync -a --prune-empty-dirs \
@@ -733,7 +735,7 @@ connected. The values come from `local/perun/runs/session.md`.
 ```bash
 PERUN_LOGIN="<login>"
 PERUN_ACCOUNT="<project-account>"
-EXPERIMENT=swiglu-8   # or quantization-1 or swiglu-9
+EXPERIMENT=swiglu-8   # or quantization-1, swiglu-9, or stacking-1
 scp "$PERUN_LOGIN@login01.perun.tuke.sk:/mnt/project/$PERUN_ACCOUNT/transfer/$EXPERIMENT-analysis.tar.gz" local/perun/
 mkdir -p data/results/workflows/model
 tar -xzf "local/perun/$EXPERIMENT-analysis.tar.gz" -C data/results/workflows/model
@@ -974,3 +976,217 @@ sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=01:00:00 
   --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
   workflows/jobs/perun/swiglu_9.sbatch reference-kl --resume
 ```
+
+## 10. Stacking-1
+
+Design, checks, and resource plan:
+[stacking-1.md](../../experiments/model/stacking/stacking-1.md). Every
+submission needs the researcher's go.
+
+Stacking-1 runs from a **second clone** of the repository (10.0). SwiGLU-9's
+run fingerprints hash every Python file under `src/` and `workflows/runs/`,
+including new ones, so pulling Stacking-1 into the SwiGLU-9 checkout would make
+a SwiGLU-9 resume refuse to start. Keep the first clone on SwiGLU-9's commit
+until SwiGLU-9 has finished.
+
+| Step | Block | Requested per task | Expected per task | Before using the results |
+| --- | --- | --- | --- | --- |
+| Second clone, once | 10.0 | - | minutes | `git log -1` shows the Stacking-1 commit |
+| Pre-submission checks | 10.1 | - | minutes | Every line OK |
+| **Block 1:** QAT and dense, 6 + 2 tasks | 10.2 | 6 h (2 h for INT3 PTQ), 128 GB | 0.4-3.5 h | K3 (order B) or K2 (dense) pass |
+| **Block 2:** order A at 100M, 33 tasks | 10.3 | 2 h, 128 GB | 0.3-0.5 h | K1, K2, K4, K5 pass |
+| **Block 3:** order A at 1B, 9 tasks, after SwiGLU-9 | 10.5 | 2 h, 128 GB | 0.3-0.5 h | K1, K2, K4, K5 pass |
+
+PERUN refuses every new `sbatch` while 4 of your jobs run, and accepts at most
+48 submitted tasks, counting each array task (perun-status.md). Submit a block
+only while at most 3 of your jobs run and the queue leaves room for it; block 1
+first, because its tasks are the longest.
+
+Task maps come from the runner, not the job script:
+`python -m workflows.runs.model.stacking.stacking_1 list-variants --group a100m`
+(or `a1b`, `b`) prints the variants in array order.
+
+Run 1.2 and 1.3 first, then `cd` into the second clone instead of the first.
+
+### 10.0 Second clone (once)
+
+**Deliberate.** It creates a new directory next to the first clone. Run it
+once, after the Stacking-1 commit is pushed.
+
+```bash
+cd "$PERUN_PROJECT"
+ORIGIN=$(git -C diploma-thesis-block-replacement remote get-url origin)
+test -e diploma-thesis-stacking && echo "STOP: diploma-thesis-stacking exists" \
+  || git clone --branch "$PERUN_BRANCH" "$ORIGIN" diploma-thesis-stacking
+cd diploma-thesis-stacking
+git log -1 --oneline
+```
+
+Later updates of this clone use 1.4 inside `diploma-thesis-stacking`.
+
+### 10.1 Pre-submission checks
+
+**Safe to re-run.** Every line should print OK or a value, never MISSING or
+MISMATCH. The SwiGLU-9 fitted 80% model prints PENDING until 10.5.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-stacking"
+# Every pinned SwiGLU-7 and SwiGLU-8 input exists and matches the configuration.
+python - <<'EOF'
+import hashlib, json, os
+config = json.load(open("workflows/configs/model/stacking/stacking-1.json"))
+root = os.environ["PERUN_RESULTS"]
+def sha(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+expected = {"swiglu-8/prepare-001/result.json": config["sources"]["swiglu8_prepare_sha256"]}
+for name, model in config["sources"]["models"].items():
+    run = f"{model['workflow']}/{model['run']}"
+    if model["result_sha256"] is None:
+        print("PENDING ", run)
+        continue
+    expected[f"{run}/result.json"] = model["result_sha256"]
+    expected[f"{run}/model/bundle.json"] = model["bundle_sha256"]
+for relative, digest in expected.items():
+    path = os.path.join(root, relative)
+    print("MISSING " if not os.path.isfile(path) else "OK      " if sha(path) == digest else "MISMATCH", relative)
+EOF
+
+# The large inputs QAT stages; the stream must be 400000000 bytes.
+stat -c '%s %n' "$PERUN_RESULTS/swiglu-8/prepare-001/prepared/recovery-tokens.int32"
+ls "$PERUN_RESULTS"/swiglu-8/prepare-001/prepared/starts/fitted-target-0.{2,5,8}.pt
+ls "$PERUN_RESULTS/swiglu-8/prepare-001/prepared/kl-tokens.int32" \
+   "$PERUN_RESULTS/swiglu-8/prepare-001/prepared/local-evaluation-batches.pt"
+
+# Software, the variant lists (6, 2, 33, 9), launcher syntax, and whether Slurm would accept the jobs.
+pip show torch torchao mslk 2>/dev/null | grep -E '^(Name|Version)'
+for GROUP in b dense a100m a1b; do
+    echo "$GROUP: $(PYTHONPATH=src python -m workflows.runs.model.stacking.stacking_1 list-variants --group $GROUP | wc -l)"
+done
+bash -n workflows/jobs/perun/stacking_1.sbatch && echo "launcher syntax OK"
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=0-5 \
+  workflows/jobs/perun/stacking_1.sbatch group b
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=02:00:00 --array=0-32 \
+  workflows/jobs/perun/stacking_1.sbatch group a100m
+perunfsusage    # PROJECT needs about 75-105 GB over all blocks
+ls "$PERUN_RESULTS/stacking-1" 2>/dev/null || echo "no Stacking-1 outputs yet"
+squeue -u "$USER"   # submit only while at most 3 of your jobs run
+```
+
+### 10.2 Block 1: QAT and dense (8 tasks)
+
+**Submits jobs. Run once.** It writes the job IDs to
+`$PERUN_LOG_DIR/stacking-1_block-1.txt`. If an ID prints empty, that
+`sbatch` was refused: submit only that line again once fewer jobs run.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-stacking"
+EXISTING=$(find "$PERUN_RESULTS/stacking-1" -mindepth 1 -maxdepth 1 \( -name 'b-*' -o -name 'q-*' \) 2>/dev/null)
+if [[ -n "$EXISTING" ]] || squeue -u "$USER" -h -n stacking-1 | grep -q .; then
+    echo "STOP: Stacking-1 outputs exist or a stacking-1 job is queued:"; echo "$EXISTING"
+else
+    B=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=0-5 \
+        --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        workflows/jobs/perun/stacking_1.sbatch group b)
+    QAT=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 \
+        --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+        workflows/jobs/perun/stacking_1.sbatch variant q-dense-qat-100m-int3)
+    PTQ=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=02:00:00 \
+        --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+        workflows/jobs/perun/stacking_1.sbatch variant q-dense-ptq-int3)
+    printf 'B=%s\nQAT=%s\nPTQ=%s\n' "${B%%;*}" "${QAT%%;*}" "${PTQ%%;*}" \
+        | tee "$PERUN_LOG_DIR/stacking-1_block-1.txt"
+    echo "<- record these in local/perun/runs/stacking-1.md"
+fi
+```
+
+Order-B task map: 0 fitted 0.2 INT4, 1 fitted 0.2 INT3, 2 fitted 0.5 INT4,
+3 fitted 0.5 INT3, 4 fitted 0.8 INT4, 5 fitted 0.8 INT3.
+
+### 10.3 Block 2: order A at 100M (33 tasks)
+
+**Submits a job. Run once,** when at most 3 of your jobs run and at most 15
+tasks are submitted (`squeue -u "$USER" -h | wc -l`, counting each array task).
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-stacking"
+EXISTING=$(find "$PERUN_RESULTS/stacking-1" -mindepth 1 -maxdepth 1 -name 'a-*-100m-*' 2>/dev/null)
+if [[ -n "$EXISTING" ]]; then
+    echo "STOP: order-A 100M outputs exist:"; echo "$EXISTING"
+else
+    A100M=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=02:00:00 --array=0-32 \
+        --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        workflows/jobs/perun/stacking_1.sbatch group a100m)
+    printf 'A100M=%s\n' "${A100M%%;*}" | tee "$PERUN_LOG_DIR/stacking-1_block-2.txt"
+    echo "<- record this in local/perun/runs/stacking-1.md"
+fi
+```
+
+### 10.4 Watch the jobs
+
+**Safe to re-run.** Each task prints its variant at the start. A failed check
+(K1-K5) stops the task with `AcceptanceFailure` in its `.err` file; stop and
+investigate before trusting any result.
+
+```bash
+squeue -u "$USER" -n stacking-1
+for FILE in "$PERUN_LOG_DIR"/stacking-1_*.out; do
+    VARIANT=$(grep -m1 -o 'variant=[^ ]*' "$FILE")
+    LAST=$(grep '^variant=.*tokens=' "$FILE" | tail -n 1)
+    DONE=$(grep -l 'Verified persistent output' "$FILE")
+    FAILED=$(grep -l -E 'AcceptanceFailure|Traceback' "${FILE%.out}.err" 2>/dev/null)
+    echo "$(basename "$FILE"): ${VARIANT:-not started}${LAST:+ | $LAST}${DONE:+ | done}${FAILED:+   <- check its .err}"
+done
+gpu-status
+```
+
+### 10.5 Block 3: order A at 1B (9 tasks, after SwiGLU-9)
+
+When SwiGLU-9's fitted 80% run is on PROJECT and its checks were reviewed,
+print its two sha256 values and give them to the agent, which adds them to
+`stacking-1.json` (`sources.models["fitted-0.8-1b"]`) for you to commit. Then
+update the second clone (1.4), rerun 10.1 (no PENDING), and submit.
+
+```bash
+# Safe to re-run: the values the configuration needs.
+sha256sum "$PERUN_RESULTS/swiglu-9/fitted-target-0.8-1b-run-001/result.json" \
+          "$PERUN_RESULTS/swiglu-9/fitted-target-0.8-1b-run-001/model/bundle.json"
+```
+
+```bash
+# Submits a job. Run once, after the configuration update.
+cd "$PERUN_PROJECT/diploma-thesis-stacking"
+A1B=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=02:00:00 --array=0-8 \
+    --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+    workflows/jobs/perun/stacking_1.sbatch group a1b)
+printf 'A1B=%s\n' "${A1B%%;*}" | tee "$PERUN_LOG_DIR/stacking-1_block-3.txt"
+```
+
+Changing the configuration changes the run fingerprint of every Stacking-1
+variant, so finish the 100M runs before this update, or resume them from the
+commit they started on.
+
+### 10.6 Resume a stopped task
+
+**Submits a job. Run once, after the cause is understood.** A finished bundle
+is reused; a QAT task continues from its last 25M-token checkpoint. Resume
+refuses changed code, configuration, or environment, and needs the run's
+`result.json` on PROJECT with no lock (see 5.2).
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-stacking"
+# One array task; replace the group, index, and limit (b: 6 h; a100m, a1b: 2 h):
+sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=3 \
+  --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+  workflows/jobs/perun/stacking_1.sbatch group b --resume
+
+# One dense variant:
+sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 \
+  --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+  workflows/jobs/perun/stacking_1.sbatch variant q-dense-qat-100m-int3 --resume
+```
+
+Then copy the results home (section 6, `EXPERIMENT=stacking-1`).

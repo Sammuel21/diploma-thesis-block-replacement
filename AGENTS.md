@@ -17,6 +17,14 @@
 - When committing or pushing is the next step, report the changed files and
   provide the commands for me to run instead of executing them.
 
+## PERUN access
+- Only I log in to PERUN. Agents never connect to PERUN hosts themselves
+  (no `ssh`, `scp`, `rsync`, or other remote access), even when access
+  appears to be available.
+- Whenever a PERUN environment check, submission, monitoring step, file
+  transfer, or any other PERUN action is needed, stop, give me the exact
+  commands to run, and wait for me to paste the output.
+
 ## Objective judgment
 - Treat my proposed approach and expected outcome as hypotheses to evaluate,
   not conclusions to validate. Serve the underlying goal without agreeing

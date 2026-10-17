@@ -25,7 +25,10 @@ def state_digests(model):
     }
 
 
-def export_quantized_bundle(model, tokenizer, directory, paths, bits, backend, provenance):
+def export_quantized_bundle(model, tokenizer, directory, paths, bits, backend, provenance,
+                            replacements=None, calculated_bytes=None):
+    """Save packed weights; `replacements` records SwiGLU topology (path, width, real_width, down_bias)."""
+
     directory = Path(directory)
     staging = directory.with_name(directory.name + ".building")
     if directory.exists() or staging.exists():
@@ -45,6 +48,11 @@ def export_quantized_bundle(model, tokenizer, directory, paths, bits, backend, p
         "files": {str(path.relative_to(staging)): file_digest(path)
                   for path in sorted(staging.rglob("*")) if path.is_file()},
     }
+    # Optional keys keep Quantization-1's dense-topology manifests unchanged.
+    if replacements:
+        manifest["replacements"] = replacements
+    if calculated_bytes is not None:
+        manifest["calculated_bytes"] = calculated_bytes
     write_json_atomic(staging / "bundle.json", manifest)
     staging.rename(directory)
     return validate_quantized_bundle(directory)
@@ -53,7 +61,7 @@ def export_quantized_bundle(model, tokenizer, directory, paths, bits, backend, p
 def validate_quantized_bundle(directory):
     directory = Path(directory)
     manifest = read_json(directory / "bundle.json")
-    if manifest.get("format") != FORMAT or manifest.get("bits") not in (4, 8):
+    if manifest.get("format") != FORMAT or manifest.get("bits") not in (3, 4, 8):
         raise ValueError("Unsupported quantized inference bundle")
     if manifest.get("quantization_recipe") != recipe_record(manifest["bits"]):
         raise ValueError("Quantized bundle recipe differs from the pinned library recipe")
@@ -68,6 +76,8 @@ def load_quantized_bundle(directory, device="cuda", attention_implementation="sd
 
     import torch
     from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+    from mlp_replacement.compression.surgery import replace_submodule
+    from mlp_replacement.operators import GatedMLPReplacement
 
     directory = Path(directory)
     device = torch.device(device)
@@ -81,6 +91,11 @@ def load_quantized_bundle(directory, device="cuda", attention_implementation="sd
         model = AutoModelForCausalLM.from_config(
             config, torch_dtype=torch.bfloat16, attn_implementation=attention_implementation,
         )
+        for row in manifest.get("replacements", []):
+            # SwiGLU replacements are rebuilt at their stored (padded) width.
+            replace_submodule(model, row["path"], GatedMLPReplacement(
+                config.hidden_size, row["width"], down_bias=row["down_bias"],
+            ).to(dtype=torch.bfloat16))
     model.requires_grad_(False)
     state = torch.load(directory / "model.pt", map_location=device, weights_only=True)
     model.load_state_dict(state, strict=True, assign=True)
