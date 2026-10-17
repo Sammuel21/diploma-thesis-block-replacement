@@ -5,7 +5,7 @@ summary: Allocates homogeneous SwiGLU widths by minimizing a summed singleton-KL
 type: method
 status: review
 created: 2026-10-02
-updated: 2026-10-15
+updated: 2026-10-17
 
 epistemic:
   role: mixed
@@ -15,6 +15,14 @@ epistemic:
     - experiment-backed
 
 sources:
+  - source_id: src-spdy-2022
+    locator: "Section 3.1, Eq. (1); Section 3.2, Eqs. (2)-(3), Algorithm 1"
+    relation: motivates
+    note: "Inspiration for the allocation formulation: exact dynamic program over discrete per-layer options under a summed budget with additive per-layer error. Locators from an automated HTML fetch, not yet confirmed in the PDF."
+  - source_id: src-ziplm-2023
+    locator: "Sections 3.1-3.3"
+    relation: motivates
+    note: "Inspiration as the closest prior application to structured FFN width: per-layer database with layer-wise reconstruction, SPDY-based search, then distillation. Locators from an automated HTML fetch, not yet confirmed in the PDF."
   - source_id: src-modegpt-2025
     locator: "Section 3.3; Equations 10-11"
     relation: contextualizes
@@ -38,6 +46,17 @@ SwiGLU-7 independently rebuilds this method from the pinned teacher and data;
 it needs no earlier run artifacts. This is one fixed allocation procedure,
 not a tournament over allocation strategies. It still optimizes which width
 each layer receives.
+
+The allocation formulation is not a project invention. It solves the same
+additive, budget-constrained per-layer choice as SPDY's dynamic program, and
+ZipLM applies that kind of allocation to structured FFN width
+[src-spdy-2022, Sections 3.1-3.2; src-ziplm-2023, Section 3.2]. The researcher
+records both as inspirations. The project-specific parts are the choice set
+(widths of locally fitted SwiGLU replacements), the per-option cost (measured
+singleton teacher KL, smoothed by isotonic regression), and the parameter
+budget. The working note
+[Width allocation as an integer program](../../../docs/methodology/width-allocation-integer-program.md)
+gives the full formulation and the evidence.
 
 ## Procedure and Objective
 
@@ -64,13 +83,18 @@ $$
 \sum_{i\in E}p_i(k_i)\leq B.
 $$
 
-**Project-proposed surrogate formalization.** The additive KL objective is a
-project modeling choice, not a theorem about composed-model KL or an equation
-borrowed from MoDeGPT. The knapsack and isotonic procedures are standard
-algorithms, not claimed inventions; this formulation needs no external
-citation to establish its project definition. For bias-free SwiGLU,
-$p_i(k)=3dk$ is standard dimension accounting. Output-biased candidates add
-$d$ parameters. The implementation handles integer budget realization.
+**Equation status.** The constrained problem is a multiple-choice knapsack,
+a standard integer program, and the implementation solves it exactly with the
+standard dynamic program over budget units of $d$ parameters. As a per-layer
+compression allocation it follows SPDY's formulation, which is cited
+[src-spdy-2022, Section 3.1, Eq. (1); Section 3.2, Eqs. (2)-(3)]. Choosing
+$c_i(k)$ as the monotonicized singleton teacher KL, and therefore treating
+joint model KL as the sum of singleton KLs, is a **project-proposed modeling
+choice**. It is not a theorem about composed-model KL and is not borrowed from
+MoDeGPT. Isotonic regression is a standard algorithm; a textbook reference is
+not yet registered. For bias-free SwiGLU, $p_i(k)=3dk$ is standard dimension
+accounting. Output-biased candidates add $d$ parameters. The implementation
+handles integer budget realization.
 
 Here the target $s$ means **eligible-MLP parameters removed**, so the retained
 budget is approximately $(1-s)$ of their dense total. S7 targets 20/30/40/50%
@@ -79,7 +103,25 @@ embeddings, and norms are outside this allocation denominator.
 
 ## Evidence and Prior-Work Boundary
 
-**Prior work.** MoDeGPT maps BI scores to nonuniform sparsity through an
+**Prior work.** SPDY chooses one sparsity level per layer from a discrete
+set, minimizing summed per-layer error under a summed runtime budget, and
+solves this exactly with a dynamic program over discretized time. It names
+error additivity as a strong assumption. Its per-layer error is a parametric
+curve whose coefficients an outer random search tunes against the loss of the
+stitched model. [src-spdy-2022, Sections 3.1-3.3] ZipLM prunes attention heads
+and FFN intermediate neurons with a layer-wise reconstruction update, stores
+several pruned versions per layer, chooses levels with an SPDY-based search
+under a runtime budget, and then distills. [src-ziplm-2023, Sections 3.1-3.3]
+
+**Synthesis.** Relative to these, the project allocator uses a parameter
+budget instead of runtime, a directly measured model-level cost per option
+instead of a parametric or layer-local error, isotonic smoothing, and a single
+dynamic-program solve with no outer search. Its homogeneous use (teacher
+neuron selection plus local fitting) is close to structured width pruning
+with layer-wise reconstruction, so the word "replacement" does not by itself
+separate it from ZipLM.
+
+MoDeGPT maps BI scores to nonuniform sparsity through an
 entropy-regularized negative-softmax rule. It does not define the singleton-KL
 width-curve objective above. [src-modegpt-2025, Section 3.3, Equations 10-11]
 The earlier project adaptation remains documented in
@@ -95,6 +137,15 @@ preserved useful quality through 100M tokens. The 20% selection-label defect
 and its limits are recorded in
 [`swiglu-5.md`](../../../docs/experiments/model/swiglu/swiglu-5.md).
 
+**Empirical finding.** The additive objective underestimates measured joint
+damage. Offline comparisons of the allocator's predicted sum with the joint
+model's token-0 KL in SwiGLU-7 and SwiGLU-8, and the block-interaction
+study's window residuals, both show super-additive damage. The numbers and
+their caveats are in the
+[width-allocation note](../../../docs/methodology/width-allocation-integer-program.md#5-the-additive-singleton-kl-objective).
+Whether the sum still ranks allocations at one budget correctly has not been
+tested.
+
 ## Limitations
 
 The solver minimizes the **grid surrogate**, not the true jointly replaced
@@ -104,6 +155,11 @@ measured at selection time. The boundary extension is a heuristic, not a
 global continuous optimum. Fresh local fitting and integrated evaluation remain
 necessary; evidence from one model and seed does not establish transfer or
 literature novelty.
+
+**Open question.** Later work in the same research line replaces the additive
+dynamic program with whole-model search. Those papers (EvoPress, DarwinLM)
+are not registered, so this page makes no claim from them; the
+width-allocation note records them as unregistered leads.
 
 ## Relationships
 
@@ -118,6 +174,10 @@ literature novelty.
 
 ## Sources
 
+- `src-spdy-2022` - Section 3.1, Eq. (1); Section 3.2, Eqs. (2)-(3),
+  Algorithm 1; Section 3.3; inspiration for the allocation formulation.
+- `src-ziplm-2023` - Sections 3.1-3.3; inspiration and closest prior
+  application to structured FFN width.
 - `src-modegpt-2025` - Section 3.3, Equations 10-11; contrasting prior method.
 - Project evidence - linked SwiGLU-5 search and confirmations, checked
   2026-10-02; [SwiGLU-7 preparation](../../../data/results/workflows/model/swiglu-7/prepare-001/result.json).

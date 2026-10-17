@@ -1,5 +1,5 @@
 schema_version: 1
-updated: 2026-10-02
+updated: 2026-10-17
 path_base: repository-root
 
 collections:
@@ -101,3 +101,15 @@ collections:
     mutability: immutable-snapshot
     ingestion_policy: selective-with-source-verification
     notes: Original method citations for Stacking-1's quantization-aware training and for its stated limits of round-to-nearest INT3; selected sections checked, without implying full paper ingestion.
+
+  - id: allocation-method-references
+    title: Layer-wise compression allocation method references
+    locations:
+      - https://arxiv.org
+    storage: remote
+    origin: external-other
+    evidence_kinds: [scholarly-primary]
+    priority: supporting
+    mutability: immutable-snapshot
+    ingestion_policy: selective-with-source-verification
+    notes: Prior methods that allocate per-layer compression levels under a global budget, cited as the inspiration for the discrete width allocator; selected sections checked, without implying full paper ingestion.

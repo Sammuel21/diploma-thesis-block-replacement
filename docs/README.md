@@ -48,6 +48,10 @@ Markdown files in this directory follow the
 - [Global-to-local MLP operator budget allocation](methodology/global-to-local-operator-budget-allocation.md)
   summarizes the numbered procedure for converting one model-level parameter
   target into block-specific replacement caps and reconciling unused budget.
+- [Width allocation as an integer program](methodology/width-allocation-integer-program.md)
+  is the working note on the discrete width allocator: the knapsack, its exact
+  dynamic program, the additive singleton-KL objective, its evidence, prior
+  work, and the heterogeneous extension.
 - [Operator calibration data and training budget](methodology/operator-calibration-data-and-training-budget.md)
   explains activation-pair data feeding and distinguishes fixed-update,
   fixed-epoch, and operator-batch-size experiments.

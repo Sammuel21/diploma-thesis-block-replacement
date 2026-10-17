@@ -484,3 +484,56 @@ sources:
       group size 128 throughout; Section 5.2, Table 4, for INT3-g128 results
       of round-to-nearest, GPTQ, and AWQ on LLaMA models. No full paper
       ingestion was performed.
+
+  - id: src-spdy-2022
+    title: "SPDY: Accurate Pruning with Speedup Guarantees"
+    collection_id: allocation-method-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Elias Frantar, Dan Alistarh]
+    year: 2022
+    canonical_url: https://arxiv.org/abs/2201.13096v2
+    sha256: null
+    added: 2026-10-17
+    ingestion_status: registered
+    notes: >-
+      Layer-wise sparsity allocation under a runtime budget (ICML 2022, per the
+      arXiv v2 comments). Recorded by the researcher on 2026-10-17 as an
+      inspiration for the discrete width allocator: the same exact dynamic
+      program over discrete per-layer options under a summed budget and an
+      additive per-layer error. Bibliographic identity checked on arXiv on
+      2026-10-17. Locators found on 2026-10-17 through an automated fetch of
+      the ar5iv HTML rendering, not yet confirmed in the PDF: Section 3.1,
+      Eq. (1), for the constrained problem and the statement that error
+      additivity is a strong assumption; Section 3.2, Eqs. (2)-(3) and
+      Algorithm 1, for the dynamic program over discretized time; Section 3.3,
+      Eq. (4), for the parametric per-layer error and the search over its
+      coefficients. No full paper ingestion was performed.
+
+  - id: src-ziplm-2023
+    title: "ZipLM: Inference-Aware Structured Pruning of Language Models"
+    collection_id: allocation-method-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Eldar Kurtic, Elias Frantar, Dan Alistarh]
+    year: 2023
+    canonical_url: https://arxiv.org/abs/2302.04089v2
+    sha256: null
+    added: 2026-10-17
+    ingestion_status: registered
+    notes: >-
+      Structured pruning of attention heads and FFN intermediate neurons with
+      layer-wise weight reconstruction and an SPDY-based search for per-layer
+      levels under a runtime budget (NeurIPS 2023, per the arXiv v2 comments).
+      Recorded by the researcher on 2026-10-17 as an inspiration for the
+      discrete width allocator: the closest prior application of per-layer
+      allocation to structured FFN width. Bibliographic identity checked on
+      arXiv on 2026-10-17. Locators found on 2026-10-17 through an automated
+      fetch of the ar5iv HTML rendering, not yet confirmed in the PDF:
+      Section 3.1, Eqs. (2)-(4), for the pruned structures and the
+      reconstruction update; Section 3.2 for the per-layer database, the
+      runtime table, and the structured SPDY search with a relative
+      layer-wise error prior; Section 3.3 for distillation. No full paper
+      ingestion was performed.

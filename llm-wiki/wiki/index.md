@@ -78,6 +78,11 @@ SGDR's cosine annealing rule was checked at Section 3, Eq. (5) (arXiv v5).
 Both remain `registered`, with no full ingestion or source-summary page
 implied.
 
+SPDY (`src-spdy-2022`) and ZipLM (`src-ziplm-2023`) are registered as the
+researcher-recorded inspirations for
+[[method-discrete-width-curve-allocation]]. Locators come from automated HTML
+fetches and are not yet confirmed in the PDFs. Both remain `registered`.
+
 ## Concepts
 
 - [[concept-replacement-error-propagation|Replacement error propagation]]:
@@ -126,7 +131,9 @@ No model, dataset, software, or other entity pages have been created yet.
   unverified, separate from the working homogeneous control.
 - [[method-discrete-width-curve-allocation|Discrete width-curve allocation]]:
   Selects homogeneous SwiGLU widths by minimizing a summed singleton-KL
-  surrogate under one shared parameter budget; not a composition theorem.
+  surrogate under one shared parameter budget, using an SPDY-style exact
+  dynamic program; not a composition theorem, and measured damage is
+  super-additive.
 - [[method-hybrid-operator-replacement|Hybrid linear-nonlinear MLP replacement]]:
   Defines a project-proposed linear-plus-nonlinear drop-in operator while
   leaving its internal capacity allocation as unresolved future work.

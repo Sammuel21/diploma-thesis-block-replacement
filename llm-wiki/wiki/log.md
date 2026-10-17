@@ -1020,3 +1020,24 @@ This file is append-only. Entries use the format:
 - Outside the wiki: the sources section of
   [`stacking-1.md`](../../docs/experiments/model/stacking/stacking-1.md) cites
   them.
+
+## [2026-10-17] register + update | SPDY and ZipLM; discrete width allocation prior work
+
+- `raw/collections.yml`: new collection `allocation-method-references` for
+  prior methods that allocate per-layer compression under a global budget.
+- `raw/sources.yml`: registered `src-spdy-2022` and `src-ziplm-2023`, which
+  the researcher records as inspirations for the discrete width allocator.
+- [[method-discrete-width-curve-allocation]]: added both sources with
+  relation `motivates`; replaced the statement that the formulation needs no
+  external citation with an equation-status paragraph; added the prior-work
+  boundary, a synthesis of the differences, an empirical finding on
+  super-additivity that links the new note, and an open question on
+  whole-model search (EvoPress, DarwinLM; not registered).
+- Index: updated the method summary and the sources paragraph.
+- Evidence: bibliographic identity checked on arXiv; locators from automated
+  fetches of the ar5iv HTML renderings, not yet confirmed in the PDFs. Both
+  sources stay `registered`; no ingestion or source-summary page.
+- Outside the wiki: new working note
+  [`width-allocation-integer-program.md`](../../docs/methodology/width-allocation-integer-program.md),
+  which owns the offline additivity calculations, and its link in
+  `docs/README.md`.
