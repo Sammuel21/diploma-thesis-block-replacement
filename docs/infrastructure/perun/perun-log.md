@@ -2,7 +2,7 @@
 title: TUKE Perun Experiment Log
 status: active
 created: 2026-09-25
-modified: 2026-09-29
+modified: 2026-10-18
 ---
 
 # TUKE Perun Experiment Log
@@ -325,3 +325,19 @@ Entries are appended below in submission order.
 - Variance: 1.69 h against 0.8-1.2 h; about 4.2 min per measurement instead of 2-3, mostly untimed process start-up and BF16 bundle loading (43-50 s)
 - Experiment document: [Speed-1](../../experiments/model/baseline/speed-1.md#results-2026-10-15)
 - Notes: The job prints no per-measurement progress; progress is visible only in the scratch `result.json`.
+
+## [2026-10-17 17:30 UTC] 117283-117285 | SwiGLU-9 1B runs, block check, and reference KL
+
+- Plan: train 5 × 9.5-11 h (14-hour limit); block check 3 × 0.8-2.7 h (6-hour limit); reference KL 0.1-0.3 h (1-hour limit); about 51-62 GPU-hours expected, ceiling 89 ([resource plan](../../experiments/model/swiglu/swiglu-9.md#pre-run-resource-plan)); medium-high confidence for training, low for the block check
+- Outcome: all 9 tasks COMPLETED with structured status `completed`; no retries
+- Submission: `workflows/jobs/perun/swiglu_9.sbatch`; `train --array=0-4` (117283), `block-check --array=0-2` (117284), `reference-kl` (117285); all with `--begin=now+10minutes`, so the three submissions were accepted before any task started; submission time read from the PERUN clock (UTC+2 assumed)
+- Provenance: commit `ae67eab` (code identical to `4700b19`); configuration sha256 `6afcc214…`; every SwiGLU-7 and SwiGLU-8 input matched its pinned sha256 in the pre-submission check
+- Allocation: `gpu_short`; 1 NVIDIA H200 and 8 CPUs per task; 64 GB requested memory (train, reference KL) or 128 GB (block check); nodes gpu03, gpu04, gpu05
+- Consumption: workflow elapsed: train 9.37-10.62 h (50.0 h in total), block check 1.26 / 2.69 / 1.48 h (5.4 h), reference KL 96 s; about 55.5 GPU-hours workflow proxy; requested GPU-hour ceiling 89; allocation GPU-hours Unknown; queue wait about 1.3 h after the begin time
+- Efficiency: CPU Unknown; peak RAM 5.9-8.9 GiB and peak VRAM 25.1-31.3 GiB per training run; block check and reference KL memory not recorded; GPU utilization Unknown
+- Outputs: PROJECT `perun-results/swiglu-9/` (11 GB: five 1B bundles plus JSON), including the merged `block-check-001` and `part-b-summary-001` written on the login node
+- Continuation: completed; checkpoints were deleted after the results and bundles were validated
+- Verification: staged out and checksum-verified by the job script; no leftover locks; C1, B1, P4, D1, D2, P5, A1, and A2-A3 passed; 2 of 45 C2 values flagged (one transient at 50M in the slice-only 50% run, reviewed in the experiment document)
+- Variance: training and block check within plan; reference KL much faster than planned (96 s against 6-18 min)
+- Experiment document: [SwiGLU-9](../../experiments/model/swiglu/swiglu-9.md#part-b-results-2026-10-18)
+- Notes: `scontrol` records had expired by the time they were requested, so scheduler state, exit codes, and elapsed times come from the job logs and the result records.

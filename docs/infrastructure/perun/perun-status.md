@@ -2,7 +2,7 @@
 title: TUKE Perun Project Status
 status: active
 created: 2026-09-25
-modified: 2026-10-15
+modified: 2026-10-18
 ---
 
 # TUKE Perun Project Status
@@ -86,6 +86,7 @@ scheduler records.
 | SwiGLU-8 block check, preparation, 16 runs and 4 stopped attempts, workflow timing | about 32.1 H200-hours | Block check 7.91, preparation 3.36, runs 20.18, stopped attempts 0.68, from the [SwiGLU-8 page](../../experiments/model/swiglu/swiglu-8.md) and its artifacts; workflow-timing proxy, not scheduler allocation |
 | Quantization-1 five models, failed reloads and four re-evaluations, workflow timing | about 18.9 H200-hours, plus 0.03 h CPU preparation | Dense 0.29, INT8 and INT4 first attempts 0.02, QAT 100M 1.63, QAT 1B 15.83, evaluations 1.10, from the [Quantization-1 page](../../experiments/model/baseline/quantization-1.md#results-2026-10-13) and its artifacts; workflow-timing proxy, not scheduler allocation |
 | Speed-1 one-GPU speed comparison, workflow timing | about 1.7 H200-hours | Job 110219, 24 measurements, from the [Speed-1 page](../../experiments/model/baseline/speed-1.md#results-2026-10-15) and its artifacts; workflow-timing proxy, not scheduler allocation |
+| SwiGLU-9 five 1B runs, block check, and reference KL, workflow timing | about 55.5 H200-hours | Jobs 117283-117285 (9 tasks, no retries): training 50.0, block check 5.4, reference KL 0.03, from the [SwiGLU-9 page](../../experiments/model/swiglu/swiglu-9.md#measured-resource-use-2026-10-18) and its artifacts; workflow-timing proxy, not scheduler allocation |
 
 ## Open questions
 
