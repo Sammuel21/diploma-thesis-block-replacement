@@ -14,8 +14,8 @@ replacement), numerical (quantization), or algebraic (low-rank). Local fitting
 and recovery training are not reduction types. Each variant is an ordered list
 of stages applied to one model. Quantization of the dense model alone is a
 baseline, not stacking: INT8 and INT4 are in
-[Quantization-1](../baseline/quantization-1.md), INT3 in Quantization-2
-(decision log, 2026-10-20).
+[Quantization-1](../baseline/quantization-1.md), INT3 in
+[Quantization-2](../baseline/quantization-2.md) (decision log, 2026-10-20).
 
 | Experiment | Main question | Status |
 | --- | --- | --- |

@@ -7,15 +7,17 @@ compression, recovery, and evaluation operations belong in
 | Runner | Configuration | Experiment guide |
 | --- | --- | --- |
 | [compression.py](compression.py) | [compression.json](../../../configs/model/baseline/compression.json) | [Compression baseline](../../../../docs/experiments/model/baseline/compression-baseline.md) |
-| [quantization.py](quantization.py) | [quantization-1.json](../../../configs/model/baseline/quantization-1.json) | [Quantization-1](../../../../docs/experiments/model/baseline/quantization-1.md) |
+| [quantization.py](quantization.py) | [quantization-1.json](../../../configs/model/baseline/quantization-1.json), [quantization-2.json](../../../configs/model/baseline/quantization-2.json) | [Quantization-1](../../../../docs/experiments/model/baseline/quantization-1.md), [Quantization-2](../../../../docs/experiments/model/baseline/quantization-2.md) |
 | [speed.py](speed.py) | [speed-1.json](../../../configs/model/baseline/speed-1.json) | [Speed-1](../../../../docs/experiments/model/baseline/speed-1.md) |
 
 The compression runner exposes historical, optimized, and combined stages;
 its numerical parity with retained notebook artifacts remains unverified.
 Quantization-1 exposes `prepare`, `run`, `evaluate`, and `report`. Its default
 variants are dense BF16, MLP INT8 PTQ, and MLP INT4 PTQ. Optional INT4 QAT
-requires an explicit positive training-token budget. Full GPU scientific
-validation remains pending.
+requires an explicit positive training-token budget. Quantization-2 runs on
+the same runner with its own configuration: INT3 PTQ by default, optional
+INT3 QAT, Quantization-1's `prepare-001`, and resident memory without speed;
+it refuses `prepare` and `evaluate`.
 
 Quantization-1 has dedicated [local](../../../jobs/local/quantization_1.sh) and
 [Perun](../../../jobs/perun/quantization_1.sbatch) launchers. It runs in the

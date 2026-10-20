@@ -47,7 +47,8 @@ including INT3, must be on the same plot; otherwise a stacked model could look
 like a winner only because its strongest equal-size competitor is missing.
 Quantization alone comes from the baselines: INT8 and INT4 from
 [Quantization-1](../baseline/quantization-1.md), INT3 PTQ and INT3 QAT at 100M
-and 1B from Quantization-2 (decision log, 2026-10-20). A stacked model
+and 1B from [Quantization-2](../baseline/quantization-2.md) (decision log,
+2026-10-20). A stacked model
 applies at least two kinds of redundancy reduction (structural, numerical, or
 algebraic); quantizing the dense model alone is a baseline, not stacking.
 
@@ -118,7 +119,8 @@ projection in layers 1-22 is fake-quantized, including the dense-kept layers,
 which stay frozen as they are in order A.
 
 **Quantization alone** is not part of Stacking-1. The dense INT3 PTQ and
-INT3 QAT runs planned here on 2026-10-17 moved to Quantization-2, which runs
+INT3 QAT runs planned here on 2026-10-17 moved to
+[Quantization-2](../baseline/quantization-2.md), which runs
 on Quantization-1's runner and adds INT3 QAT at 1B (decision log,
 2026-10-20).
 

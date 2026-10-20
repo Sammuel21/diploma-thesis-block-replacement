@@ -63,7 +63,23 @@ HF_HOME="${HF_HOME:?Export the persistent PROJECT model/dataset cache}"
 HF_HOME="$(realpath "$HF_HOME")"
 [[ "$HF_HOME" == "$PROJECT_DIR"/* ]] || exit 2
 export HF_HOME
-PROJECT_RESULTS="$PROJECT_DIR/perun-results/quantization-1"
+# The configuration names the workflow (quantization-1 or quantization-2), and with it the results folder.
+CONFIG_PATH="$SUBMIT_DIR/workflows/configs/model/baseline/quantization-1.json"
+PREVIOUS_ARGUMENT=""
+for ARGUMENT in "$@"; do
+    if [[ "$PREVIOUS_ARGUMENT" == --config ]]; then
+        CONFIG_PATH="$ARGUMENT"
+        [[ "$CONFIG_PATH" == /* ]] || CONFIG_PATH="$SUBMIT_DIR/$CONFIG_PATH"
+    fi
+    PREVIOUS_ARGUMENT="$ARGUMENT"
+done
+WORKFLOW="$("$PYTHON_BIN" -c 'import json, sys; print(json.load(open(sys.argv[1]))["workflow"])' "$CONFIG_PATH")"
+case "$WORKFLOW" in quantization-1|quantization-2) ;; *) echo "Unsupported workflow: $WORKFLOW" >&2; exit 2;; esac
+if [[ -n "${SLURM_ARRAY_TASK_ID:-}" && "$WORKFLOW" != quantization-1 ]]; then
+    echo "run-array maps Quantization-1's five models only; submit $WORKFLOW runs one by one" >&2
+    exit 2
+fi
+PROJECT_RESULTS="$PROJECT_DIR/perun-results/$WORKFLOW"
 PERSISTENT_OUTPUT="$PROJECT_RESULTS/$OUTPUT_NAME"
 LOCK_DIR="${PERSISTENT_OUTPUT}.perun-lock"
 SCRATCH_DIR="$SCRATCH_ROOT/job_${SLURM_JOB_ID:?}"

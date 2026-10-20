@@ -38,7 +38,9 @@ experiments are independent and can run at the same time. SwiGLU-9
 (section 9) adds three more, submitted back to back in one block: the five 1B
 training runs, the three-task block check, and the reference KL. Stacking-1
 (section 10) adds three more, submitted back to back in one block: order B,
-order A at 100M, and order A at 1B, 48 tasks in total.
+order A at 100M, and order A at 1B, 48 tasks in total. Quantization-2
+(section 11) adds three single runs on Quantization-1's launcher, after
+Stacking-1 has finished.
 
 **Official PERUN rules these commands follow**, checked against the
 [PERUN wiki](https://wiki.hpc.tuke.sk/perun/perun/) on 2026-10-11:
@@ -1133,3 +1135,115 @@ sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 
 Right after the last task finishes, run section 7 for the three job IDs
 (scheduler records expire), then copy the results home (section 6,
 `EXPERIMENT=stacking-1`).
+
+## 11. Quantization-2
+
+Design, checks, and resource plan:
+[quantization-2.md](../../experiments/model/baseline/quantization-2.md).
+Every submission needs the researcher's go.
+
+Quantization-2 runs on Quantization-1's launcher with its own configuration
+and writes to `perun-results/quantization-2/`. It reuses Quantization-1's
+`prepare-001`, so it has no preparation step. Update the checkout (1.4) only
+after every Stacking-1 task has finished: the Quantization-2 code changes
+`workflows/runs/`, and a Stacking-1 resume refuses changed code.
+
+| Run | Output | Expected | Time limit |
+| --- | --- | --- | --- |
+| INT3 PTQ | `int3-001` | 0.3-0.5 h | 2 h |
+| INT3 QAT 100M | `qat-int3-100m-001` | 1.6-3.5 h | 6 h |
+| INT3 QAT 1B | `qat-int3-1b-001` | 16-32 h | 36 h |
+
+Run 1.2, 1.3, and 1.4 first.
+
+### 11.1 Pre-submission checks
+
+**Safe to re-run.** The settings line must print `quantization-2 ['ptq-int3']`,
+every `--test-only` line must be accepted, and no Quantization-2 output may
+exist yet.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+CONFIG=workflows/configs/model/baseline/quantization-2.json
+Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+PYTHONPATH=src python -c "from workflows.runs.model.baseline import quantization as q; s = q.load_settings('$CONFIG'); print(s['workflow'], s['variants'])"
+ls -l "$Q1_PREPARED" "$PERUN_RESULTS"/quantization-1/prepare-001/prepared/
+bash -n workflows/jobs/perun/quantization_1.sbatch && echo "launcher syntax OK"
+sbatch --test-only --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=02:00:00 \
+  workflows/jobs/perun/quantization_1.sbatch run int3-001 --config "$CONFIG" --prepared "$Q1_PREPARED" --variant ptq-int3
+sbatch --test-only --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 \
+  workflows/jobs/perun/quantization_1.sbatch run qat-int3-1b-001 --config "$CONFIG" --prepared "$Q1_PREPARED" \
+  --variant qat-int3 --qat-tokens 1000000000
+perunfsusage    # PROJECT needs about 7 GB
+ls "$PERUN_RESULTS/quantization-2" 2>/dev/null || echo "no Quantization-2 outputs yet"
+git log -1 --oneline
+squeue -u "$USER"   # Stacking-1 must have finished
+```
+
+### 11.2 Submit the three runs
+
+**Submits jobs. Run once,** after 11.1 is clean. It writes the three job IDs
+to `$PERUN_LOG_DIR/quantization-2_submission.txt`.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+CONFIG=workflows/configs/model/baseline/quantization-2.json
+Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+COMMON=(--parsable --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS"
+        --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err")
+EXISTING=$(find "$PERUN_RESULTS/quantization-2" -mindepth 1 -maxdepth 1 2>/dev/null)
+if [[ -n "$EXISTING" ]] || squeue -u "$USER" -h -n quantization-2 | grep -q .; then
+    echo "STOP: Quantization-2 outputs exist or a quantization-2 job is queued:"; echo "$EXISTING"
+else
+    PTQ=$(sbatch "${COMMON[@]}" --time=02:00:00 workflows/jobs/perun/quantization_1.sbatch \
+        run int3-001 --config "$CONFIG" --prepared "$Q1_PREPARED" --variant ptq-int3)
+    QAT100M=$(sbatch "${COMMON[@]}" --time=06:00:00 workflows/jobs/perun/quantization_1.sbatch \
+        run qat-int3-100m-001 --config "$CONFIG" --prepared "$Q1_PREPARED" --variant qat-int3 --qat-tokens 100000000)
+    QAT1B=$(sbatch "${COMMON[@]}" --time=36:00:00 workflows/jobs/perun/quantization_1.sbatch \
+        run qat-int3-1b-001 --config "$CONFIG" --prepared "$Q1_PREPARED" --variant qat-int3 --qat-tokens 1000000000)
+    printf 'PTQ=%s\nQAT100M=%s\nQAT1B=%s\n' "${PTQ%%;*}" "${QAT100M%%;*}" "${QAT1B%%;*}" \
+        | tee "$PERUN_LOG_DIR/quantization-2_submission.txt"
+    echo "<- record these in local/perun/runs/quantization-2.md"
+fi
+```
+
+### 11.3 Watch the runs
+
+**Safe to re-run.** A stream that differs from Quantization-1's stops the QAT
+run with "QAT stream differs" in its `.err` file before training starts.
+
+```bash
+source "$PERUN_LOG_DIR/quantization-2_submission.txt"
+squeue -u "$USER" -n quantization-2 -o "%.12i %.9T %.10M %.11l %R"
+for NAME in PTQ QAT100M QAT1B; do
+    JOB="${!NAME}"
+    LAST=$(tail -n 1 "$PERUN_LOG_DIR/quantization-2_$JOB.out" 2>/dev/null)
+    DONE=$(grep -l 'Verified persistent output' "$PERUN_LOG_DIR/quantization-2_$JOB.out" 2>/dev/null)
+    FAILED=$(grep -l 'Traceback' "$PERUN_LOG_DIR/quantization-2_$JOB.err" 2>/dev/null)
+    echo "$NAME ($JOB): ${LAST:-not started}${DONE:+ | done}${FAILED:+   <- check its .err}"
+done
+gpu-status
+```
+
+While a run is going, its current stage is in the scratch copy of its
+`result.json` (section 2.1).
+
+### 11.4 Resume a stopped run
+
+**Submits a job. Run once, after the cause is understood.** Needs the run's
+`result.json` on PROJECT and no lock (see 5.2). Replace the output name,
+token budget, and limit for the run being resumed.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+sbatch --parsable --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 \
+  --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+  workflows/jobs/perun/quantization_1.sbatch run qat-int3-1b-001 \
+  --config workflows/configs/model/baseline/quantization-2.json \
+  --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json" \
+  --variant qat-int3 --qat-tokens 1000000000 --resume
+```
+
+Right after the last run finishes, run section 7 for the three job IDs, then
+copy the results home (section 6, `EXPERIMENT=quantization-2`). The
+comparison report is built on the PC (see the experiment page).

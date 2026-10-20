@@ -1,4 +1,9 @@
-"""Quantization-1: scoped PTQ/QAT, deployment evaluation, and reporting."""
+"""Quantization-1 and -2: scoped PTQ/QAT, deployment evaluation, and reporting.
+
+Quantization-2 is the dense INT3 baseline on this runner (decision log,
+2026-10-20). It reuses Quantization-1's preparation, recipes, and QAT data,
+records calculated INT3 bytes, and measures resident memory but no speed.
+"""
 
 import argparse
 import csv
@@ -24,7 +29,11 @@ from mlp_replacement.artifacts import (
 
 ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_CONFIG = ROOT / "workflows/configs/model/baseline/quantization-1.json"
-VARIANTS = ("dense-bf16", "ptq-int8", "ptq-int4", "qat-int4")
+VARIANTS = ("dense-bf16", "ptq-int8", "ptq-int4", "qat-int4", "ptq-int3", "qat-int3")
+WORKFLOW_VARIANTS = {"quantization-1": VARIANTS[:4], "quantization-2": ("ptq-int3", "qat-int3")}
+# Quantization-2 must equal Quantization-1 here, so it reuses its preparation and QAT data.
+SHARED_BLOCKS = ("seed", "model", "backend", "scope", "data", "qat", "evaluation")
+QAT_BUDGETS = ("100000000", "1000000000")
 
 
 def utc_now():
@@ -38,8 +47,25 @@ def resolve_path(path):
 
 def load_settings(path, qat_tokens=None):
     settings = read_json(resolve_path(path))
-    if settings.get("workflow") != "quantization-1" or settings.get("schema_version") != 1:
-        raise ValueError("Expected a Quantization-1 configuration")
+    workflow = settings.get("workflow")
+    if workflow not in WORKFLOW_VARIANTS or settings.get("schema_version") != 1:
+        raise ValueError("Expected a Quantization-1 or Quantization-2 configuration")
+    if workflow == "quantization-2":
+        reference = read_json(DEFAULT_CONFIG)
+        for key in SHARED_BLOCKS:
+            # A run's effective configuration carries its own QAT budget; nothing else may differ.
+            ours, theirs = settings.get(key), reference[key]
+            if key == "qat" and isinstance(ours, dict):
+                ours, theirs = ({name: value for name, value in block.items() if name != "target_tokens"}
+                                for block in (ours, theirs))
+            if ours != theirs:
+                raise ValueError(f"Quantization-2 must reuse Quantization-1's {key} block")
+        streams = settings.get("recovery_stream_sha256") or {}
+        if tuple(sorted(streams, key=int)) != QAT_BUDGETS or not all(
+                isinstance(value, str) and len(value) == 64 for value in streams.values()):
+            raise ValueError("Quantization-2 pins the 100M and 1B QAT streams by sha256")
+        if set(settings.get("runtime", {})) != {"attention_implementation"}:
+            raise ValueError("Quantization-2 measures resident memory but no speed")
     if qat_tokens is not None:
         settings["qat"]["target_tokens"] = qat_tokens
     if settings["scope"]["eligible_layers"] != list(range(1, 23)):
@@ -72,9 +98,9 @@ def load_settings(path, qat_tokens=None):
     tokens = settings["qat"]["target_tokens"]
     if tokens is not None and (type(tokens) is not int or tokens < 1):
         raise ValueError("QAT requires an explicitly specified positive integer token budget")
-    if any(value not in VARIANTS for value in settings["variants"]):
+    if any(value not in WORKFLOW_VARIANTS[workflow] for value in settings["variants"]):
         raise ValueError("Unknown default quantization variant")
-    if "qat-int4" in settings["variants"]:
+    if any(value.startswith("qat-") for value in settings["variants"]):
         raise ValueError("QAT is optional and cannot be in the default run list")
     if settings["runtime"]["attention_implementation"] != "sdpa":
         raise ValueError("Quantization-1 uses the common eager SDPA execution path")
@@ -127,7 +153,7 @@ def start_artifact(directory, settings, command, identity, resume):
         directory.mkdir(parents=True)
         log = ExperimentLog(directory / "run.json", settings)
         log.data["environment"] = environment
-        artifact = {"schema_version": 1, "workflow": "quantization-1", "command": command,
+        artifact = {"schema_version": 1, "workflow": settings["workflow"], "command": command,
                     "identity": identity, "configuration": settings,
                     "run_fingerprint": fingerprint, "source_hashes": contract["source_hashes"],
                     "status": "running", "created_at": utc_now(), "results": {}}
@@ -334,7 +360,7 @@ def cpu_tree(value):
     return value
 
 
-def recover_qat(student, teacher, tokenizer, paths, directory, work_dir, artifact, log,
+def recover_qat(student, teacher, tokenizer, paths, bits, directory, work_dir, artifact, log,
                 prepared_root, prepared, settings):
     """Adapt the established exact-token loop, not a second optimizer loop."""
 
@@ -344,7 +370,7 @@ def recover_qat(student, teacher, tokenizer, paths, directory, work_dir, artifac
         capture_rng, commit_single_checkpoint, recover_exact_segment, restore_checkpoint,
         restore_rng, segment_schedule,
     )
-    from mlp_replacement.compression.quantization import prepare_int4_qat
+    from mlp_replacement.compression.quantization import prepare_qat
     from mlp_replacement.data import PackedTokenCache
     from mlp_replacement.data_streams import build_finite_stream
     from mlp_replacement.evaluation.final_quality import evaluate_rolling_likelihood
@@ -384,12 +410,16 @@ def recover_qat(student, teacher, tokenizer, paths, directory, work_dir, artifac
         stream = build_finite_stream(records, tokenizer, stream_path, budget, text_column=source["text_column"])
         stream["fingerprint"] = stream_contract
         write_json_atomic(descriptor, stream)
+    pinned = settings.get("recovery_stream_sha256")
+    if pinned is not None and stream["sha256"] != pinned.get(str(budget)):
+        # Quantization-2 trains on exactly the tokens Quantization-1's INT4 QAT used (decision log, 2026-10-20).
+        raise ValueError("QAT stream differs from the pinned stream of Quantization-1's INT4 QAT at this budget")
     prior = artifact["results"].get("recovery_stream")
     durable = {key: value for key, value in stream.items() if key != "path"}
     if prior is not None and prior != durable:
         raise ValueError("Regenerated recovery stream changed on resume")
     artifact["results"]["recovery_stream"] = durable
-    parameters = prepare_int4_qat(student, paths)
+    parameters = prepare_qat(student, paths, bits)
     state = None
     checkpoints = directory / "checkpoints"
     if artifact["results"].get("recovery", {}).get("tokens_seen", 0) > 0 and not list(checkpoints.glob("checkpoint-*.json")):
@@ -482,14 +512,15 @@ def recover_qat(student, teacher, tokenizer, paths, directory, work_dir, artifac
 def build_variant_bundle(directory, work_dir, artifact, log, settings, prepared_root, prepared):
     import torch
     from mlp_replacement.compression.quantization import (
-        apply_ptq, convert_int4_qat, frozen_state_hashes, projection_paths,
+        apply_ptq, calculated_weight_bytes, convert_qat, frozen_state_hashes, projection_paths,
         quantization_footprint, recipe_record, require_backend, verify_frozen_state,
     )
     from mlp_replacement.evaluation.bundles import export_bundle
     from mlp_replacement.evaluation.quantized_bundles import export_quantized_bundle
 
     variant = artifact["identity"]["variant"]
-    bits = 4 if variant.endswith("int4") else 8 if variant.endswith("int8") else None
+    bits = {"int8": 8, "int4": 4, "int3": 3}.get(variant.rsplit("-", 1)[1])
+    qat = variant.startswith("qat-")
     require_backend(settings["backend"], bits)
     persist(directory, artifact, log, "model_loading")
     model, tokenizer = load_teacher(settings)
@@ -497,31 +528,36 @@ def build_variant_bundle(directory, work_dir, artifact, log, settings, prepared_
     if len(paths) != settings["scope"]["expected_projections"]:
         raise ValueError("Eligible projection count changed")
     before = quantization_footprint(model, paths)
+    # INT3 is stored one value per int8, so its size is calculated at 3.25 bits per weight
+    # (decision log, 2026-10-17); the measured footprint is kept as the container size.
+    calculated = calculated_weight_bytes(model, paths, bits) if bits == 3 else None
     teacher = None
     started = perf_counter()
     try:
-        if variant == "qat-int4":
+        if qat:
             frozen = frozen_state_hashes(model, paths)
             teacher, unused_tokenizer = load_teacher(settings)
-            recover_qat(model, teacher, tokenizer, paths, directory, work_dir, artifact, log,
+            recover_qat(model, teacher, tokenizer, paths, bits, directory, work_dir, artifact, log,
                         prepared_root, prepared, settings)
             verify_frozen_state(model, paths, frozen)
             artifact["results"]["recovery_wall_seconds"] = perf_counter() - started
             started = perf_counter()
-            artifact["results"]["conversion"] = convert_int4_qat(model, paths)
+            artifact["results"]["conversion"] = convert_qat(model, paths, bits)
             verify_frozen_state(model, paths, frozen)
         elif bits:
             artifact["results"]["conversion"] = apply_ptq(model, paths, bits)
         artifact["results"]["conversion_seconds"] = perf_counter() - started
         artifact["results"]["quantization_recipe"] = recipe_record(bits) if bits else None
-        provenance = {"workflow": "quantization-1", "run_fingerprint": artifact["run_fingerprint"],
+        if calculated is not None:
+            artifact["results"]["calculated_footprint"] = calculated
+        provenance = {"workflow": settings["workflow"], "run_fingerprint": artifact["run_fingerprint"],
                       "model": settings["model"], "scope": settings["scope"], "variant": variant,
-                      "training_tokens": settings["qat"]["target_tokens"] if variant == "qat-int4" else 0}
+                      "training_tokens": settings["qat"]["target_tokens"] if qat else 0}
         persist(directory, artifact, log, "bundle_export")
         started = perf_counter()
         if bits:
             manifest = export_quantized_bundle(model, tokenizer, directory / "model", paths, bits,
-                                                settings["backend"], provenance)
+                                                settings["backend"], provenance, calculated_bytes=calculated)
         else:
             manifest = export_bundle(model, tokenizer, directory / "model", [], provenance)
         artifact["results"]["export_seconds"] = perf_counter() - started
@@ -669,8 +705,8 @@ def report(directory, artifact, log, settings, result_paths):
     for path in result_paths:
         path = resolve_path(path)
         run = read_json(path)
-        if run["workflow"] != "quantization-1" or run["status"] != "completed" or "evaluation" not in run["results"]:
-            raise ValueError(f"Report requires a completed Quantization-1 evaluation: {path}")
+        if run["workflow"] not in WORKFLOW_VARIANTS or run["status"] != "completed" or "evaluation" not in run["results"]:
+            raise ValueError(f"Report requires a completed Quantization-1 or -2 evaluation: {path}")
         loaded.append((path.parent, run))
     dense_runs = [(root, run) for root, run in loaded if run["identity"].get("variant") == "dense-bf16"]
     if len(dense_runs) != 1:
@@ -705,18 +741,27 @@ def report(directory, artifact, log, settings, result_paths):
             }
         footprint = result["footprint"]
         name = run["identity"].get("variant") or str(run["identity"].get("label", "reference"))
-        row = {"variant": name, "status": "completed", "result_sha256": file_digest(root / "result.json"),
+        if name.startswith("qat-"):
+            name = f"{name}-{result['training_tokens'] // 1_000_000}M"
+        # INT3 sits on the frontier at its calculated size; every other format at its measured size.
+        calculated = result.get("calculated_footprint")
+        frontier_bytes = calculated["weight_bytes"] if calculated else footprint["weight_storage_bytes"]
+        row = {"variant": name, "workflow": run["workflow"], "status": "completed",
+               "result_sha256": file_digest(root / "result.json"),
                "quality_protocol": protocol, **footprint,
                "whole_model_parameter_removal": 1 - footprint["logical_parameters"] / dense_footprint["logical_parameters"],
                "eligible_parameter_removal": 1 - footprint["eligible_parameters"] / dense_footprint["eligible_parameters"],
                "whole_model_weight_byte_savings": 1 - footprint["weight_storage_bytes"] / dense_footprint["weight_storage_bytes"],
                "eligible_weight_byte_savings": 1 - footprint["eligible_weight_storage_bytes"] / dense_footprint["eligible_weight_storage_bytes"],
+               "frontier_basis": "calculated" if calculated else "measured",
+               "frontier_weight_bytes": frontier_bytes,
+               "whole_model_frontier_byte_savings": 1 - frontier_bytes / dense_footprint["weight_storage_bytes"],
                "training_tokens": result["training_tokens"], "calibration_tokens": result.get("calibration_tokens"),
                "test_ppl_8192": evaluation["likelihood"]["test-8192"]["perplexity"],
                "likelihood": evaluation["likelihood"], "kl": evaluation["kl"],
                "kl_8192": evaluation["kl"]["kl"], "tasks": tasks,
                "macro_accuracy": sum(item["accuracy"] for item in tasks.values()) / len(tasks),
-               "runtime_comparable_to_dense": result["runtime"]["execution_fingerprint"] == dense_runtime,
+               "runtime_comparable_to_dense": result["runtime"].get("execution_fingerprint") == dense_runtime,
                "runtime": result["runtime"],
                "quantization_recipe": result.get("quantization_recipe"),
                "resources": result.get("resources"),
@@ -745,7 +790,8 @@ def report(directory, artifact, log, settings, result_paths):
     columns = ["variant", "status", "logical_parameters", "eligible_parameters",
                "whole_model_parameter_removal", "eligible_parameter_removal",
                "weight_storage_bytes", "eligible_weight_storage_bytes", "eligible_weight_byte_savings",
-               "whole_model_weight_byte_savings", "tensor_file_bytes", "bundle_bytes", "kl_8192",
+               "whole_model_weight_byte_savings", "frontier_basis", "frontier_weight_bytes",
+               "whole_model_frontier_byte_savings", "tensor_file_bytes", "bundle_bytes", "kl_8192",
                "macro_accuracy", "training_tokens", "runtime_comparable_to_dense",
                "conversion_seconds", "export_seconds", "evaluation_seconds", "recovery_seconds",
                "workflow_gpu_hours_proxy", "resident_gpu_bytes", "resident_rss_bytes"]
@@ -755,7 +801,7 @@ def report(directory, artifact, log, settings, result_paths):
         columns += [f"{task}_accuracy", f"{task}_delta", f"{task}_ci_low", f"{task}_ci_high"]
     speed_metrics = ("time_to_first_token_ms", "mean_subsequent_token_latency_ms",
                      "generation_latency_ms", "output_tokens_per_second", "peak_gpu_allocated_bytes")
-    for workload in settings["runtime"]["workloads"]:
+    for workload in settings["runtime"].get("workloads", []):
         prefix = f"b{workload['batch_size']}_p{workload['prompt_tokens']}"
         columns += [f"{prefix}_{metric}" for metric in speed_metrics]
     csv_rows = []
@@ -785,7 +831,7 @@ def report(directory, artifact, log, settings, result_paths):
         stream.flush()
         os.fsync(stream.fileno())
     temporary.replace(directory / "comparison.csv")
-    lines = ["# Quantization-1 comparison", "", "| Variant | Status | Weight bytes | 8K test PPL | Task macro | Training tokens |",
+    lines = ["# Quantization comparison", "", "| Variant | Status | Weight bytes | 8K test PPL | Task macro | Training tokens |",
              "| --- | --- | ---: | ---: | ---: | ---: |"]
     for row in rows:
         lines.append("| " + " | ".join(str(row.get(key, "—")) for key in
@@ -849,6 +895,16 @@ def runtime_worker(args, settings):
     from mlp_replacement.compression.quantization import require_backend
 
     require_backend(settings["backend"], None)
+    if "workloads" not in settings["runtime"]:
+        # Quantization-2: the shared resident-memory protocol only, no speed (decision log, 2026-10-20).
+        from mlp_replacement.evaluation.bundles import measure_resident_bundle
+        from mlp_replacement.evaluation.quantized_bundles import load_inference_bundle
+
+        bundle = resolve_path(args.bundle)
+        result = {"resident_memory": measure_resident_bundle(bundle, loader=load_inference_bundle),
+                  "speed": None, "bundle_manifest_sha256": file_digest(bundle / "bundle.json")}
+        write_json_atomic(resolve_path(args.output_dir) / "runtime.json", result)
+        return
     root, prepared = load_prepared(args.prepared, settings)
     values = verified_tokens(root, prepared["corpora"]["validation"])
     result = measure_bundle_runtime(resolve_path(args.bundle), values, settings["runtime"])
@@ -916,7 +972,11 @@ def main():
         raise ValueError("Run/evaluate requires --prepared RESULT_JSON")
     if args.command == "run" and args.variant is None:
         raise ValueError("Run requires one explicit --variant")
-    if args.variant == "qat-int4" and settings["qat"]["target_tokens"] is None:
+    if args.variant is not None and args.variant not in WORKFLOW_VARIANTS[settings["workflow"]]:
+        raise ValueError(f"{settings['workflow']} does not define variant {args.variant}")
+    if settings["workflow"] == "quantization-2" and args.command in ("prepare", "evaluate"):
+        raise ValueError("Quantization-2 reuses Quantization-1's prepare-001 and evaluates only its own runs")
+    if args.variant is not None and args.variant.startswith("qat-") and settings["qat"]["target_tokens"] is None:
         raise ValueError("QAT is optional and requires --qat-tokens or a configured target_tokens")
     if args.command == "evaluate" and not args.bundle:
         raise ValueError("Evaluate requires a deployment --bundle")
@@ -929,7 +989,7 @@ def main():
         if directory == prepared_root or directory.is_relative_to(prepared_root):
             raise ValueError("Run output cannot be inside immutable prepared inputs")
     if args.command == "run":
-        identity.update(variant=args.variant, qat_tokens=settings["qat"]["target_tokens"] if args.variant == "qat-int4" else 0)
+        identity.update(variant=args.variant, qat_tokens=settings["qat"]["target_tokens"] if args.variant.startswith("qat-") else 0)
     if args.command == "evaluate":
         bundle = resolve_path(args.bundle)
         if directory == bundle or directory.is_relative_to(bundle):

@@ -7,6 +7,7 @@ These files hold explicit scientific settings for the matching
 | --- | --- | --- |
 | [compression.json](compression.json) | Fixed interleaved SwiGLU replacement and fitting-method comparisons. | [Compression baseline](../../../../docs/experiments/model/baseline/compression-baseline.md) |
 | [quantization-1.json](quantization-1.json) | MLP-only INT8/INT4 PTQ, optional INT4 QAT, and final quality and deployment measurements using the frozen SwiGLU-7 reference. | [Quantization-1](../../../../docs/experiments/model/baseline/quantization-1.md) |
+| [quantization-2.json](quantization-2.json) | The dense INT3 baseline (PTQ, optional INT3 QAT) on Quantization-1's runner; must equal Quantization-1's shared blocks, pins the 100M and 1B QAT streams, and measures no speed. | [Quantization-2](../../../../docs/experiments/model/baseline/quantization-2.md) |
 | [speed-1.json](speed-1.json) | The 12 saved bundles timed in one job, each pinned by its manifest sha256, with forward and reverse passes. | [Speed-1](../../../../docs/experiments/model/baseline/speed-1.md) |
 
 Quantization-1 leaves the QAT token budget unset and excludes QAT from its
