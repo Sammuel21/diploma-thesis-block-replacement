@@ -256,25 +256,6 @@
         "export",
         "evaluate"
       ]
-    },
-    "Q-PTQ": {
-      "upstream": [],
-      "stages": [
-        "load_dense",
-        "ptq",
-        "export",
-        "evaluate"
-      ]
-    },
-    "Q-QAT": {
-      "upstream": [],
-      "stages": [
-        "load_dense",
-        "qat_recover",
-        "convert",
-        "export",
-        "evaluate"
-      ]
     }
   },
   "grid": {
@@ -322,18 +303,6 @@
       "bits": [
         4,
         3
-      ]
-    },
-    "dense": {
-      "variants": [
-        {
-          "order": "Q-PTQ",
-          "bits": 3
-        },
-        {
-          "order": "Q-QAT",
-          "bits": 3
-        }
       ]
     }
   },
@@ -463,8 +432,8 @@
         "arm": "fitted",
         "target": 0.8,
         "recovery_tokens": 1000000000,
-        "result_sha256": null,
-        "bundle_sha256": null
+        "result_sha256": "69b86261078aa63d45c5acafdfe2f03b4c25a8c2b0cb0a1a99369592dcbc959d",
+        "bundle_sha256": "1f384bb4e9af4fddf58669bf921eaa9ebed89b6774434012e9cf3f4481ea862f"
       }
     }
   },

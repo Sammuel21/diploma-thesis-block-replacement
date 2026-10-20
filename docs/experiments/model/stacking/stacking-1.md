@@ -2,20 +2,22 @@
 title: Stacking-1 - SwiGLU Replacement Plus Weight Quantization
 status: active
 created: 2026-10-17
-modified: 2026-10-17
+modified: 2026-10-20
 ---
 
 # Stacking-1 - SwiGLU Replacement Plus Weight Quantization
 
 **Status:** design settled on 2026-10-17 in a grilling session after the
 [supervisor meeting of 2026-10-16](../../../meetings/2026-10-16-supervisor-feedback.md).
-Implemented on 2026-10-17 without any run (see [Implementation](#implementation));
-the [pre-run resource plan](#pre-run-resource-plan) is recorded. **Next step:**
-the pre-submission checks and submissions in the
+Implemented on 2026-10-17 without any run (see [Implementation](#implementation)).
+Revised on 2026-10-20 in a second grilling session: the dense INT3 runs moved
+to the Quantization-2 baseline, leaving 48 stacked runs, and SwiGLU-9's fitted
+80% model is pinned, so every run can be submitted at once. The
+[pre-run resource plan](#pre-run-resource-plan) is recorded. **Next step:**
+the pre-submission checks and the single submission in the
 [PERUN runbook](../../../infrastructure/perun/perun-runbook.md#10-stacking-1),
-after the researcher's go, from a second PERUN clone while SwiGLU-9 runs.
-The order-A runs on the 1B models wait for SwiGLU-9. The binding decisions
-are the 2026-10-16 and 2026-10-17 rows in the
+after the researcher's go. The binding decisions are the 2026-10-16,
+2026-10-17, and 2026-10-20 rows in the
 [shared decision log](../../../agents/decisions.md); if this page and the log
 disagree, the log wins until the conflict is raised.
 
@@ -43,6 +45,11 @@ KL, test perplexity, task macro accuracy), and each plot includes SwiGLU
 alone, quantization alone, and the stacked models. Quantization alone,
 including INT3, must be on the same plot; otherwise a stacked model could look
 like a winner only because its strongest equal-size competitor is missing.
+Quantization alone comes from the baselines: INT8 and INT4 from
+[Quantization-1](../baseline/quantization-1.md), INT3 PTQ and INT3 QAT at 100M
+and 1B from Quantization-2 (decision log, 2026-10-20). A stacked model
+applies at least two kinds of redundancy reduction (structural, numerical, or
+algebraic); quantizing the dense model alone is a baseline, not stacking.
 
 Approximate whole-model byte savings (offline arithmetic: eligible MLPs are
 about 64.8% of the BF16 bytes; INT8 costs about 8 bits, INT4 4.25, INT3 3.25
@@ -73,12 +80,11 @@ stage (structural, numerical, and algebraic redundancy as three stage kinds).
 | Order A: quantize after recovery | replace → fit → recover (BF16) → PTQ → evaluate |
 | Order B: train while quantized | replace → fit → recover with simulated quantization (QAT) → convert to real integers → evaluate |
 | Order C (deferred) | replace → fit → recover (BF16) → QAT → convert → evaluate |
-| Quantization alone (0% row) | dense model → PTQ or QAT → evaluate |
 
 In the configuration, the stages that already ran in SwiGLU-7, -8, or -9
 (replace, fit, recover) are recorded as upstream provenance; the runner
-executes `load_recovered|load_start|load_dense → pad → ptq|qat_recover →
-convert → export → evaluate`.
+executes `load_recovered|load_start → pad → ptq|qat_recover → convert →
+export → evaluate`.
 
 **Quantized scope:** every MLP linear layer in layers 1-22, as in
 Quantization-1, including layers the allocator kept dense. Attention,
@@ -86,7 +92,8 @@ embeddings, norms, and layers 0 and 23 stay BF16.
 
 ## Run grid
 
-50 runs. **Order A**, conversion and evaluation only:
+48 runs, stacked models only (decision log, 2026-10-20). **Order A**,
+conversion and evaluation only:
 
 | SwiGLU models | INT8 | INT4 | INT3 | Runs |
 | --- | :---: | :---: | :---: | ---: |
@@ -97,7 +104,8 @@ embeddings, norms, and layers 0 and 23 stay BF16.
 The slice-only rows answer question 3 at no training cost. The 1B rows are
 fitted only: fitted versus slice-only at 1B is SwiGLU-9's question, and
 Stacking-1 does not test gap closing (decision log, 2026-10-17). They run
-after SwiGLU-9 finishes; its fitted 80% model is pinned then.
+from SwiGLU-9's fitted 80% model, pinned on 2026-10-20 after SwiGLU-9
+finished.
 
 **Order B**, QAT recovery from SwiGLU-8's token-0 starts, 100M tokens, 6 runs:
 
@@ -109,9 +117,26 @@ Order B trains SwiGLU-8's S7-0 scope (the replacement modules only); every
 projection in layers 1-22 is fake-quantized, including the dense-kept layers,
 which stay frozen as they are in order A.
 
-**Quantization alone (0% row):** INT3 PTQ and INT3 QAT at 100M, 2 runs. The
-INT3 QAT trains all 66 projections, as Quantization-1's QAT did. INT8 and
-INT4 alone come from Quantization-1.
+**Quantization alone** is not part of Stacking-1. The dense INT3 PTQ and
+INT3 QAT runs planned here on 2026-10-17 moved to Quantization-2, which runs
+on Quantization-1's runner and adds INT3 QAT at 1B (decision log,
+2026-10-20).
+
+**Why order B stays at 100M.** Order A already has 1B rows because the 1B
+SwiGLU models exist and quantizing them costs only an evaluation. Order B at
+1B would cost about 15-20 GPU-hours per run, 90-120 in total. Dense INT4 QAT
+gained almost nothing from 1B tokens over 100M in Quantization-1 (8K KL
+0.0352 against 0.0360), so 1B order-B runs are justified only if the 100M
+results show that order A and order B differ. That decision is taken after the
+100M results (decision log, 2026-10-20).
+
+**Why the fitted models, and why slice-only only at 100M.** SwiGLU-9 found
+that local fitting no longer matters after 1B recovery tokens (8K KL gap
+0.3-2.8%), but it still does at 100M (10-18%). Quantizing both arms at 1B
+would therefore be redundant, while the 100M slice-only rows are the only test
+of whether quantization changes fitting's head start. Every model used here
+already exists, so the choice of arm costs no GPU time (decision log,
+2026-10-20).
 
 **Order comparison:** A and B both use 100M training tokens in total. Order C
 runs only if A and B differ clearly, and is then compared with B at equal
@@ -218,7 +243,7 @@ Each check stops the run if it fails, except where noted.
 | Check | What it compares | Tolerance |
 | --- | --- | --- |
 | K1 | Order A: the source bundle manifest's sha256 equals the configuration pin and the source result's record | exact |
-| K2 | Order A and the dense variants: the monitoring perplexity of the loaded BF16 input equals the source run's `monitoring_after_bf16` (or SwiGLU-8's dense `monitoring_validation`) | relative 1e-4 |
+| K2 | Order A: the monitoring perplexity of the loaded BF16 input equals the source run's `monitoring_after_bf16` | relative 1e-4 |
 | K3 | Order B: the token-0 monitoring KL and perplexity of the start, before padding and fake quantization, equal SwiGLU-8's token-0 row | relative 1e-4 |
 | K4 | INT8 and INT4: calculated eligible bytes equal measured eligible bytes | exact |
 | K5 | Padded models: the deployed bundle's padded neurons output exactly zero gate and up values on one monitoring batch; order B also checks that the padded master weights are still zero after training (`K5-training`) | exact |
@@ -250,16 +275,15 @@ and -9 code is not modified; Stacking-1 imports their helpers.
 **Commands.** One variant per process; the variant id fixes everything else.
 
 ```bash
-python -m workflows.runs.model.stacking.stacking_1 list-variants --group a100m   # a100m, a1b, b, dense
+python -m workflows.runs.model.stacking.stacking_1 list-variants --group a100m   # a100m, a1b, b
 bash workflows/jobs/local/stacking_1.sh run --variant a-fitted-0.2-100m-int3 \
   --prepared data/results/workflows/model/swiglu-8/prepare-001/result.json \
   --source-root data/results/workflows/model \
   --output-dir data/results/workflows/model/stacking-1/a-fitted-0.2-100m-int3-001
 ```
 
-Variant ids are `a-{arm}-{target}-{100m|1b}-int{8,4,3}`,
-`b-fitted-{target}-100m-int{4,3}`, `q-dense-ptq-int3`, and
-`q-dense-qat-100m-int3`. Each output holds `result.json`, `run.json`, the
+Variant ids are `a-{arm}-{target}-{100m|1b}-int{8,4,3}` and
+`b-fitted-{target}-100m-int{4,3}`. Each output holds `result.json`, `run.json`, the
 packed `model/` bundle, and the benchmark records; QAT runs keep a 25M-token
 checkpoint while running, deleted after the result is validated. A completed
 bundle is reused on resume, and the run fingerprint covers the configuration,
@@ -275,35 +299,44 @@ library's two rounding paths differ, and matching the scale precision did not
 remove it. GPU execution, MSLK kernels, autocast on INT3 weights, and full
 evaluation are untested and are part of the intended runs.
 
+On 2026-10-20 the dense group was removed and SwiGLU-9's fitted 80% model was
+pinned from the copy of its run on the researcher's PC (`result.json`
+sha256 `69b86261…`, bundle manifest `1f384bb4…`; the result's own manifest
+record equals the bundle digest). The pre-submission check compares both
+values with the files on PERUN. CPU only: the 15 contract tests give 11
+passes and 4 TorchAO skips in the project's Python, and the full suite passes
+(120 tests, 5 skipped).
+
 ## Pre-run resource plan
 
-Recorded 2026-10-17 under the [PERUN resource contract](../../../infrastructure/perun/perun-resources.md).
-Estimates, not measurements.
+Recorded 2026-10-17 under the [PERUN resource contract](../../../infrastructure/perun/perun-resources.md)
+and revised on 2026-10-20 for the 48-run grid. Estimates, not measurements.
 
 | Group | Tasks | Per task, expected | GPU-h expected | Time limit | Ceiling GPU-h | Basis | Confidence |
 | --- | ---: | --- | ---: | --- | ---: | --- | --- |
 | A 100M (`a100m`) | 33 | 0.3-0.5 h | 10-17 | 2 h | 66 | SwiGLU-8 final evaluation 849 s with the 8K KL; Quantization-1 evaluations 0.27-0.29 h; INT3 dequantization adds an estimated 5 min | Medium |
 | A 1B (`a1b`) | 9 | 0.3-0.5 h | 2.5-4.5 | 2 h | 18 | same | Medium |
 | B (`b`) | 6 | 1.5-3 h | 9-18 | 6 h | 36 | SwiGLU-8 recovery 1.03 h per 100M; Quantization-1 QAT 1.51 h; INT3 fake-quantization overhead unknown | Low |
-| INT3 PTQ / QAT (`dense`) | 2 | 0.4 h / 2-3.5 h | 2.5-4 | 2 h / 6 h | 8 | Quantization-1 QAT 100M 1.63 h in total | Low |
-| **Total** | **50** | | **about 24-44** | | **128** | | |
+| **Total** | **48** | | **about 22-40** | | **120** | | |
 
 - **Per task:** one H200, 8 CPUs, 128 GiB RAM, `gpu_short`; one process,
-  no communication between tasks. Expected CPU use 190-350 core-hours;
-  requested ceiling 1,024 core-hours.
+  no communication between tasks. Expected CPU use 170-320 core-hours;
+  requested ceiling 960 core-hours.
 - **Parallelism:** at most 12 running tasks (`MaxJobs`), 48 submitted
   (`MaxSubmitJobs`, array tasks counted individually), and new submissions
-  refused while 4 of your jobs run (perun-status.md). The 100M order-A
-  array and the QAT/dense jobs are therefore two submission blocks
-  (runbook 10.2-10.3). Critical path about 3-4 h for the 100M blocks once
-  running.
+  refused while 4 of your jobs run (perun-status.md). The 48 tasks are
+  exactly the submission limit, so they go in one sitting while none of your
+  jobs is queued: three array submissions with a delayed start, order B
+  first because its tasks are the longest (runbook 10.2). Critical path about
+  3-4 h once running.
 - **Memory:** peak VRAM 14-16 GiB for evaluation (Quantization-1 measured
   13.9-15.4); under 40 GiB for QAT (reasoning, not a measurement).
-- **Storage:** PROJECT about 75-105 GB of packed bundles (INT3 is stored at
+- **Storage:** PROJECT about 70-100 GB of packed bundles (INT3 is stored at
   INT8 size, 1.4-2.1 GB each). SCRATCH per task: the source bundle (up to
   3.4 GB) and output (up to 2.2 GB); QAT tasks add the 0.4 GB stream and up to
-  two checkpoint generations, about 27 GB for the dense INT3 QAT. About 210 of
-  8,424 project GPU-hours were used before Stacking-1.
+  two checkpoint generations. About 265 of 8,424 project GPU-hours were used
+  before Stacking-1 (about 210 recorded on 2026-10-17 plus SwiGLU-9's 55.5
+  workflow-timing hours).
 
 ## Limits
 

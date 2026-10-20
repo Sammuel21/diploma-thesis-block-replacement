@@ -3,9 +3,10 @@
 ``run --variant ID`` executes one variant's ordered stage list from the
 configuration. Order A quantizes a recovered SwiGLU-7, -8, or -9 model after
 recovery (PTQ). Order B recovers SwiGLU-8's fitted token-zero start for 100M
-tokens while quantization is simulated (QAT), then converts it. The dense
-variants are the INT3 quantization-only baseline. Every variant is evaluated
-like SwiGLU-8's final evaluation plus the shared 8K teacher KL.
+tokens while quantization is simulated (QAT), then converts it. Quantization
+of the dense model alone is a baseline and belongs to Quantization-2, not
+here. Every variant is evaluated like SwiGLU-8's final evaluation plus the
+shared 8K teacher KL.
 ``list-variants`` prints a group's variant ids in array order, ``inputs``
 prints the files one variant reads for the job script to stage, and
 ``measure-bundle`` measures resident memory in a fresh process. The binding
@@ -73,14 +74,12 @@ SWIGLU8_CONFIG = Path("workflows/configs/model/swiglu/swiglu-8.json")
 QUANTIZATION_CONFIG = Path("workflows/configs/model/baseline/quantization-1.json")
 DEFAULT_SOURCE_ROOT = Path("data/results/workflows/model")
 MEASURE_MODULE = "workflows.runs.model.stacking.stacking_1"
-GROUPS = ("a100m", "a1b", "b", "dense")
+GROUPS = ("a100m", "a1b", "b")
 # Decided stage lists (decision log, 2026-10-17). Upstream stages ran in SwiGLU-7, -8,
 # or -9 and are recorded for provenance only.
 ORDERS = {
     "A": {"upstream": ["replace", "fit", "recover"], "stages": ["load_recovered", "pad", "ptq", "export", "evaluate"]},
     "B": {"upstream": ["replace", "fit"], "stages": ["load_start", "pad", "qat_recover", "convert", "export", "evaluate"]},
-    "Q-PTQ": {"upstream": [], "stages": ["load_dense", "ptq", "export", "evaluate"]},
-    "Q-QAT": {"upstream": [], "stages": ["load_dense", "qat_recover", "convert", "export", "evaluate"]},
 }
 QUANTIZATION = {
     "bits": [8, 4, 3],
@@ -97,11 +96,11 @@ A100M_SOURCES = [
 # Fitted only: fitted versus slice-only at 1B is SwiGLU-9's question (decision log, 2026-10-17).
 A1B_SOURCES = ["fitted-0.2-1b", "fitted-0.5-1b", "fitted-0.8-1b"]
 B_STARTS = ["fitted-0.2", "fitted-0.5", "fitted-0.8"]
+# 48 runs, stacked models only (decision log, 2026-10-20).
 GRID = {
     "a100m": {"order": "A", "sources": A100M_SOURCES, "bits": [8, 4, 3]},
     "a1b": {"order": "A", "sources": A1B_SOURCES, "bits": [8, 4, 3]},
     "b": {"order": "B", "starts": B_STARTS, "bits": [4, 3]},
-    "dense": {"variants": [{"order": "Q-PTQ", "bits": 3}, {"order": "Q-QAT", "bits": 3}]},
 }
 
 
@@ -141,13 +140,11 @@ def load_settings(path):
         raise ValueError("Stacking-1 pins exactly the models of its order-A grid")
     for name, model in models.items():
         expected_tokens = 100_000_000 if name.endswith("-100m") else 1_000_000_000
-        digests = (model.get("result_sha256"), model.get("bundle_sha256"))
-        pending = digests == (None, None) and model.get("workflow") == "swiglu-9"
         if (
             model.get("workflow") not in ("swiglu-7", "swiglu-8", "swiglu-9")
             or name != f"{model.get('arm')}-{model.get('target')}-{name.rsplit('-', 1)[1]}"
             or int(model.get("recovery_tokens", -1)) != expected_tokens
-            or not (pending or all(is_digest(value) for value in digests))
+            or not all(is_digest(model.get(key)) for key in ("result_sha256", "bundle_sha256"))
         ):
             raise ValueError(f"Source model {name} is not pinned consistently")
     return settings, path
@@ -167,9 +164,6 @@ def variant_table(settings):
             table[f"b-{start}-100m-int{bits}"] = {
                 "group": "b", "order": "B", "bits": bits, "start": start, "reference": f"{start}-100m",
             }
-    for entry in grid["dense"]["variants"]:
-        label = "ptq" if entry["order"] == "Q-PTQ" else "qat-100m"
-        table[f"q-dense-{label}-int{entry['bits']}"] = {"group": "dense", "order": entry["order"], "bits": entry["bits"]}
     return table
 
 
@@ -213,10 +207,7 @@ def start_target(spec):
 
 
 def source_model(settings, name):
-    model = settings["sources"]["models"][name]
-    if model["result_sha256"] is None:
-        raise ValueError(f"{name} is not pinned yet; add its SwiGLU-9 sha256 values after that run completes")
-    return model
+    return settings["sources"]["models"][name]
 
 
 def source_result(context, name):
@@ -274,22 +265,6 @@ def load_recovered(context):
     context.input_reference = {
         "perplexity": result["results"]["evaluation"]["monitoring_after_bf16"]["perplexity"],
         "source": f"{model_record['workflow']} {model_record['run']} monitoring_after_bf16",
-    }
-    record_input(context, context.model)
-
-
-def load_dense(context):
-    from mlp_replacement.config import make_model_config
-    from mlp_replacement.model import load_model_and_tokenizer
-
-    context.model, context.tokenizer = load_model_and_tokenizer(make_model_config(context.settings["model"]))
-    context.model.requires_grad_(False)
-    validated_attention_implementation(context.model)
-    context.replacements = []
-    context.artifact["results"]["source"] = {"name": "dense", "model": context.settings["model"], "training_tokens": 0}
-    context.input_reference = {
-        "perplexity": context.prepared["results"]["dense_evaluation"]["monitoring_validation"]["perplexity"],
-        "source": "swiglu-8 prepare-001 dense_evaluation monitoring_validation",
     }
     record_input(context, context.model)
 
@@ -445,9 +420,8 @@ def ptq_stage(context):
 
 
 def qat_groups(context, trainable):
-    group_name = "replacements" if context.spec["order"] == "B" else "eligible_mlp"
     return [{
-        "name": group_name,
+        "name": "replacements",
         "parameters": trainable,
         "parameter_names": parameter_names(context.model, trainable),
         "parameter_count": sum(value.numel() for value in trainable),
@@ -477,16 +451,13 @@ def qat_recover_stage(context):
     load_teacher_and_validation(context)
     context.paths = eligible_paths(context)
     context.calculated = calculated_weight_bytes(context.model, context.paths, bits)
-    if context.spec["order"] == "B":
-        replaced = {row["path"] for row in context.replacements}
-        trainable_paths = [path for path in context.paths if path.rsplit(".", 1)[0] in replaced]
-        # S7-0 scope: every parameter of the replacement modules, and nothing else.
-        modules = [context.model.get_submodule(path) for path in sorted(replaced)]
-        scope = {*parameter_names(context.model, unique_parameters(modules))}
-        if scope != {f"{path}.weight" for path in trainable_paths}:
-            raise ValueError("Order B must train exactly SwiGLU-8's S7-0 replacement scope")
-    else:
-        trainable_paths = list(context.paths)
+    replaced = {row["path"] for row in context.replacements}
+    trainable_paths = [path for path in context.paths if path.rsplit(".", 1)[0] in replaced]
+    # S7-0 scope: every parameter of the replacement modules, and nothing else.
+    modules = [context.model.get_submodule(path) for path in sorted(replaced)]
+    scope = {*parameter_names(context.model, unique_parameters(modules))}
+    if scope != {f"{path}.weight" for path in trainable_paths}:
+        raise ValueError("Order B must train exactly SwiGLU-8's S7-0 replacement scope")
     trainable = prepare_qat(context.model, context.paths, bits, trainable_paths)
     hooks = mask_padded_gradients(context.model, getattr(context, "padding", []))
     groups = qat_groups(context, trainable)
@@ -851,7 +822,6 @@ def evaluate_stage(context):
 STAGES = {
     "load_recovered": load_recovered,
     "load_start": load_start,
-    "load_dense": load_dense,
     "pad": pad_stage,
     "ptq": ptq_stage,
     "qat_recover": qat_recover_stage,
@@ -900,11 +870,9 @@ def run(args, settings, config_path):
         source_root = resolve_path(Path(args.source_root))
         if spec["order"] == "A":
             pins = source_model(settings, spec["source"])
-        elif spec["order"] == "B":
+        else:
             pins = {"start_sha256": prepared["results"]["starts"][start_key("fitted", start_target(spec))]["sha256"],
                     "reference": source_model(settings, spec["reference"])}
-        else:
-            pins = None
         contract = {
             "configuration": settings,
             "configuration_sha256": file_digest(config_path),
@@ -986,11 +954,10 @@ def variant_inputs(settings, spec, prepared):
     if spec["order"] == "A":
         model = source_model(settings, spec["source"])
         lines.append(f"source {model['workflow']}/{model['run']}")
-    if spec["order"] == "B":
+    else:
         model = source_model(settings, spec["reference"])
         lines.append(f"reference {model['workflow']}/{model['run']}/result.json")
         lines.append(f"prepared {results['starts'][start_key('fitted', start_target(spec))]['path']}")
-    if spec["order"] in ("B", "Q-QAT"):
         lines.append(f"prepared {results['stream']['path']}")
     return lines
 

@@ -69,25 +69,36 @@ class ConfigurationContracts(unittest.TestCase):
         self.assertEqual(self.settings["long_context"]["sequence_length"], quantization1["data"]["sequence_length"])
         self.assertEqual(self.settings["recovery"]["target_tokens"], 100_000_000)
 
-    def test_grid_has_the_decided_fifty_variants(self):
+    def test_grid_has_the_decided_forty_eight_stacked_variants(self):
         table = runner.variant_table(self.settings)
         counts = {group: sum(spec["group"] == group for spec in table.values()) for group in runner.GROUPS}
-        self.assertEqual(counts, {"a100m": 33, "a1b": 9, "b": 6, "dense": 2})
+        self.assertEqual(counts, {"a100m": 33, "a1b": 9, "b": 6})
+        self.assertEqual(len(table), 48)
+        # Quantization of the dense model alone is Quantization-2's baseline (decision log, 2026-10-20).
+        self.assertEqual({spec["order"] for spec in table.values()}, {"A", "B"})
         self.assertFalse([name for name in table if name.startswith("a-slice") and "-1b-" in name])
         self.assertEqual({spec["bits"] for spec in table.values() if spec["order"] == "B"}, {4, 3})
-        self.assertEqual(table["q-dense-qat-100m-int3"]["order"], "Q-QAT")
         self.assertEqual(table["b-fitted-0.8-100m-int3"]["reference"], "fitted-0.8-100m")
 
-    def test_pins_agree_with_swiglu9_and_wait_for_its_80_percent_model(self):
+    def test_pins_agree_with_swiglu9(self):
         swiglu9 = read_json(ROOT / "workflows/configs/model/swiglu/swiglu-9.json")["sources"]
         models = self.settings["sources"]["models"]
         self.assertEqual(self.settings["sources"]["swiglu8_prepare_sha256"], swiglu9["swiglu8_prepare_sha256"])
         for key, digest in swiglu9["swiglu8_runs_sha256"].items():
             arm, target = key.split(":")
             self.assertEqual(models[f"{arm}-{target}-100m"]["result_sha256"], digest)
-        self.assertIsNone(models["fitted-0.8-1b"]["result_sha256"])
-        with self.assertRaisesRegex(ValueError, "not pinned yet"):
-            runner.source_model(self.settings, "fitted-0.8-1b")
+        for target, digest in swiglu9["swiglu7_runs_sha256"].items():
+            self.assertEqual(models[f"fitted-{target}-1b"]["result_sha256"], digest)
+        self.assertEqual(models["fitted-0.8-1b"]["workflow"], "swiglu-9")
+
+    def test_unpinned_source_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "config.json"
+            changed = deepcopy(self.settings)
+            changed["sources"]["models"]["fitted-0.8-1b"]["result_sha256"] = None
+            write_json_atomic(path, changed)
+            with self.assertRaisesRegex(ValueError, "not pinned consistently"):
+                runner.load_settings(path)
 
     def test_changed_stage_lists_grid_or_shared_blocks_are_rejected(self):
         changes = [
