@@ -439,7 +439,8 @@ def qat_recover_stage(context):
         segment_origin, segment_schedule,
     )
     from mlp_replacement.compression.quantization import (
-        calculated_weight_bytes, mask_padded_gradients, padded_weights_are_zero, prepare_qat, require_backend,
+        calculated_weight_bytes, int3_fake_quantization_check, mask_padded_gradients, padded_weights_are_zero,
+        prepare_qat, require_backend,
     )
     from mlp_replacement.data import PackedTokenCache
     from workflows.runs.model.swiglu.shared import recovery_memory_record
@@ -459,6 +460,13 @@ def qat_recover_stage(context):
     if scope != {f"{path}.weight" for path in trainable_paths}:
         raise ValueError("Order B must train exactly SwiGLU-8's S7-0 replacement scope")
     trainable = prepare_qat(context.model, context.paths, bits, trainable_paths)
+    if bits == 3:
+        # K6: training sees exactly the deployed INT3 weights; convert_qat repeats it at conversion.
+        check = int3_fake_quantization_check(context.model, context.paths)
+        artifact["results"]["int3_fake_quantization_check"] = check
+        enforce(artifact, output_dir, "K6-start", [equality_check(
+            "K6", len(check["mismatched"]), 0, metric="int3_fake_differs_from_deployed_projections",
+            projections=check["projections"])])
     hooks = mask_padded_gradients(context.model, getattr(context, "padding", []))
     groups = qat_groups(context, trainable)
     artifact["results"]["trainable_scope"] = group_metadata(groups, context.model)

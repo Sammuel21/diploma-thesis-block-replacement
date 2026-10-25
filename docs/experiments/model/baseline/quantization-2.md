@@ -19,11 +19,14 @@ log, 2026-10-20).
 123646-123648, commit `d7d7c1e`); all three runs completed. INT3 PTQ is
 valid ([Results](#results-2026-10-25)). **Both INT3 QAT results are
 invalid:** the INT3 training-time quantizer does not reproduce the deployed
-INT3 format ([INT3 QAT incident](#int3-qat-incident-2026-10-25)). **Next
-step:** fix the INT3 training-time quantizer and rerun INT3 QAT as `-002`
-outputs, 100M first and 1B only if still wanted; the reruns are documented
-here when they finish. The binding decisions are the 2026-10-20 and
-2026-10-25 rows in the [shared decision log](../../../agents/decisions.md).
+INT3 format ([INT3 QAT incident](#int3-qat-incident-2026-10-25)). The
+fixed quantizer was implemented on 2026-10-25
+([INT3 QAT fix](#int3-qat-fix-2026-10-25)). **Next step:** submit
+`qat-int3-100m-002` together with Stacking-1's three order-B INT3 reruns
+(runbook 10.5 and 11.5, after the researcher's go); `qat-int3-1b-002` is
+decided after that. The reruns are documented here when they finish. The
+binding decisions are the 2026-10-20 and 2026-10-25 rows in the
+[shared decision log](../../../agents/decisions.md).
 
 ## Runs
 
@@ -32,8 +35,11 @@ here when they finish. The binding decisions are the 2026-10-20 and
 | INT3 PTQ | Round the 66 MLP projections to INT3, then evaluate | 0 | `int3-001` |
 | INT3 QAT 100M | Train the 66 projections for 100M tokens with INT3 simulated, convert to real INT3, evaluate | 100M | `qat-int3-100m-001` |
 | INT3 QAT 1B | The same for 1B tokens | 1,000M | `qat-int3-1b-001` |
+| INT3 QAT 100M, rerun (planned) | As above, with the fixed INT3 quantizer | 100M | `qat-int3-100m-002` |
+| INT3 QAT 1B, rerun (decided after the 100M rerun) | As above, with the fixed INT3 quantizer | 1,000M | `qat-int3-1b-002` |
 
-The INT4 counterparts are Quantization-1's `int4`, `qat-int4-100m`, and
+The two `-001` QAT runs are invalid and kept as evidence
+([INT3 QAT incident](#int3-qat-incident-2026-10-25)). The INT4 counterparts are Quantization-1's `int4`, `qat-int4-100m`, and
 `qat-int4-1b` runs. The 1B run gives Stacking-1's 1B stacked models an INT3
 competitor with equal training tokens (decision log, 2026-10-20).
 
@@ -52,12 +58,19 @@ Quantization-2's `seed`, `model`, `backend`, `scope`, `data`, `qat`, and
   round-to-nearest (`IntxWeightOnlyConfig(int3, PerGroup(128), ASYMMETRIC)`).
 - **INT3 QAT:** Quantization-1's recipe (KL to the dense teacher, AdamW at
   3e-5 with a constant schedule, 8,192-token sequences, a validation row every
-  25M tokens). INT3 is simulated with an explicit
-  `IntxFakeQuantizeConfig(int3, group 128, asymmetric)`, because TorchAO
-  infers fake quantization only for symmetric mapping. Gradients pass through
-  rounding by a straight-through estimator (`src-qat-jacob-2018`, Section 3;
-  `src-ste-bengio-2013`, Section 4). INT4 QAT uses TorchAO's dedicated INT4
-  fake quantizer, so the two QAT points do not share one implementation.
+  25M tokens). The `-001` runs simulated INT3 with TorchAO's
+  `IntxFakeQuantizeConfig(int3, group 128, asymmetric)`, which does not
+  reproduce the deployed INT3, so they are invalid
+  ([INT3 QAT incident](#int3-qat-incident-2026-10-25)). The `-002` reruns
+  use the project's `DeployedInt3FakeQuantizer`: its scale and zero point are
+  the deployed recipe's (the deployed equations in [Cause](#cause),
+  source-derived from `src-torchao-0-17-0`), computed on the BF16-cast weight,
+  so the simulated weights equal the deployed weights bit for bit
+  ([INT3 QAT fix](#int3-qat-fix-2026-10-25)). Gradients pass through rounding
+  by a straight-through estimator (`src-qat-jacob-2018`, Section 3;
+  `src-ste-bengio-2013`, Section 4), implemented by TorchAO's `_Round`. INT4
+  QAT uses TorchAO's dedicated INT4 fake quantizer, so the two QAT points do
+  not share one implementation.
 - **Calculated bytes.** TorchAO stores one int8 per INT3 value, about 8.2
   bits per weight. Each INT3 result therefore records two sizes: the measured
   container, and the calculated size at 3.25 bits per weight (3 bits plus a
@@ -108,6 +121,14 @@ Each check stops the run.
 | Stream | The QAT stream's sha256 equals the pinned stream for its budget |
 | Scope | Exactly the 66 projections are INT3 tensors of the expected type, block size, and dtypes; every other weight is unchanged (Quantization-1's checks) |
 | Bundle | The deployed footprint equals the bundle manifest after a fresh reload; tied embeddings are kept |
+| INT3 start (`-002` on) | After QAT preparation, before the first update: every projection's simulated INT3 weight is bitwise equal to the deployed recipe applied to the same weight (`results.int3_fake_quantization_check`) |
+| INT3 conversion (`-002` on) | At conversion: every projection's deployed INT3 weight is bitwise equal to the simulated weight of the trained master just before conversion (`results.conversion.int3_fake_equals_deployed`) |
+
+Recorded, not enforced: the token-0 8K KL of the simulated model (expected
+near INT3 PTQ's 0.2226; the `-001` runs started at 6.229) and the first-step
+gradient norm (`-001`: 308; INT4 QAT: 0.571). The 24-batch monitoring
+perplexity is not a gate: it mostly measures damage at target position 1
+(experiment-audit session, 2026-10-25).
 
 ## Implementation
 
@@ -139,6 +160,51 @@ bash workflows/jobs/local/quantization_1.sh run --config workflows/configs/model
   --output-dir data/results/workflows/model/quantization-2/qat-int3-100m-001
 ```
 
+### INT3 QAT fix (2026-10-25)
+
+Implemented on 2026-10-25 after the
+[INT3 QAT incident](#int3-qat-incident-2026-10-25), for Quantization-2 and
+Stacking-1 order B together (decision log, 2026-10-25). INT4 QAT and every PTQ
+path are unchanged.
+
+| File | Change |
+| --- | --- |
+| [quantization.py](../../../../src/mlp_replacement/compression/quantization.py) | `DeployedInt3FakeQuantizer` (below); `prepare_qat` wraps each INT3 projection in TorchAO's `FakeQuantizedLinear` with this quantizer instead of `IntxFakeQuantizeConfig`; `int3_fake_quantization_check` compares simulated and deployed weights; `convert_qat` stops if a converted INT3 weight differs from the trained simulated weight |
+| [quantization.py](../../../../workflows/runs/model/baseline/quantization.py) (runner) | Runs the check right after QAT preparation, records it, and stops before the first update on any mismatch |
+| [test_stacking1_contracts.py](../../../../tests/test_stacking1_contracts.py) | A planted +9.375 outlier; trained masters off the BF16 grid; the old TorchAO quantizer is caught by both checks; all 66 projections of the pinned SmolLM2-1.7B weights (skipped without TorchAO or the cached snapshot) |
+
+**The quantizer.** For each group of 128 weights, the scale and zero point
+are chosen exactly as the deployed recipe chooses them
+(`IntxUnpackedToInt8Tensor.from_hp`: `choose_qparams_affine`, asymmetric,
+range −4…3, int8 zero point, BF16 scale), on the master weight cast to BF16
+as `convert_qat` casts it. TorchAO's `_fake_quantize_affine` then quantizes and
+dequantizes with the same internal functions as the deployed path, without
+the int8 cast, which is exact for integers in −4…3. Its `_Round` passes
+gradients straight through. The equations are the deployed ones in
+[Cause](#cause). TorchAO's convert step reads the quantizer's `config` only to
+pass learned ranges; the project quantizer has none, so conversion applies the
+plain deployed recipe. `_fake_quantize_affine` and `_DTYPE_TO_QVALUE_BOUNDS`
+are private TorchAO names, acceptable under the 0.17.0 pin.
+
+**Effect on runs.** Every run fingerprint covers all maintained source, so no
+earlier Quantization-1 or -2 run can be resumed (all completed). The reruns
+write new `-002` outputs; the `-001` outputs stay as evidence. A `-002` run
+resumes only from unchanged code, configuration, and environment, so the
+PERUN checkout is not updated until the reruns finish.
+
+**What was tested** (2026-10-25, CPU, on the researcher's PC):
+
+- In a scratch environment with TorchAO 0.17.0 and PyTorch 2.11.0+cu128 (the
+  pinned versions), the three quantization test files pass (36 tests). These
+  include the real-weight test: all 66 projections of the cached
+  `effd688a` snapshot are bitwise equal after preparation, with three trained
+  masters (layers 1, 7, 22 `down_proj`) moved off the BF16 grid. The
+  22 `down_proj` outlier stays above +9, and the conversion check passes.
+- In the project's Python (no TorchAO), the full suite passes (130 tests, 8
+  skipped).
+- Not tested: GPU execution of the new quantizer and the checks. The in-run
+  checks on PERUN are the authority there.
+
 ## Pre-run resource plan
 
 Recorded 2026-10-20 under the
@@ -161,6 +227,30 @@ Estimates, not measurements.
   up to two checkpoint generations of about 13 GB each.
 - **Timeout:** a run that hits its limit resumes from its last 25M-token
   checkpoint, but only from unchanged code, configuration, and environment.
+
+### Reruns with the fixed quantizer (recorded 2026-10-25)
+
+Estimates, not measurements, based on the measured `-001` runs, which ran the
+same stages; the two new weight checks add seconds (estimate). Stage 1 is
+submitted together with Stacking-1's three order-B INT3 reruns
+([Stacking-1 plan](../stacking/stacking-1.md#reruns-with-the-fixed-quantizer-recorded-2026-10-25)).
+
+| Run | Stage | Expected | Time limit | Ceiling GPU-h | Basis | Confidence |
+| --- | --- | --- | --- | ---: | --- | --- |
+| INT3 QAT 100M `-002` | 1 | 1.7-2.2 h | 4 h | 4 | `qat-int3-100m-001` 1.78 h of workflow time | Medium |
+| INT3 QAT 1B `-002` | 2, decided after stage 1 | 14-17 h | 24 h | 24 | `qat-int3-1b-001` 14.25 h | Medium |
+
+- **Per run:** one H200, 8 CPUs, 128 GB RAM, `gpu_short`, one process.
+  Expected CPU use 14-18 core-hours (100M) and 112-136 (1B); ceilings 32 and
+  192.
+- **Memory:** `-001` measured 49.6 GiB peak allocated VRAM and 14.6 GiB peak
+  RSS.
+- **Storage:** PROJECT about 2.3 GB per run; the `-001` outputs are kept.
+  SCRATCH: the stream (0.4 GB at 100M, 4 GB at 1B) and up to two checkpoint
+  generations of about 13 GB.
+- **Stage 1 in total** (with Stacking-1): 4 single-GPU jobs, expected
+  5.3-7.0 GPU-hours, ceiling 13. Headroom against the 8,424-GPU-hour
+  allocation is ample.
 
 ## Results (2026-10-25)
 
@@ -315,10 +405,10 @@ asymmetric INT3 (the assert in `_infer_fake_quantize_configs`; test
 - **Cost:** 16.0 workflow GPU-hours here (1.78 + 14.25), plus about
   3.6-4.3 h in Stacking-1.
 - **Still valid:** `int3-001`, and every INT8, INT4, and PTQ result.
-- **Fix and reruns (planned):** the INT3 training-time quantizer will take its
-  scale and zero point from the deployed path. It will have an equality test on
-  real weights and an in-run stop. The reruns are documented here when they
-  finish.
+- **Fix and reruns:** the INT3 training-time quantizer now takes its scale and
+  zero point from the deployed path, with a real-weight equality test and
+  in-run stops ([INT3 QAT fix](#int3-qat-fix-2026-10-25)). The reruns
+  (`-002`) are documented here when they finish.
 
 ## Measured resource use (2026-10-25)
 
@@ -347,6 +437,11 @@ asymmetric INT3 (the assert in `_infer_fake_quantize_configs`; test
   them by one step, but this held only on random Gaussian weights. On the real
   weights, the INT3 fake quantizer distorts the outliers, and the INT3 QAT
   results are invalid ([INT3 QAT incident](#int3-qat-incident-2026-10-25)).
+  From `-002` on, INT3 uses the project's quantizer, which is bitwise equal to
+  the deployed INT3 and checked in every run
+  ([INT3 QAT fix](#int3-qat-fix-2026-10-25)). INT4 still uses TorchAO's INT4
+  quantizer; its conversion adds KL that is not yet explained
+  (0.0286 → 0.0360 at 100M), an open question outside this fix.
 - No speed is measured.
 
 ## Sources

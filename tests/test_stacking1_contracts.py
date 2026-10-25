@@ -244,8 +244,46 @@ class Int3Contracts(unittest.TestCase):
         self.assertTrue(quantization.padded_weights_are_zero(model, records))
         for handle in handles:
             handle.remove()
-        quantization.convert_qat(model, paths, 3)
+        # Trained FP32 masters leave the BF16 grid; training must still see the deployed weights.
+        self.assertFalse(all(torch.equal(value, value.to(torch.bfloat16).float()) for value in parameters))
+        self.assertEqual(quantization.int3_fake_quantization_check(model, paths)["mismatched"], [])
+        record = quantization.convert_qat(model, paths, 3)
+        self.assertEqual(record["int3_fake_equals_deployed"],
+                         {"projections": len(paths), "mismatched": [], "comparison": "sha256-bf16"})
         self.assertTrue(model.layers[1].mlp.gate_projection.weight.dequantize()[200:].eq(0).all())
+
+    def outlier_model(self):
+        """A BF16 TinyModel whose dense down projection holds a SmolLM2-like +9.375 outlier."""
+
+        model = self.padded_bf16_model()
+        with torch.no_grad():
+            model.layers[0].mlp.down_proj.weight[3, 17] = 9.375
+        return model
+
+    def test_int3_fake_quantization_equals_deployed_on_an_outlier(self):
+        model = self.outlier_model()
+        paths = quantization.projection_paths(model, [0, 1, 2])
+        quantization.prepare_qat(model, paths, 3, [])
+        check = quantization.int3_fake_quantization_check(model, paths)
+        self.assertEqual((check["projections"], check["mismatched"]), (len(paths), []))
+        module = model.layers[0].mlp.down_proj
+        with torch.no_grad():
+            fake = module.weight_fake_quantizer(module.weight)
+        # TorchAO's asymmetric IntxFakeQuantizeConfig turned this weight into about -2.7.
+        self.assertGreater(fake[3, 17].item(), 9.0)
+
+    def test_int3_checks_catch_the_mismatched_torchao_fake_quantizer(self):
+        from torchao.quantization.qat import IntxFakeQuantizeConfig, IntxFakeQuantizer
+
+        model = self.outlier_model()
+        paths = quantization.projection_paths(model, [0, 1, 2])
+        quantization.prepare_qat(model, paths, 3, [])
+        model.layers[0].mlp.down_proj.weight_fake_quantizer = IntxFakeQuantizer(
+            IntxFakeQuantizeConfig(torch.int3, group_size=quantization.GROUP_SIZE, is_symmetric=False))
+        check = quantization.int3_fake_quantization_check(model, paths)
+        self.assertEqual([row["path"] for row in check["mismatched"]], ["layers.0.mlp.down_proj"])
+        with self.assertRaisesRegex(ValueError, "differ from the trained fake-quantized"):
+            quantization.convert_qat(model, paths, 3)
 
     def test_asymmetric_int3_cannot_use_the_inferred_qat_path(self):
         from torchao.quantization import quantize_
@@ -297,6 +335,42 @@ class Int3Contracts(unittest.TestCase):
         self.assertEqual(reloaded.model.layers[5].mlp.gate_projection.out_features, 256)
         with torch.no_grad():
             torch.testing.assert_close(reloaded(input_ids=inputs).logits, expected, rtol=0, atol=0)
+
+
+@unittest.skipUnless(TORCHAO_AVAILABLE, "TorchAO is not installed")
+class Int3RealWeightContracts(unittest.TestCase):
+    """The INT3 QAT incident's outliers live in SmolLM2's weights; random weights have none."""
+
+    def test_int3_fake_quantization_equals_deployed_on_smollm2_weights(self):
+        from transformers import AutoModelForCausalLM
+
+        pinned = read_json(ROOT / "workflows/configs/model/baseline/quantization-1.json")["model"]
+        try:
+            model = AutoModelForCausalLM.from_pretrained(pinned["model_id"], revision=pinned["revision"],
+                                                         torch_dtype=torch.bfloat16, local_files_only=True)
+        except OSError:
+            self.skipTest("The pinned SmolLM2 snapshot is not in the local Hugging Face cache")
+        paths = quantization.projection_paths(model, range(1, 23))
+        self.assertEqual(len(paths), 66)
+        # The three largest incident outliers (+9.375, +7.594, -7.875); trained masters leave the BF16 grid.
+        outliers = [path for path in paths if path.endswith(("layers.22.mlp.down_proj", "layers.1.mlp.down_proj",
+                                                             "layers.7.mlp.down_proj"))]
+        parameters = quantization.prepare_qat(model, paths, 3, outliers)
+        generator = torch.Generator().manual_seed(0)
+        with torch.no_grad():
+            for value in parameters:
+                value.add_(1e-4 * torch.randn(value.shape, generator=generator))
+        self.assertFalse(any(torch.equal(value, value.to(torch.bfloat16).float()) for value in parameters))
+        check = quantization.int3_fake_quantization_check(model, paths)
+        self.assertEqual((check["projections"], check["mismatched"]), (66, []))
+        module = model.get_submodule(next(path for path in outliers if ".22." in path))
+        with torch.no_grad():
+            index = module.weight.abs().argmax()
+            master, fake = module.weight.flatten()[index].item(), module.weight_fake_quantizer(module.weight).flatten()[index].item()
+        self.assertGreater(master, 9.0)
+        self.assertGreater(fake, 9.0)  # the deployed INT3 keeps +9.625; TorchAO's config gave -2.752
+        record = quantization.convert_qat(model, paths, 3)
+        self.assertEqual(record["int3_fake_equals_deployed"]["mismatched"], [])
 
 
 if __name__ == "__main__":

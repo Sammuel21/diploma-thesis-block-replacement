@@ -1,7 +1,14 @@
-"""Scoped weight-only PTQ and QAT using the pinned TorchAO recipes."""
+"""Scoped weight-only PTQ and QAT using the pinned TorchAO recipes.
+
+INT3 QAT uses the project's `DeployedInt3FakeQuantizer`, whose training-time
+weights equal the deployed INT3 weights (decision log, 2026-10-25).
+"""
 
 import hashlib
 from importlib.metadata import version
+
+import torch
+import torch.nn as nn
 
 PROJECTIONS = ("gate_proj", "up_proj", "down_proj")
 REPLACEMENT_PROJECTIONS = ("gate_projection", "up_projection", "down_projection")
@@ -221,24 +228,80 @@ def apply_ptq(model, paths, bits):
     return {"before": before, "after": after, "converted_projections": len(paths)}
 
 
+class DeployedInt3FakeQuantizer(nn.Module):
+    """INT3 fake quantization whose values equal the deployed `weight_only_recipe(3)` weights.
+
+    TorchAO 0.17.0's asymmetric `IntxFakeQuantizeConfig` chooses its scale and zero
+    point for the range 0..7 and applies them on -4..3, which distorts outlier
+    weights (decision log, 2026-10-25). Here both come from the deployed path:
+    `choose_qparams_affine` with the arguments of `IntxUnpackedToInt8Tensor.from_hp`,
+    on the BF16 cast that `convert_qat` applies. TorchAO's fake-quantize op then
+    rounds with a straight-through gradient. No state: qparams follow every update.
+    """
+
+    # QATConfig's convert step reads `config` only to pass learned ranges; None keeps
+    # conversion on the plain deployed recipe, which `convert_qat` then verifies.
+    config = None
+
+    def forward(self, weight):
+        from torchao.quantization.quant_primitives import (
+            _DTYPE_TO_QVALUE_BOUNDS, MappingType, _fake_quantize_affine, choose_qparams_affine,
+        )
+
+        block_size = (1, GROUP_SIZE)
+        quant_min, quant_max = _DTYPE_TO_QVALUE_BOUNDS[torch.int3]
+        deployed = weight.to(torch.bfloat16)
+        scale, zero_point = choose_qparams_affine(
+            deployed.detach(), MappingType.ASYMMETRIC, block_size, target_dtype=torch.int8,
+            quant_min=quant_min, quant_max=quant_max, zero_point_dtype=torch.int8, keepdim=True,
+        )
+        fake = _fake_quantize_affine(deployed, block_size, scale, zero_point, quant_dtype=torch.int8,
+                                     quant_min=quant_min, quant_max=quant_max)
+        return fake.to(weight.dtype)
+
+
+def deployed_int3_weight(weight):
+    """The BF16 weight the deployed INT3 recipe computes from `weight`."""
+
+    from torchao.quantization import quantize_
+
+    out_features, in_features = weight.shape
+    reference = nn.Linear(in_features, out_features, bias=False, device=weight.device, dtype=torch.bfloat16)
+    with torch.no_grad():
+        reference.weight.copy_(weight.detach().to(torch.bfloat16))
+    quantize_(reference, weight_only_recipe(3))
+    return reference.weight.dequantize()
+
+
+def int3_fake_quantization_check(model, paths):
+    """Compare each projection's training-time INT3 weight bitwise with its deployed weight.
+
+    Callers enforce the result; a nonempty `mismatched` list invalidates INT3 QAT.
+    """
+
+    mismatched = []
+    with torch.no_grad():
+        for path in paths:
+            module = model.get_submodule(path)
+            fake = module.weight_fake_quantizer(module.weight).to(torch.bfloat16)
+            deployed = deployed_int3_weight(module.weight)
+            differing = fake.view(torch.int16).ne(deployed.view(torch.int16))
+            if differing.any().item():
+                mismatched.append({"path": path, "differing_values": int(differing.sum().item()),
+                                   "max_abs_difference": float((fake.float() - deployed.float()).abs().max().item())})
+            del fake, deployed, differing
+    return {"projections": len(paths), "mismatched": mismatched, "comparison": "bitwise-bf16"}
+
+
 def qat_prepare_config(bits):
-    """Fake-quantization config whose conversion matches the deployed PTQ recipe."""
+    """INT4 fake-quantization config whose conversion matches the deployed PTQ recipe."""
 
     from torchao.quantization.qat import QATConfig
 
     if bits == 4:
         return QATConfig(weight_only_recipe(4), step="prepare")
-    if bits == 3:
-        import torch
-        from torchao.quantization.qat import IntxFakeQuantizeConfig
-
-        # TorchAO 0.17.0 infers fake quantization from IntxWeightOnlyConfig only for
-        # symmetric mapping, so the asymmetric INT3 fake quantizer is stated explicitly.
-        return QATConfig(
-            weight_config=IntxFakeQuantizeConfig(torch.int3, group_size=GROUP_SIZE, is_symmetric=False),
-            step="prepare",
-        )
-    raise ValueError("QAT is implemented for INT4 and INT3 only")
+    # INT3 uses DeployedInt3FakeQuantizer (decision log, 2026-10-25).
+    raise ValueError("TorchAO's QAT config is used for INT4 only")
 
 
 def prepare_qat(model, paths, bits, trainable_paths=None):
@@ -250,11 +313,25 @@ def prepare_qat(model, paths, bits, trainable_paths=None):
     trainable = tuple(paths if trainable_paths is None else trainable_paths)
     if not set(trainable) <= set(paths):
         raise ValueError("QAT can train only fake-quantized projections")
+    if bits not in (3, 4):
+        raise ValueError("QAT is implemented for INT4 and INT3 only")
     names = set(paths)
     dimensions = {path: tuple(model.get_submodule(path).weight.shape) for path in paths}
     for parameter in model.parameters():
         parameter.requires_grad_(False)
-    quantize_(model, qat_prepare_config(bits), filter_fn=lambda module, name: name in names)
+    if bits == 4:
+        quantize_(model, qat_prepare_config(bits), filter_fn=lambda module, name: name in names)
+    else:
+        from torchao.quantization.qat import FakeQuantizedLinear
+        from mlp_replacement.compression.surgery import replace_submodule
+
+        # TorchAO's FakeQuantizedLinear, so QATConfig's convert step still applies the deployed recipe.
+        for path in paths:
+            if model.get_submodule(path).in_features % GROUP_SIZE:
+                raise ValueError(f"Grouped INT3 QAT needs whole groups of {GROUP_SIZE}: {path}")
+            fake = FakeQuantizedLinear.from_linear(model.get_submodule(path))
+            fake.weight_fake_quantizer = DeployedInt3FakeQuantizer()
+            replace_submodule(model, path, fake)
     for path in paths:
         module = model.get_submodule(path)
         if tuple(module.weight.shape) != dimensions[path]:
@@ -263,6 +340,8 @@ def prepare_qat(model, paths, bits, trainable_paths=None):
         # `enabled` attribute. Other library fake quantizers may expose one.
         if module.activation_fake_quantizer is not None or not getattr(module.weight_fake_quantizer, "enabled", True):
             raise ValueError("QAT must fake-quantize weights only, from the first update")
+        if bits == 3 and not isinstance(module.weight_fake_quantizer, DeployedInt3FakeQuantizer):
+            raise ValueError("INT3 QAT must use the deployed-path INT3 fake quantizer")
     for path in trainable:
         module = model.get_submodule(path)
         module.weight.data = module.weight.data.to(torch.float32)
@@ -289,6 +368,11 @@ def convert_qat(model, paths, bits):
     # The deployed PTQ/QAT recipes both use BF16 scales and BF16 activations.
     for path in paths:
         model.get_submodule(path).weight.data = model.get_submodule(path).weight.data.to(torch.bfloat16)
+    if bits == 3:
+        # The trained weights must convert to exactly what training saw (decision log, 2026-10-25).
+        with torch.no_grad():
+            trained = {path: tensor_digest(model.get_submodule(path).weight_fake_quantizer(
+                model.get_submodule(path).weight)) for path in paths}
     names = set(paths)
     quantize_(model, QATConfig(weight_only_recipe(bits), step="convert"),
               filter_fn=lambda module, name: name in names)
@@ -297,7 +381,15 @@ def convert_qat(model, paths, bits):
         path: tuple(model.get_submodule(path).weight.shape) for path in paths
     }:
         raise ValueError("QAT conversion changed logical parameters or projection dimensions")
-    return {"converted_projections": len(paths), "logical_parameters": logical_parameters}
+    record = {"converted_projections": len(paths), "logical_parameters": logical_parameters}
+    if bits == 3:
+        mismatched = [path for path in paths
+                      if tensor_digest(model.get_submodule(path).weight.dequantize()) != trained[path]]
+        if mismatched:
+            raise ValueError(f"Deployed INT3 weights differ from the trained fake-quantized weights: {mismatched}")
+        record["int3_fake_equals_deployed"] = {"projections": len(paths), "mismatched": mismatched,
+                                               "comparison": "sha256-bf16"}
+    return record
 
 
 def convert_int4_qat(model, paths):

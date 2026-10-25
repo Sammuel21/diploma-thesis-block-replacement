@@ -370,7 +370,7 @@ def recover_qat(student, teacher, tokenizer, paths, bits, directory, work_dir, a
         capture_rng, commit_single_checkpoint, recover_exact_segment, restore_checkpoint,
         restore_rng, segment_schedule,
     )
-    from mlp_replacement.compression.quantization import prepare_qat
+    from mlp_replacement.compression.quantization import int3_fake_quantization_check, prepare_qat
     from mlp_replacement.data import PackedTokenCache
     from mlp_replacement.data_streams import build_finite_stream
     from mlp_replacement.evaluation.final_quality import evaluate_rolling_likelihood
@@ -420,6 +420,14 @@ def recover_qat(student, teacher, tokenizer, paths, bits, directory, work_dir, a
         raise ValueError("Regenerated recovery stream changed on resume")
     artifact["results"]["recovery_stream"] = durable
     parameters = prepare_qat(student, paths, bits)
+    if bits == 3:
+        # Stop before any update unless training sees exactly the deployed INT3 weights (decision log, 2026-10-25).
+        check = int3_fake_quantization_check(student, paths)
+        artifact["results"]["int3_fake_quantization_check"] = check
+        persist(directory, artifact, log, "qat_int3_fake_quantization_check")
+        if check["mismatched"]:
+            raise ValueError("INT3 fake-quantized weights differ from the deployed INT3 weights: "
+                             f"{[row['path'] for row in check['mismatched']]}")
     state = None
     checkpoints = directory / "checkpoints"
     if artifact["results"].get("recovery", {}).get("tokens_seen", 0) > 0 and not list(checkpoints.glob("checkpoint-*.json")):

@@ -2,7 +2,7 @@
 title: PERUN Runbook
 status: active
 created: 2026-10-11
-modified: 2026-10-20
+modified: 2026-10-25
 ---
 
 # PERUN Runbook
@@ -986,15 +986,19 @@ Design, checks, and resource plan:
 submission needs the researcher's go.
 
 Stacking-1 runs from the usual checkout, `diploma-thesis-block-replacement`
-(decision log, 2026-10-20). SwiGLU-9 has finished, so updating the checkout no
-longer affects it. Once Stacking-1 is submitted, do not update the checkout
-until every Stacking-1 task has *finished*: a job copies the code when it
-starts, and a resume refuses changed code.
+(decision log, 2026-10-20). All 48 tasks were submitted on 2026-10-20 and
+finished on 2026-10-21 (10.1-10.2 are kept as the record of that submission).
+The three order-B INT3 outputs (`-001`) are invalid and are rerun as `-002`
+with the fixed INT3 quantizer (10.5). The same rule applies to the reruns:
+once they are submitted, do not update the checkout until every rerun has
+*finished*, because a job copies the code when it starts and a resume
+refuses changed code.
 
 | Step | Block | Requested per task | Expected per task | Before using the results |
 | --- | --- | --- | --- | --- |
-| Update and pre-submission checks | 10.1 | - | minutes | Every line OK; your queue is empty |
-| Submit all 48 tasks: order B (6), order A at 100M (33), order A at 1B (9) | 10.2 | 6 h (B) or 2 h (A), 128 GB | 1.5-3 h (B), 0.3-0.5 h (A) | K1, K2, K4, K5 (order A); K3, K4, K5 (order B) |
+| Update and pre-submission checks (done 2026-10-20) | 10.1 | - | minutes | Every line OK; your queue is empty |
+| Submit all 48 tasks: order B (6), order A at 100M (33), order A at 1B (9) (done 2026-10-20) | 10.2 | 6 h (B) or 2 h (A), 128 GB | 1.5-3 h (B), 0.3-0.5 h (A) | K1, K2, K4, K5 (order A); K3, K4, K5 (order B) |
+| Rerun the three order-B INT3 tasks as `-002` (stage 1, with 11.5) | 10.5 | 3 h, 128 GB | 1.2-1.6 h | K3, K5, K6 (K4 covers INT8 and INT4 only) |
 
 PERUN accepts at most 48 submitted tasks, counting each array task, and
 refuses every new `sbatch` while 4 of your jobs run (perun-status.md).
@@ -1063,6 +1067,9 @@ squeue -u "$USER"   # must list no job: 48 tasks are the whole submission limit
 
 ### 10.2 Submit all 48 tasks
 
+*Original submission, done on 2026-10-20. Its STOP guard now always fires
+because Stacking-1 outputs exist; reruns use 10.5.*
+
 **Submits jobs. Run once,** after 10.1 is clean. It writes the three job IDs
 to `$PERUN_LOG_DIR/stacking-1_submission.txt`. If an ID prints empty, that
 `sbatch` was refused: tell the assistant before submitting it again.
@@ -1124,17 +1131,69 @@ Resume refuses changed code, configuration, or environment, and needs the
 run's `result.json` on PROJECT with no lock (see 5.2). Only possible while
 fewer than 4 of your jobs run.
 
+The `-001` tasks have all finished and cannot be resumed after the INT3 fix
+(their code fingerprint changed). For an order-B INT3 rerun task, keep
+`--attempt 002` before `--resume`:
+
 ```bash
 cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
-# One array task; replace the group, index, and limit (b: 6 h; a100m, a1b: 2 h):
-sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=3 \
+# One order-B INT3 rerun task; replace the index (1, 3, or 5):
+sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --array=3 \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-  workflows/jobs/perun/stacking_1.sbatch group b --resume
+  workflows/jobs/perun/stacking_1.sbatch group b --attempt 002 --resume
 ```
 
-Right after the last task finishes, run section 7 for the three job IDs
+Right after the last task finishes, run section 7 for the job IDs
 (scheduler records expire), then copy the results home (section 6,
 `EXPERIMENT=stacking-1`).
+
+### 10.5 Rerun the order-B INT3 tasks as `-002`
+
+**Stage 1 of the INT3 QAT reruns,** submitted in the same sitting as 11.5,
+after the researcher's go. The fixed INT3 quantizer and its checks are in
+[stacking-1.md](../../experiments/model/stacking/stacking-1.md#int3-qat-fix-2026-10-25).
+Run 1.2, 1.3, and 1.4 first: the checkout must contain the fix commit.
+
+**Pre-submission checks. Safe to re-run.** The `git log` line must show the
+fix commit. The `list-variants` lines must print
+`b-fitted-0.2-100m-int3`, `b-fitted-0.5-100m-int3`, and
+`b-fitted-0.8-100m-int3`, in that order. The `--test-only` line must be
+accepted. No `-002` output may exist yet, and `squeue` should list no job.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+git log -1 --oneline
+# Array tasks 1, 3, and 5 of group b are the three INT3 variants:
+PYTHONPATH=src python -m workflows.runs.model.stacking.stacking_1 list-variants --group b | sed -n '2p;4p;6p'
+bash -n workflows/jobs/perun/stacking_1.sbatch && echo "launcher syntax OK"
+find "$PERUN_RESULTS/stacking-1" -maxdepth 1 -name 'b-fitted-*-100m-int3-002*' | grep . || echo "no -002 outputs yet"
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --array=1,3,5 \
+  workflows/jobs/perun/stacking_1.sbatch group b --attempt 002
+squeue -u "$USER"
+```
+
+**Submits jobs. Run once,** after the checks are clean. It writes the job ID
+to `$PERUN_LOG_DIR/stacking-1-int3-rerun_submission.txt`. If the ID prints
+empty, `sbatch` was refused: tell the assistant before submitting again.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+EXISTING=$(find "$PERUN_RESULTS/stacking-1" -maxdepth 1 -name 'b-fitted-*-100m-int3-002*')
+if [[ -n "$EXISTING" ]]; then
+    echo "STOP: an order-B INT3 -002 output or lock already exists:"; echo "$EXISTING"
+else
+    BINT3=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --array=1,3,5 \
+        --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        workflows/jobs/perun/stacking_1.sbatch group b --attempt 002)
+    printf 'BINT3=%s\n' "${BINT3%%;*}" | tee "$PERUN_LOG_DIR/stacking-1-int3-rerun_submission.txt"
+    echo "<- record this in local/perun/runs/stacking-1.md"
+fi
+```
+
+**Watch** with 10.3. If training is not shown the deployed INT3 weights, the
+task stops right after QAT preparation with `AcceptanceFailure` and `K6-start`
+in its `.err` file. A mismatch at conversion stops it with "Deployed INT3
+weights differ" before export. Either way, stop and tell the assistant.
 
 ## 11. Quantization-2
 
@@ -1144,19 +1203,27 @@ Every submission needs the researcher's go.
 
 Quantization-2 runs on Quantization-1's launcher with its own configuration
 and writes to `perun-results/quantization-2/`. It reuses Quantization-1's
-`prepare-001`, so it has no preparation step. Update the checkout (1.4) only
-after every Stacking-1 task has finished: the Quantization-2 code changes
-`workflows/runs/`, and a Stacking-1 resume refuses changed code.
+`prepare-001`, so it has no preparation step. The three original runs were
+submitted on 2026-10-21 (jobs 123646-123648) after Stacking-1 had finished;
+11.1-11.2 are kept as the record of that submission. Both INT3 QAT runs are
+invalid and are rerun as `-002` with the fixed INT3 quantizer (11.5, 11.6).
+Once a rerun is submitted, do not update the checkout until it has finished:
+a resume refuses changed code.
 
-| Run | Output | Expected | Time limit |
-| --- | --- | --- | --- |
-| INT3 PTQ | `int3-001` | 0.3-0.5 h | 2 h |
-| INT3 QAT 100M | `qat-int3-100m-001` | 1.6-3.5 h | 6 h |
-| INT3 QAT 1B | `qat-int3-1b-001` | 16-32 h | 36 h |
+| Run | Output | Expected | Time limit | Status |
+| --- | --- | --- | --- | --- |
+| INT3 PTQ | `int3-001` | 0.3-0.5 h | 2 h | Valid |
+| INT3 QAT 100M | `qat-int3-100m-001` | 1.6-3.5 h | 6 h | Invalid (INT3 QAT incident) |
+| INT3 QAT 1B | `qat-int3-1b-001` | 16-32 h | 36 h | Invalid (INT3 QAT incident) |
+| INT3 QAT 100M, rerun (stage 1, 11.5) | `qat-int3-100m-002` | 1.7-2.2 h | 4 h | Planned |
+| INT3 QAT 1B, rerun (stage 2, 11.6) | `qat-int3-1b-002` | 14-17 h | 24 h | Decided after stage 1 |
 
 Run 1.2, 1.3, and 1.4 first.
 
 ### 11.1 Pre-submission checks
+
+*Original submission, done on 2026-10-21. "No Quantization-2 output may exist
+yet" applied to that submission only; reruns use 11.5 and 11.6.*
 
 **Safe to re-run.** The settings line must print `quantization-2 ['ptq-int3']`,
 every `--test-only` line must be accepted, and no Quantization-2 output may
@@ -1181,6 +1248,9 @@ squeue -u "$USER"   # Stacking-1 must have finished
 ```
 
 ### 11.2 Submit the three runs
+
+*Original submission, done on 2026-10-21 (jobs 123646-123648). Its STOP guard
+now always fires because Quantization-2 outputs exist.*
 
 **Submits jobs. Run once,** after 11.1 is clean. It writes the three job IDs
 to `$PERUN_LOG_DIR/quantization-2_submission.txt`.
@@ -1231,19 +1301,100 @@ While a run is going, its current stage is in the scratch copy of its
 ### 11.4 Resume a stopped run
 
 **Submits a job. Run once, after the cause is understood.** Needs the run's
-`result.json` on PROJECT and no lock (see 5.2). Replace the output name,
-token budget, and limit for the run being resumed.
+`result.json` on PROJECT and no lock (see 5.2). The `-001` runs cannot be
+resumed after the INT3 fix (their code fingerprint changed). Replace the
+output name, token budget, and limit for the rerun being resumed (100M: 4 h;
+1B: 24 h).
 
 ```bash
 cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
-sbatch --parsable --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 \
+sbatch --parsable --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 \
   --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-  workflows/jobs/perun/quantization_1.sbatch run qat-int3-1b-001 \
+  workflows/jobs/perun/quantization_1.sbatch run qat-int3-100m-002 \
   --config workflows/configs/model/baseline/quantization-2.json \
   --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json" \
-  --variant qat-int3 --qat-tokens 1000000000 --resume
+  --variant qat-int3 --qat-tokens 100000000 --resume
 ```
 
-Right after the last run finishes, run section 7 for the three job IDs, then
+Right after the last run finishes, run section 7 for its job IDs, then
 copy the results home (section 6, `EXPERIMENT=quantization-2`). The
 comparison report is built on the PC (see the experiment page).
+
+### 11.5 Rerun INT3 QAT 100M as `-002`
+
+**Stage 1 of the INT3 QAT reruns,** submitted in the same sitting as 10.5,
+after the researcher's go. The fixed INT3 quantizer and its checks are in
+[quantization-2.md](../../experiments/model/baseline/quantization-2.md#int3-qat-fix-2026-10-25).
+Run 1.2, 1.3, and 1.4 first: the checkout must contain the fix commit.
+
+**Pre-submission checks. Safe to re-run.** The `git log` line must show the
+fix commit, the settings line must print `quantization-2 ['ptq-int3']`, the
+`--test-only` line must be accepted, and `qat-int3-100m-002` must not exist.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+CONFIG=workflows/configs/model/baseline/quantization-2.json
+Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+git log -1 --oneline
+PYTHONPATH=src python -c "from workflows.runs.model.baseline import quantization as q; s = q.load_settings('$CONFIG'); print(s['workflow'], s['variants'])"
+bash -n workflows/jobs/perun/quantization_1.sbatch && echo "launcher syntax OK"
+sbatch --test-only --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 \
+  workflows/jobs/perun/quantization_1.sbatch run qat-int3-100m-002 --config "$CONFIG" --prepared "$Q1_PREPARED" \
+  --variant qat-int3 --qat-tokens 100000000
+find "$PERUN_RESULTS/quantization-2" -maxdepth 1 -name 'qat-int3-100m-002*' | grep . || echo "no 100M -002 output yet"
+squeue -u "$USER"
+```
+
+**Submits a job. Run once,** after the checks are clean. It writes the job ID
+to `$PERUN_LOG_DIR/quantization-2-int3-rerun_submission.txt`.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+CONFIG=workflows/configs/model/baseline/quantization-2.json
+Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+EXISTING=$(find "$PERUN_RESULTS/quantization-2" -maxdepth 1 -name 'qat-int3-100m-002*')
+if [[ -n "$EXISTING" ]]; then
+    echo "STOP: the 100M -002 output or lock already exists:"; echo "$EXISTING"
+else
+    QAT100M=$(sbatch --parsable --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+        --time=04:00:00 --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+        workflows/jobs/perun/quantization_1.sbatch run qat-int3-100m-002 --config "$CONFIG" \
+        --prepared "$Q1_PREPARED" --variant qat-int3 --qat-tokens 100000000)
+    printf 'QAT100M=%s\n' "${QAT100M%%;*}" | tee "$PERUN_LOG_DIR/quantization-2-int3-rerun_submission.txt"
+    echo "<- record this in local/perun/runs/quantization-2.md"
+fi
+```
+
+**Watch** with 11.3, replacing its first line with
+`source "$PERUN_LOG_DIR/quantization-2-int3-rerun_submission.txt"` (only
+`QAT100M` is set, so PTQ and QAT1B print "not started"). If training is not shown the deployed INT3 weights, the run
+stops right after QAT preparation with "INT3 fake-quantized weights differ"
+in its `.err` file. A mismatch at conversion stops it with "Deployed INT3
+weights differ" before export. Either way, stop and tell the assistant.
+
+### 11.6 Rerun INT3 QAT 1B as `-002` (stage 2)
+
+**Only after the researcher's go on the stage-1 results** (decision log,
+2026-10-25). Same checks and form as 11.5, with the 1B output, budget, and
+limit:
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+CONFIG=workflows/configs/model/baseline/quantization-2.json
+Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+git log -1 --oneline
+sbatch --test-only --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=24:00:00 \
+  workflows/jobs/perun/quantization_1.sbatch run qat-int3-1b-002 --config "$CONFIG" --prepared "$Q1_PREPARED" \
+  --variant qat-int3 --qat-tokens 1000000000
+EXISTING=$(find "$PERUN_RESULTS/quantization-2" -maxdepth 1 -name 'qat-int3-1b-002*')
+if [[ -n "$EXISTING" ]]; then
+    echo "STOP: the 1B -002 output or lock already exists:"; echo "$EXISTING"
+else
+    QAT1B=$(sbatch --parsable --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+        --time=24:00:00 --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+        workflows/jobs/perun/quantization_1.sbatch run qat-int3-1b-002 --config "$CONFIG" \
+        --prepared "$Q1_PREPARED" --variant qat-int3 --qat-tokens 1000000000)
+    printf 'QAT1B=%s\n' "${QAT1B%%;*}" | tee -a "$PERUN_LOG_DIR/quantization-2-int3-rerun_submission.txt"
+    echo "<- record this in local/perun/runs/quantization-2.md"
+fi
+```

@@ -16,10 +16,11 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: sbatch --array=0-32 $0 group a100m [--resume]" >&2
-    echo "   or: sbatch --array=0-8 $0 group a1b [--resume]" >&2
-    echo "   or: sbatch --array=0-5 $0 group b [--resume]" >&2
-    echo "   or: sbatch $0 variant VARIANT_ID [--resume]" >&2
+    echo "Usage: sbatch --array=0-32 $0 group a100m [--attempt NNN] [--resume]" >&2
+    echo "   or: sbatch --array=0-8 $0 group a1b [--attempt NNN] [--resume]" >&2
+    echo "   or: sbatch --array=0-5 $0 group b [--attempt NNN] [--resume]" >&2
+    echo "   or: sbatch $0 variant VARIANT_ID [--attempt NNN] [--resume]" >&2
+    echo "Outputs are VARIANT_ID-NNN; NNN defaults to 001 (a rerun is a new attempt, never an overwrite)." >&2
 }
 
 for REQUIRED_COMMAND in rsync realpath cmp nvidia-smi; do
@@ -32,6 +33,12 @@ done
 MODE="$1"
 SELECTOR="$2"
 shift 2
+ATTEMPT=001
+if [[ "${1:-}" == "--attempt" ]]; then
+    [[ "${2:-}" =~ ^[0-9]{3}$ ]] || { usage; exit 2; }
+    ATTEMPT="$2"
+    shift 2
+fi
 RESUME=0
 if [[ "${1:-}" == "--resume" ]]; then
     RESUME=1
@@ -82,7 +89,7 @@ case "$MODE" in
 esac
 mapfile -t INPUTS < <(cd "$SUBMIT_DIR" && "${RUNNER[@]}" inputs --variant "$VARIANT" --prepared "$SWIGLU8_PREPARED/result.json")
 (( ${#INPUTS[@]} > 0 )) || { echo "No input list for variant $VARIANT" >&2; exit 2; }
-OUTPUT_NAME="${VARIANT}-001"
+OUTPUT_NAME="${VARIANT}-${ATTEMPT}"
 
 PERSISTENT_OUTPUT_DIR="$PROJECT_RESULTS_ROOT/$OUTPUT_NAME"
 LOCK_DIR="${PERSISTENT_OUTPUT_DIR}.perun-lock"

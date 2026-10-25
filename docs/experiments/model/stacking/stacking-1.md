@@ -25,7 +25,10 @@ disagree, the log wins until the conflict is raised.
 completed. The results analysis and the job-log entry are still pending. The
 three order-B INT3 runs are invalid
 ([INT3 order-B runs invalid](#int3-order-b-runs-invalid-2026-10-25)); the
-other 45 runs are unaffected.
+other 45 runs are unaffected. The fixed INT3 quantizer was implemented the
+same day ([INT3 QAT fix](#int3-qat-fix-2026-10-25)). **Next step:** rerun the
+three order-B INT3 variants as `-002` (runbook 10.5), together with
+Quantization-2's INT3 QAT 100M rerun, after the researcher's go.
 
 ## Questions
 
@@ -164,13 +167,17 @@ total tokens (100M + 100M against 200M). Whether any stacking variant goes to
   weights with values in [-4, 3], one int8 per value, a BF16 scale and an
   int8 zero point per group. Its linear layer dequantizes the weight and calls
   an ordinary BF16 matrix multiply; there is no INT3 kernel.
-- **INT3 QAT uses an explicit fake quantizer.** TorchAO infers fake
+- **INT3 QAT uses a project fake quantizer.** TorchAO infers fake
   quantization from `IntxWeightOnlyConfig` only for symmetric mapping (an
-  assert in `_infer_fake_quantize_configs`). INT3 QAT therefore prepares with
-  `IntxFakeQuantizeConfig(torch.int3, group_size=128, is_symmetric=False)`
-  and converts with the asymmetric PTQ recipe. The method is simulated
-  quantization during training (`src-qat-jacob-2018`, Section 3), with
-  gradients passed through rounding by a straight-through estimator
+  assert in `_infer_fake_quantize_configs`). The `-001` order-B INT3 runs
+  therefore prepared with `IntxFakeQuantizeConfig(torch.int3, group_size=128,
+  is_symmetric=False)`, which does not reproduce the deployed INT3; they are
+  invalid ([INT3 order-B runs invalid](#int3-order-b-runs-invalid-2026-10-25)).
+  From `-002` on, INT3 QAT uses `DeployedInt3FakeQuantizer`, whose simulated
+  weights are bitwise equal to the deployed INT3 weights, and converts with the
+  asymmetric PTQ recipe ([INT3 QAT fix](#int3-qat-fix-2026-10-25)). The method
+  is simulated quantization during training (`src-qat-jacob-2018`, Section 3),
+  with gradients passed through rounding by a straight-through estimator
   (`src-ste-bengio-2013`, Section 4).
 - **Calculated bytes.** INT3 bytes are calculated from 3.25 bits per weight
   (3 bits plus a 16-bit scale and a 16-bit zero point per group, the INT4
@@ -255,10 +262,14 @@ Each check stops the run if it fails, except where noted.
 | K3 | Order B: the token-0 monitoring KL and perplexity of the start, before padding and fake quantization, equal SwiGLU-8's token-0 row | relative 1e-4 |
 | K4 | INT8 and INT4: calculated eligible bytes equal measured eligible bytes | exact |
 | K5 | Padded models: the deployed bundle's padded neurons output exactly zero gate and up values on one monitoring batch; order B also checks that the padded master weights are still zero after training (`K5-training`) | exact |
+| K6 | Order-B INT3, from `-002` on: after QAT preparation, before the first update, every projection's simulated INT3 weight equals the deployed recipe applied to the same weight (`K6-start`); at conversion, every deployed INT3 weight equals the trained simulated weight (`convert_qat`, recorded in `results.conversion.int3_fake_equals_deployed`) | bitwise |
 
 The monitoring perplexity after padding (before quantization) is recorded but
 not enforced, because a matrix multiply over a longer row may sum in a
-different order. The existing checks of Quantization-1's code also apply:
+different order. The conversion change (`conversion_ppl_delta`), the token-0
+validation KL, and the first-step gradient norm are also recorded, not
+enforced. The 24-batch monitoring perplexity mostly measures damage at target
+position 1 (experiment-audit session, 2026-10-25), so it is not a gate. The existing checks of Quantization-1's code also apply:
 frozen weights outside the scope, unchanged logical dimensions, tied
 embeddings, and the packed-bundle round trip.
 
@@ -322,6 +333,28 @@ values with the files on PERUN. CPU only: the 15 contract tests give 11
 passes and 4 TorchAO skips in the project's Python, and the full suite passes
 (120 tests, 5 skipped).
 
+### INT3 QAT fix (2026-10-25)
+
+The shared INT3 QAT code was fixed for Stacking-1 order B and Quantization-2
+together (decision log, 2026-10-25). The quantizer, the tests, and what was
+tested are described in
+[Quantization-2's fix record](../baseline/quantization-2.md#int3-qat-fix-2026-10-25).
+Order A, order-B INT4, and every PTQ path are unchanged.
+
+| File | Change |
+| --- | --- |
+| [quantization.py](../../../../src/mlp_replacement/compression/quantization.py) | `DeployedInt3FakeQuantizer`: scale and zero point from the deployed INT3 recipe, so simulated weights equal deployed weights bit for bit; `int3_fake_quantization_check`; `convert_qat` stops if a converted INT3 weight differs from the trained simulated weight |
+| [stacking_1.py](../../../../workflows/runs/model/stacking/stacking_1.py) | Check `K6-start` right after QAT preparation in order-B INT3, before the first update; the conversion half runs inside `convert_qat` |
+| [stacking_1.sbatch](../../../../workflows/jobs/perun/stacking_1.sbatch) | Optional `--attempt NNN` (default `001`), placed before `--resume`; the output is `VARIANT-NNN`, so a rerun never overwrites the invalid `-001` evidence |
+| [test_stacking1_contracts.py](../../../../tests/test_stacking1_contracts.py) | Planted outlier, trained masters off the BF16 grid, the old TorchAO quantizer caught by both checks, and the pinned SmolLM2 weights |
+
+**Effect on runs.** The run fingerprint covers all maintained code, so no
+`-001` run can be resumed (all completed). The three reruns are
+`b-fitted-{0.2,0.5,0.8}-100m-int3-002`, group-b array tasks 1, 3, and 5. A
+`-002` task resumes only from unchanged code, configuration, and environment,
+so the PERUN checkout is not updated until the reruns finish. The Stacking-1
+analysis takes order-B INT3 from `-002`.
+
 ## Pre-run resource plan
 
 Recorded 2026-10-17 under the [PERUN resource contract](../../../infrastructure/perun/perun-resources.md)
@@ -352,6 +385,29 @@ and revised on 2026-10-20 for the 48-run grid. Estimates, not measurements.
   two checkpoint generations. About 265 of 8,424 project GPU-hours were used
   before Stacking-1 (about 210 recorded on 2026-10-17 plus SwiGLU-9's 55.5
   workflow-timing hours).
+
+### Reruns with the fixed quantizer (recorded 2026-10-25)
+
+Estimates, not measurements, based on the three `-001` order-B INT3 tasks,
+which ran the same stages; the two new weight checks add seconds (estimate).
+Submitted in one sitting with Quantization-2's INT3 QAT 100M rerun
+([Quantization-2 plan](../baseline/quantization-2.md#reruns-with-the-fixed-quantizer-recorded-2026-10-25)).
+
+| Group | Tasks | Per task, expected | GPU-h expected | Time limit | Ceiling GPU-h | Basis | Confidence |
+| --- | ---: | --- | ---: | --- | ---: | --- | --- |
+| B INT3 `-002` (array tasks 1, 3, 5) | 3 | 1.2-1.6 h | 3.6-4.8 | 3 h | 9 | `-001` stage times 1.42, 1.35, 1.20 h (recovery 0.94-1.11 h, evaluation 0.25-0.31 h) | Medium |
+
+- **Per task:** one H200, 8 CPUs, 128 GB RAM, `gpu_short`; one process, no
+  communication between tasks. Expected CPU use 29-38 core-hours; ceiling 72.
+- **Memory:** `-001` measured 25.9-33.3 GiB peak VRAM and 6.1-8.9 GiB peak
+  RAM.
+- **Storage:** PROJECT 1.4-2.1 GB per packed INT3 bundle; the `-001` outputs
+  are kept. SCRATCH: the 0.4 GB stream and up to two checkpoint generations of
+  the replacement weights.
+- **Stage 1 in total** (with Quantization-2's 100M rerun): 4 single-GPU jobs,
+  expected 5.3-7.0 GPU-hours, ceiling 13. Submit both while nothing of yours
+  is queued; the earlier "4 running jobs" submit refusal may have been lifted
+  by the 2026-10-25 limits (20 running, 50 queued), which is unconfirmed.
 
 ## INT3 order-B runs invalid (2026-10-25)
 
@@ -384,8 +440,11 @@ test perplexity at 8K, and macro is the five-task mean.
   INT3. Until the INT3 order-B runs are rerun with a fixed quantizer, there is
   no evidence on whether the order matters at INT3.
 - **Cost:** about 3.6-4.3 workflow GPU-hours (1.20-1.42 h per order-B task).
-- **Reruns:** planned as `-002` outputs after the fix, and documented here when
-  they finish.
+- **Reruns:** the fix is implemented ([INT3 QAT fix](#int3-qat-fix-2026-10-25));
+  the `-002` reruns are documented here when they finish. For reference, the
+  `-001` first-step gradient norms were 5.37, 53.50, and 199.56 (INT4: 0.16,
+  1.27, 3.16); a fixed run is expected to look INT4-like (recorded, not
+  enforced).
 
 ## Limits
 
@@ -393,11 +452,11 @@ test perplexity at 8K, and macro is the five-task mean.
 - INT3 PTQ uses round-to-nearest, which is known to be weak at 3 bits.
 - INT3 bytes are calculated, not measured; measured INT3 storage is an 8-bit
   container.
-- INT3 QAT uses TorchAO's generic fake quantizer, INT4 QAT its dedicated INT4
-  one, so the two QAT points do not share one fake-quantization
-  implementation. The INT3 fake quantizer does not reproduce the deployed
-  INT3, and the order-B INT3 runs are invalid
-  ([INT3 order-B runs invalid](#int3-order-b-runs-invalid-2026-10-25)).
+- INT3 QAT uses the project's fake quantizer (from `-002` on), INT4 QAT
+  TorchAO's dedicated INT4 one, so the two QAT points do not share one
+  fake-quantization implementation. The `-001` INT3 runs used TorchAO's
+  generic quantizer, which does not reproduce the deployed INT3, and are
+  invalid ([INT3 order-B runs invalid](#int3-order-b-runs-invalid-2026-10-25)).
 - For INT4, the padding zeros can widen the range of one group per row in one
   layer per padded model.
 - Order B fake-quantizes the dense-kept layers without training them, as order
