@@ -2,7 +2,7 @@
 title: Quantization-2 Dense INT3 Baseline
 status: active
 created: 2026-10-20
-modified: 2026-10-20
+modified: 2026-10-25
 ---
 
 # Quantization-2
@@ -15,12 +15,15 @@ supplies the "quantization alone" INT3 points on the
 a stacked model: only one kind of redundancy reduction is applied (decision
 log, 2026-10-20).
 
-**Status (2026-10-20):** implemented, not run. **Next step:** commit and
-submit the three runs in the
-[PERUN runbook](../../../infrastructure/perun/perun-runbook.md#11-quantization-2)
-after Stacking-1 has finished, because changing `workflows/runs/` changes the
-run fingerprint of every Stacking-1 task. The binding decisions are the
-2026-10-20 rows in the [shared decision log](../../../agents/decisions.md).
+**Status (2026-10-25):** ran on PERUN on 2026-10-21/22 (jobs
+123646-123648, commit `d7d7c1e`); all three runs completed. INT3 PTQ is
+valid ([Results](#results-2026-10-25)). **Both INT3 QAT results are
+invalid:** the INT3 training-time quantizer does not reproduce the deployed
+INT3 format ([INT3 QAT incident](#int3-qat-incident-2026-10-25)). **Next
+step:** fix the INT3 training-time quantizer and rerun INT3 QAT as `-002`
+outputs, 100M first and 1B only if still wanted; the reruns are documented
+here when they finish. The binding decisions are the 2026-10-20 and
+2026-10-25 rows in the [shared decision log](../../../agents/decisions.md).
 
 ## Runs
 
@@ -159,16 +162,191 @@ Estimates, not measurements.
 - **Timeout:** a run that hits its limit resumes from its last 25M-token
   checkpoint, but only from unchanged code, configuration, and environment.
 
+## Results (2026-10-25)
+
+The three runs ran on PERUN on 2026-10-21/22 from commit `d7d7c1e`, as jobs
+123646 (PTQ), 123647 (QAT 100M), and 123648 (QAT 1B). All three ended
+`completed`; the stream, scope, and bundle checks passed. The analysis copy
+(JSON, bundle manifests, job logs) is in
+`data/results/workflows/model/quantization-2/`. The reference rows are
+Quantization-1's dense control and its INT4 evaluations (`*-eval-001`). The
+values below were read from the `result.json` and task files; Quantization-1's
+`report` command (paired bootstrap intervals) has not been run for
+Quantization-2 yet.
+
+| Model | 8K KL to dense | WikiText-2 test PPL, 128 / 2K / 8K | Task macro | Whole-model byte saving | Status |
+| --- | ---: | --- | ---: | ---: | --- |
+| Dense BF16 | 0 | 11.98 / 7.27 / 6.93 | 0.671 | 0 | Reference |
+| INT4 PTQ | 0.090 | 13.20 / 7.79 / 7.42 | 0.650 | 47.5% (measured) | Valid |
+| INT4 QAT 100M | 0.036 | 12.60 / 7.58 / 7.21 | 0.658 | 47.5% | Valid |
+| INT4 QAT 1B | 0.035 | 12.59 / 7.61 / 7.24 | 0.666 | 47.5% | Valid |
+| **INT3 PTQ** (`int3-001`) | **0.223** | **15.61 / 9.02 / 8.56** | **0.640** | **51.6% (calculated)** | **Valid** |
+| INT3 QAT 100M (`qat-int3-100m-001`) | 0.269 | 15.96 / 9.36 / 9.49 | 0.620 | 51.6% | **Invalid** |
+| INT3 QAT 1B (`qat-int3-1b-001`) | 1.864 | 15.16 / 14.03 / 69.48 | 0.629 | 51.6% | **Invalid** |
+
+Task macro is the mean of `acc_norm` on PIQA, ARC-Easy, ARC-Challenge, and
+HellaSwag and `acc` on WinoGrande. INT3 PTQ per task: PIQA 0.758, ARC-Easy
+0.700, ARC-Challenge 0.430, WinoGrande 0.641, HellaSwag 0.670 (dense 0.774,
+0.737, 0.472, 0.661, 0.713). The INT3 saving uses the calculated 1,657,999,360
+weight bytes against the dense 3,422,752,768.
+
+Compared with INT4 PTQ, INT3 PTQ saves 4.1 percentage points more of the
+whole model's bytes, at about 2.5 times the KL (0.223 against 0.090) and a
+task macro 1.0 point lower (0.640 against 0.650). Its 8K perplexity is 23%
+above dense. This is one run per variant, without bootstrap intervals yet.
+The GPTQ condition (decision log, 2026-10-17: add GPTQ only if INT3 PTQ is
+much worse than INT3 QAT) cannot be evaluated until a valid INT3 QAT result
+exists.
+
+## INT3 QAT incident (2026-10-25)
+
+**In short.** The INT3 QAT runs trained against a training-time ("fake")
+quantizer that does not reproduce the deployed INT3 format. It nearly agrees
+on ordinary weights but distorts the model's few large outlier weights.
+Training improved this distorted model, and the final conversion restored the
+outliers, so the deployed model was never trained in the form it ships. Both
+INT3 QAT results are invalid, and so are Stacking-1's three order-B INT3
+runs, which use the same code
+([Stacking-1](../stacking/stacking-1.md#int3-order-b-runs-invalid-2026-10-25)).
+INT4 QAT is unaffected: it uses TorchAO's matched INT4 pair.
+
+### Evidence
+
+Observed in the result artifacts. KL is measured on the shared 8K stream; the
+token-0 row is the fake-quantized model before any update.
+
+| KL to dense | INT4 (Quantization-1) | INT3 QAT 100M | INT3 QAT 1B |
+| --- | ---: | ---: | ---: |
+| PTQ model (final evaluation) | 0.0896 | 0.2226 | 0.2226 |
+| Fake-quantized model, token 0 | 0.0897 | 6.229 | 6.229 |
+| Fake-quantized model, last row | 0.0286 (100M), 0.0295 (1B) | 0.0977 | 0.0836 |
+| Deployed model after conversion | 0.0360 (100M), 0.0352 (1B) | 0.2686 | 1.8644 |
+
+At token 0 the INT3 fake-quantized model has a validation 8K perplexity of
+19,594. By the last row it reaches 8.20 (100M) and 8.02 (1B), better than INT3
+PTQ's 8.83, but the converted models lose that gain and more.
+
+A CPU probe on 2026-10-25 ran TorchAO 0.17.0 in a scratch environment with the
+project's own `weight_only_recipe(3)` (deployed) and `qat_prepare_config(3)`
+(training-time, applied to the FP32 master weight as `prepare_qat` does). It
+covered all 66 MLP projections of layers 1-22 of the pinned SmolLM2-1.7B
+snapshot (`effd688a`).
+
+- Ordinary groups nearly agree. 0.8% of the values differ, and the relative
+  weight error is 0.219 deployed against 0.224 training-time. The
+  training-time path keeps a median 86% of each group's largest weight
+  (deployed: 106%), and 51% of the groups lose more than 10% of it.
+- Outlier groups do not agree. The five largest weights:
+
+| Projection | Weight | Deployed INT3 | Training-time INT3 |
+| --- | ---: | ---: | ---: |
+| 22 `down_proj` | +9.375 | +9.625 | −2.752 |
+| 7 `down_proj` | −7.875 | −7.250 | −1.210 |
+| 1 `gate_proj` | −7.719 | −7.312 | −4.379 |
+| 1 `down_proj` | +7.594 | +7.562 | 0.000 |
+| 6 `down_proj` | −5.625 | −5.312 | −1.772 |
+
+The median of each projection's largest weight magnitude is 3.08; typical
+weights are about 0.02. Not computed: the end-to-end model KL with these
+weights on CPU. That the distorted outliers cause the token-0 KL of 6.23 is
+inferred; the probe is consistent with it but does not prove it.
+
+### Cause
+
+The equations below are source-derived from the TorchAO 0.17.0 code
+(`src-torchao-0-17-0`), written in this page's notation. For one group of 128
+weights $w$ with minimum $m$ and maximum $M$:
+
+- **Deployed** (`IntxWeightOnlyConfig` → `IntxUnpackedToInt8Tensor` →
+  `choose_qparams_affine`, asymmetric; `quant_primitives.py`,
+  `_choose_qparams_affine`):
+  $s = (\max(M,0) - \min(m,0))/7$,
+  $z = \mathrm{clamp}(-4 - \mathrm{round}(\min(m,0)/s), -4, 3)$,
+  $q = \mathrm{clamp}(\mathrm{round}(w/s) + z, -4, 3)$, $\hat w = (q - z)s$.
+  The grid covers the group's range.
+- **Training-time** (`IntxFakeQuantizeConfig(torch.int3, group_size=128,
+  is_symmetric=False)`; `qat/fake_quantizer.py`,
+  `IntxFakeQuantizer._per_channel_or_group_forward`): the asymmetric branch
+  calls `utils.py` `get_groupwise_affine_qparams`. Its defaults are the
+  unsigned range 0…7 and a float-domain zero point
+  (`_choose_qparams_affine_tinygemm`): $s = (M - m)/7$, $z_f = m + 4s$. The
+  caller then casts $z_f$ to an integer by truncation and fake-quantizes with
+  the signed range −4…3 in the integer domain:
+  $q = \mathrm{clamp}(\mathrm{round}(w/s) + \mathrm{trunc}(z_f), -4, 3)$,
+  $\hat w = (q - \mathrm{trunc}(z_f))s$.
+
+Two conventions are mixed. In an ordinary group $\mathrm{trunc}(z_f) = 0$,
+so the grid is centred on zero and covers about $[-8a/7, 6a/7]$ for a group
+in $[-a, a]$: the top of the range is cut to 6/7 (the 86% above). In a group
+with an outlier of several units, $z_f$ exceeds 1, the truncated zero point is
+a nonzero integer, the grid shifts, and the outlier is clipped, zeroed, or
+sign-flipped. For example, with the +9.375 weight, $s \approx 1.35$ and
+$\mathrm{trunc}(z_f) = 5$, so $q = \mathrm{clamp}(7 + 5) = 3$ and
+$\hat w = -2 s \approx -2.7$.
+
+The project used this config because TorchAO's matched path refuses
+asymmetric INT3 (the assert in `_infer_fake_quantize_configs`; test
+`test_asymmetric_int3_cannot_use_the_inferred_qat_path`).
+
+### Why the checks did not catch it
+
+- The INT3 QAT contract test
+  (`test_int3_qat_trains_only_the_selected_scope_and_converts`) checks the
+  trainable scope, dtypes, and padding, and that conversion runs. It never
+  compares training-time values with deployed values.
+- The 2026-10-17 CPU probe found that "the library's two rounding paths
+  differ", but on random Gaussian weights, which have no outliers, so the
+  difference looked like a small one-step effect. It was recorded as a
+  limitation instead of being explained.
+- No run-time check compared the fake-quantized start with the PTQ model.
+  INT4's matched pair never needed one, and Stacking-1's K3 compares the start
+  before fake quantization. Stacking-1 recorded the conversion change
+  (`conversion_ppl_delta`) without enforcing it, and Quantization-2 had no
+  conversion check.
+- Stacking-1's recorded order-B INT3 conversion changes (+10.0 and +30.8 PPL)
+  were already on PERUN when Quantization-2 was submitted, but they were not
+  inspected before submission.
+
+### Consequences
+
+- **Invalid:** `qat-int3-100m-001`, `qat-int3-1b-001`, and Stacking-1's
+  `b-fitted-{0.2,0.5,0.8}-100m-int3-001`. Their artifacts stay as evidence;
+  they are not results.
+- **Cost:** 16.0 workflow GPU-hours here (1.78 + 14.25), plus about
+  3.6-4.3 h in Stacking-1.
+- **Still valid:** `int3-001`, and every INT8, INT4, and PTQ result.
+- **Fix and reruns (planned):** the INT3 training-time quantizer will take its
+  scale and zero point from the deployed path. It will have an equality test on
+  real weights and an in-run stop. The reruns are documented here when they
+  finish.
+
+## Measured resource use (2026-10-25)
+
+| Run | Workflow time | Plan | Peak GPU memory (allocated) | Peak process RSS |
+| --- | ---: | --- | ---: | ---: |
+| INT3 PTQ | 0.35 h | 0.3-0.5 h | 14.4 GiB | 5.7 GiB |
+| INT3 QAT 100M | 1.78 h | 1.6-3.5 h | 49.6 GiB | 14.6 GiB |
+| INT3 QAT 1B | 14.25 h | 16-32 h | 49.6 GiB | 14.6 GiB |
+| **Total** | **16.4 h** | 18-36 h (ceiling 44) | | |
+
+- Workflow timing is a stand-in. Scheduler allocation is Unknown: the
+  `scontrol` records had expired by 2026-10-25, and `sacct` is unavailable.
+- All three jobs started at 09:31 UTC on 2026-10-21 and ended at 09:52, 11:18,
+  and 23:46 UTC. 1B training took 47,042 s, about 21.3k tokens/s.
+- QAT peak VRAM was about 50 GiB; Quantization-1 did not record it.
+- Storage: 2.3 GB per run on PROJECT; the 1B checkpoint was not kept.
+
 ## Limits
 
 - One run per variant.
 - INT3 PTQ uses round-to-nearest, known to be weak at 3 bits.
 - INT3 bytes are calculated, not measured; the measured INT3 storage is an
   8-bit container.
-- INT3 and INT4 QAT use different TorchAO fake quantizers. A CPU probe on
-  2026-10-17 showed that converting INT3 QAT weights moves about 0.5-0.7% of
-  them by one step relative to their fake-quantized values
-  ([Stacking-1](../stacking/stacking-1.md#implementation)).
+- INT3 and INT4 QAT use different TorchAO fake quantizers. The 2026-10-17 CPU
+  probe found that converting INT3 QAT weights moves only about 0.5-0.7% of
+  them by one step, but this held only on random Gaussian weights. On the real
+  weights, the INT3 fake quantizer distorts the outliers, and the INT3 QAT
+  results are invalid ([INT3 QAT incident](#int3-qat-incident-2026-10-25)).
 - No speed is measured.
 
 ## Sources
@@ -177,7 +355,10 @@ Entries are registered in [the source registry](../../../../llm-wiki/raw/sources
 the locators are those checked for Stacking-1 on 2026-10-17.
 
 - `src-torchao-0-17-0`: INT3 recipe, `IntxUnpackedToInt8Tensor`, and the
-  explicit fake quantizer.
+  explicit fake quantizer. The incident analysis (2026-10-25) read the wheel's
+  `qat/fake_quantizer.py` (`IntxFakeQuantizer._per_channel_or_group_forward`),
+  `utils.py` (`get_groupwise_affine_qparams`), and `quant_primitives.py`
+  (`_choose_qparams_affine_tinygemm`, `_choose_qparams_affine`).
 - `src-qat-jacob-2018`: Section 3, simulated quantization during training.
 - `src-ste-bengio-2013`: Section 4, straight-through estimator.
 - `src-gptq-2023`: Section 5, round-to-nearest at 3 bits. Not implemented.

@@ -15,7 +15,7 @@ protocol, and artifacts.
 | --- | --- | --- |
 | [Compression baseline](compression-baseline.md) | Compare fitting methods under a fixed interleaved SwiGLU replacement pattern. | Notebook artifacts present; Python runner not yet executed |
 | [Quantization-1](quantization-1.md) | Compare MLP-only INT8/INT4 compression with architectural editing in quality, measured bytes, speed, and recovery cost. | Completed 2026-10-13; see its results |
-| [Quantization-2](quantization-2.md) | The dense INT3 baseline: INT3 PTQ and INT3 QAT at 100M and 1B, on Quantization-1's runner and preparation, with calculated INT3 bytes and no speed. | Implemented 2026-10-20; not yet submitted |
+| [Quantization-2](quantization-2.md) | The dense INT3 baseline: INT3 PTQ and INT3 QAT at 100M and 1B, on Quantization-1's runner and preparation, with calculated INT3 bytes and no speed. | Ran 2026-10-21/22; INT3 PTQ valid; both INT3 QAT runs invalid (2026-10-25 incident); fix and reruns planned |
 | [Speed-1](speed-1.md) | Time dense, quantized, and SwiGLU-8 models in one job on one GPU, so their speeds are comparable. | Implemented 2026-10-15; not yet submitted |
 
 Matching [notebooks](../../../../notebooks/model/baseline/README.md),

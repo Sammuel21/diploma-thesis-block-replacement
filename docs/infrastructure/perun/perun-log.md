@@ -2,7 +2,7 @@
 title: TUKE Perun Experiment Log
 status: active
 created: 2026-09-25
-modified: 2026-10-18
+modified: 2026-10-25
 ---
 
 # TUKE Perun Experiment Log
@@ -341,3 +341,19 @@ Entries are appended below in submission order.
 - Variance: training and block check within plan; reference KL much faster than planned (96 s against 6-18 min)
 - Experiment document: [SwiGLU-9](../../experiments/model/swiglu/swiglu-9.md#part-b-results-2026-10-18)
 - Notes: `scontrol` records had expired by the time they were requested, so scheduler state, exit codes, and elapsed times come from the job logs and the result records.
+
+## [2026-10-21, started 09:31 UTC; submission time unrecorded] 123646-123648 | Quantization-2 INT3 PTQ, INT3 QAT 100M, and INT3 QAT 1B
+
+- Plan: PTQ 0.3-0.5 h (2-hour limit), QAT 100M 1.6-3.5 h (6-hour limit), QAT 1B 16-32 h (36-hour limit); about 18-36 GPU-hours expected, ceiling 44 ([resource plan](../../experiments/model/baseline/quantization-2.md#pre-run-resource-plan)); medium confidence for PTQ, low for QAT
+- Outcome: all 3 COMPLETED with structured status `completed`; no retries. Both QAT results were later found scientifically invalid (INT3 fake-quantizer mismatch, 2026-10-25); the jobs themselves ran as designed
+- Submission: `workflows/jobs/perun/quantization_1.sbatch run <output> --config workflows/configs/model/baseline/quantization-2.json --prepared <quantization-1 prepare-001>/result.json`, variant `ptq-int3` (123646) or `qat-int3` with `--qat-tokens` 100000000 (123647) and 1000000000 (123648); three single submissions with `--job-name=quantization-2`, after Stacking-1 had finished
+- Provenance: commit `d7d7c1e`; configuration sha256 `650e8ca1…`; Quantization-1's `prepare-001` reused; both QAT streams matched their pinned sha256 (`570409c1…` 100M, `f78bf805…` 1B)
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, 128 GB requested memory per job; nodes Unknown
+- Consumption: workflow elapsed 0.35 / 1.78 / 14.25 h (16.4 h in total); all three started at 09:31 UTC on 2026-10-21 and ended at 09:52, 11:18, and 23:46 UTC; requested GPU-hour ceiling 44; allocation GPU-hours Unknown; peak GPU memory allocated 14.4 GiB (PTQ) and 49.6 GiB (each QAT run); peak process RSS 5.7 and 14.6 GiB
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown
+- Outputs: PROJECT `perun-results/quantization-2/{int3,qat-int3-100m,qat-int3-1b}-001/` (2.3 GB each); analysis copy on the PC in `data/results/workflows/model/quantization-2/`
+- Continuation: completed; the 1B checkpoint was not kept after validation
+- Verification: "Verified persistent output" logged for all three; no tracebacks; no leftover locks; stream, scope, and bundle checks passed. No check compared the INT3 fake quantizer with the deployed INT3, which is where the defect was
+- Variance: PTQ and QAT 100M within plan; QAT 1B faster than planned (14.25 h against 16-32 h)
+- Experiment document: [Quantization-2](../../experiments/model/baseline/quantization-2.md#results-2026-10-25)
+- Notes: `scontrol` returned "Invalid job id" for all three on 2026-10-25 and `sacct` is unavailable, so the times come from the job logs and result records. Incident record: [INT3 QAT incident](../../experiments/model/baseline/quantization-2.md#int3-qat-incident-2026-10-25).

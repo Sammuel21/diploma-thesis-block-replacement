@@ -2,7 +2,7 @@
 title: Stacking-1 - SwiGLU Replacement Plus Weight Quantization
 status: active
 created: 2026-10-17
-modified: 2026-10-20
+modified: 2026-10-25
 ---
 
 # Stacking-1 - SwiGLU Replacement Plus Weight Quantization
@@ -20,6 +20,12 @@ after the researcher's go. The binding decisions are the 2026-10-16,
 2026-10-17, and 2026-10-20 rows in the
 [shared decision log](../../../agents/decisions.md); if this page and the log
 disagree, the log wins until the conflict is raised.
+
+**Update (2026-10-25):** all 48 runs ran on PERUN on 2026-10-20/21 and
+completed. The results analysis and the job-log entry are still pending. The
+three order-B INT3 runs are invalid
+([INT3 order-B runs invalid](#int3-order-b-runs-invalid-2026-10-25)); the
+other 45 runs are unaffected.
 
 ## Questions
 
@@ -301,6 +307,13 @@ library's two rounding paths differ, and matching the scale precision did not
 remove it. GPU execution, MSLK kernels, autocast on INT3 weights, and full
 evaluation are untested and are part of the intended runs.
 
+*Correction (2026-10-25):* the probe's random Gaussian weights have no
+outliers, so the difference looked small. On the real SmolLM2 weights, the
+INT3 fake quantizer distorts the outlier weights (for example 9.375 becomes
+−2.752 while the deployed INT3 keeps 9.625). The difference was a defect, not
+a limitation
+([INT3 order-B runs invalid](#int3-order-b-runs-invalid-2026-10-25)).
+
 On 2026-10-20 the dense group was removed and SwiGLU-9's fitted 80% model was
 pinned from the copy of its run on the researcher's PC (`result.json`
 sha256 `69b86261…`, bundle manifest `1f384bb4…`; the result's own manifest
@@ -340,6 +353,40 @@ and revised on 2026-10-20 for the 48-run grid. Estimates, not measurements.
   before Stacking-1 (about 210 recorded on 2026-10-17 plus SwiGLU-9's 55.5
   workflow-timing hours).
 
+## INT3 order-B runs invalid (2026-10-25)
+
+`b-fitted-0.2-100m-int3-001`, `b-fitted-0.5-100m-int3-001`, and
+`b-fitted-0.8-100m-int3-001` are invalid. Order B prepares with
+`prepare_qat` and converts with `convert_qat`. At 3 bits these use TorchAO's
+generic INT3 fake quantizer, which does not reproduce the deployed INT3 and
+distorts the outlier weights. The cause and the real-weight evidence are in
+[Quantization-2's incident record](../baseline/quantization-2.md#int3-qat-incident-2026-10-25).
+Order A quantizes once with `apply_ptq` and never uses the fake quantizer, so
+all 42 order-A runs, including the 14 INT3 ones, are unaffected, and so are
+the three order-B INT4 runs.
+
+Observed in the result artifacts. KL is the 8K teacher KL, PPL is WikiText-2
+test perplexity at 8K, and macro is the five-task mean.
+
+| Width reduction | A-INT4 KL / PPL / macro | B-INT4 | A-INT3 | B-INT3 (invalid) |
+| --- | --- | --- | --- | --- |
+| 20% | 0.164 / 8.28 / 0.613 | 0.102 / 8.00 / 0.625 | 0.288 / 9.46 / 0.600 | 0.302 / 9.68 / 0.569 |
+| 50% | 0.318 / 10.52 / 0.540 | 0.255 / 9.92 / 0.554 | 0.432 / 11.91 / 0.540 | 0.484 / 13.03 / 0.501 |
+| 80% | 0.707 / 17.49 / 0.456 | 0.579 / 15.71 / 0.463 | 0.875 / 21.48 / 0.446 | 1.011 / 25.01 / 0.429 |
+
+- **Start:** the order-B INT3 runs start training with a validation KL of
+  5.165, 5.882, and 6.639; the INT4 runs start at 0.247, 0.540, and 1.292.
+- **Conversion change** (recorded `conversion_ppl_delta`, not enforced):
+  INT4 −0.03, +0.18, and +1.38 PPL; INT3 −2.41, +10.04, and +30.77 PPL.
+  *Interpretation:* at 20% the conversion helps, because the frozen dense-kept
+  layers get their outliers back.
+- **Outcome:** order B beats order A at every width for INT4, but loses for
+  INT3. Until the INT3 order-B runs are rerun with a fixed quantizer, there is
+  no evidence on whether the order matters at INT3.
+- **Cost:** about 3.6-4.3 workflow GPU-hours (1.20-1.42 h per order-B task).
+- **Reruns:** planned as `-002` outputs after the fix, and documented here when
+  they finish.
+
 ## Limits
 
 - One run per variant.
@@ -348,8 +395,9 @@ and revised on 2026-10-20 for the 48-run grid. Estimates, not measurements.
   container.
 - INT3 QAT uses TorchAO's generic fake quantizer, INT4 QAT its dedicated INT4
   one, so the two QAT points do not share one fake-quantization
-  implementation. Conversion moves a small share of INT3 weights by one step
-  relative to their fake-quantized values (CPU probe above).
+  implementation. The INT3 fake quantizer does not reproduce the deployed
+  INT3, and the order-B INT3 runs are invalid
+  ([INT3 order-B runs invalid](#int3-order-b-runs-invalid-2026-10-25)).
 - For INT4, the padding zeros can widen the range of one group per row in one
   layer per padded model.
 - Order B fake-quantizes the dense-kept layers without training them, as order
