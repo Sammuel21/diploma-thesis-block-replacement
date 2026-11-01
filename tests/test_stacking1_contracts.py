@@ -1,7 +1,9 @@
-"""Stacking-1 contracts: configuration, grid, padding, bytes, and INT3; no model download or GPU job."""
+"""Stacking-1 contracts: configuration, grid, padding, bytes, INT3, and order B at 1B; no model download or GPU job."""
 
+import hashlib
 import importlib.util
 import json
+import struct
 import sys
 import tempfile
 import types
@@ -17,12 +19,14 @@ sys.path.insert(0, str(ROOT / "src"))
 import torch
 import torch.nn as nn
 
-from mlp_replacement.artifacts import read_json, write_json_atomic
+from mlp_replacement.artifacts import file_digest, read_json, write_json_atomic
 from mlp_replacement.compression import quantization
 from mlp_replacement.operators import GatedMLPReplacement
 from workflows.runs.model.stacking import stacking_1 as runner
+from workflows.runs.model.swiglu.swiglu_8 import AcceptanceFailure
 
 TORCHAO_AVAILABLE = importlib.util.find_spec("torchao") is not None
+LOCAL_RESULTS = ROOT / "data/results/workflows/model"
 
 
 class DenseMLP(nn.Module):
@@ -68,17 +72,33 @@ class ConfigurationContracts(unittest.TestCase):
         self.assertEqual((evaluation["bootstrap_resamples"], self.settings["seed"]), (10000, 21))
         self.assertEqual(self.settings["long_context"]["sequence_length"], quantization1["data"]["sequence_length"])
         self.assertEqual(self.settings["recovery"]["target_tokens"], 100_000_000)
+        # Order B at 1B uses the recipe of the order-A 1B sources (SwiGLU-7, and SwiGLU-9 Part B).
+        swiglu7 = read_json(ROOT / "workflows/configs/model/swiglu/swiglu-7.json")
+        swiglu9 = read_json(ROOT / "workflows/configs/model/swiglu/swiglu-9.json")
+        self.assertEqual(self.settings["recovery_1b"], swiglu7["recovery"])
+        self.assertEqual(self.settings["recovery_1b"], swiglu9["recovery"])
+        self.assertEqual(self.settings["recovery_1b"]["target_tokens"], 1_000_000_000)
 
-    def test_grid_has_the_decided_forty_eight_stacked_variants(self):
+    def test_grid_has_the_decided_stacked_variants(self):
         table = runner.variant_table(self.settings)
         counts = {group: sum(spec["group"] == group for spec in table.values()) for group in runner.GROUPS}
-        self.assertEqual(counts, {"a100m": 33, "a1b": 9, "b": 6})
-        self.assertEqual(len(table), 48)
+        self.assertEqual(counts, {"a100m": 33, "a1b": 9, "b": 6, "b1b": 6})
+        self.assertEqual(len(table), 54)
         # Quantization of the dense model alone is Quantization-2's baseline (decision log, 2026-10-20).
         self.assertEqual({spec["order"] for spec in table.values()}, {"A", "B"})
         self.assertFalse([name for name in table if name.startswith("a-slice") and "-1b-" in name])
         self.assertEqual({spec["bits"] for spec in table.values() if spec["order"] == "B"}, {4, 3})
-        self.assertEqual(table["b-fitted-0.8-100m-int3"]["reference"], "fitted-0.8-100m")
+        # Group b's identities are those of its completed runs.
+        self.assertEqual(table["b-fitted-0.8-100m-int3"], {"group": "b", "order": "B", "bits": 3,
+                                                           "start": "fitted-0.8", "reference": "fitted-0.8-100m"})
+        one_b = [name for name, spec in table.items() if spec["group"] == "b1b"]
+        self.assertEqual(one_b, [name.replace("-100m-", "-1b-") for name, spec in table.items() if spec["group"] == "b"])
+        # K3 compares the start with SwiGLU-8's token-zero row at every budget.
+        self.assertEqual(table["b-fitted-0.8-1b-int4"]["reference"], "fitted-0.8-100m")
+        self.assertEqual(runner.recovery_settings(self.settings, table["b-fitted-0.8-1b-int4"]),
+                         self.settings["recovery_1b"])
+        self.assertEqual(runner.recovery_settings(self.settings, table["b-fitted-0.8-100m-int4"]),
+                         self.settings["recovery"])
 
     def test_pins_agree_with_swiglu9(self):
         swiglu9 = read_json(ROOT / "workflows/configs/model/swiglu/swiglu-9.json")["sources"]
@@ -90,6 +110,16 @@ class ConfigurationContracts(unittest.TestCase):
         for target, digest in swiglu9["swiglu7_runs_sha256"].items():
             self.assertEqual(models[f"fitted-{target}-1b"]["result_sha256"], digest)
         self.assertEqual(models["fitted-0.8-1b"]["workflow"], "swiglu-9")
+        # The 1B stream's preparation is the one SwiGLU-8 and SwiGLU-9 pin.
+        self.assertEqual(self.settings["sources"]["swiglu7_prepare_sha256"],
+                         swiglu9["swiglu7_prepare_sha256"])
+
+    def test_1b_int3_twins_are_the_fixed_quantizer_reruns(self):
+        twins = self.settings["sources"]["b1b_twins"]
+        self.assertEqual(sorted(twins), [f"b-fitted-{target}-1b-int3" for target in (0.2, 0.5, 0.8)])
+        # The -001 INT3 runs are invalid (decision log, 2026-10-25).
+        self.assertEqual({name: twin["run"] for name, twin in twins.items()},
+                         {name: name.replace("-1b-", "-100m-") + "-002" for name in twins})
 
     def test_unpinned_source_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -105,6 +135,12 @@ class ConfigurationContracts(unittest.TestCase):
             ("orders", lambda value: value["A"]["stages"].remove("pad"), "stage lists"),
             ("grid", lambda value: value["a1b"]["sources"].append("slice-0.2-1b"), "run grid"),
             ("evaluation", lambda value: value.update(bootstrap_resamples=1000), "evaluation"),
+            ("recovery_1b", lambda value: value.update(learning_rate=1e-4), "1B recovery"),
+            ("grid", lambda value: value["b1b"]["bits"].append(8), "run grid"),
+            ("sources", lambda value: value.update(swiglu7_prepare_sha256="0" * 64), "that SwiGLU-8 pins"),
+            ("sources", lambda value: value["b1b_twins"]["b-fitted-0.2-1b-int3"].update(
+                run="b-fitted-0.5-100m-int3-002"), "twin of b-fitted-0.2-1b-int3"),
+            ("sources", lambda value: value["b1b_twins"].pop("b-fitted-0.8-1b-int3"), "INT3 twins"),
         ]
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "config.json"
@@ -200,6 +236,161 @@ class PaddingAndBytesContracts(unittest.TestCase):
                                                          "mapping": "asymmetric", "group_size": 128,
                                                          "input_axis": -1, "int4_packing_format": "PLAIN"})
         self.assertEqual(quantization.recipe_record(3)["config"], "IntxWeightOnlyConfig")
+
+
+def monitoring_row(tokens, kl, perplexity=None):
+    row = {"actual_tokens": tokens, "requested_tokens": [tokens], "recovery_validation_kl": kl}
+    if perplexity is not None:
+        row["wikitext_validation"] = {"perplexity": perplexity}
+    return row
+
+
+class OrderB1BContracts(unittest.TestCase):
+    """Order B at 1B: SwiGLU-7's 1B recipe and stream, and the 100M-twin check K7."""
+
+    def setUp(self):
+        self.settings, unused_path = runner.load_settings(runner.DEFAULT_CONFIG)
+        self.table = runner.variant_table(self.settings)
+
+    def context(self, directory, variant, settings=None, **values):
+        output_dir = Path(directory) / "output"
+        output_dir.mkdir(exist_ok=True)
+        artifact = {"schema_version": runner.SCHEMA_VERSION, "workflow": runner.WORKFLOW, "command": "run",
+                    "status": "running", "configuration": {}, "results": {}}
+        return types.SimpleNamespace(settings=settings or self.settings, variant=variant, spec=self.table[variant],
+                                     artifact=artifact, output_dir=output_dir, **values)
+
+    def test_first_100m_tokens_follow_the_100m_schedule(self):
+        """K7 compares rows at the same requests, so both recipes must checkpoint alike until 100M."""
+
+        from mlp_replacement.compression.continuation import segment_schedule
+        from workflows.runs.model.swiglu.swiglu_7 import desired_requests
+
+        short, long = self.settings["recovery"], self.settings["recovery_1b"]
+        self.assertEqual(set(short), set(long))
+        self.assertEqual({key for key in short if short[key] != long[key]},
+                         {"target_tokens", "segment_endpoints", "monitoring_ppl_tokens"})
+        # The first segment ends exactly at 100M, so its last partial update is the 100M run's.
+        self.assertEqual(long["segment_endpoints"][0], short["target_tokens"])
+        schedules = [segment_schedule(0, short["target_tokens"], desired_requests({"recovery": block}),
+                                      block["effective_batch_tokens"]) for block in (short, long)]
+        self.assertEqual(schedules[0], schedules[1])
+        self.assertEqual([value for value in long["monitoring_ppl_tokens"] if value <= short["target_tokens"]],
+                         short["monitoring_ppl_tokens"])
+
+    def test_inputs_stage_the_1b_stream_and_the_int3_twin(self):
+        prepared = {"results": {
+            "evaluation_protocol": {"corpora": {"test": {"path": "prepared/test.int32"}}},
+            "dense_evaluation": {"tasks": {"piqa": {"path": "prepared/piqa.json"}}},
+            "monitoring_evaluation": {"path": "prepared/monitoring.pt"},
+            "long_context_data": {"kl_stream": {"path": "prepared/kl.int32"}},
+            "starts": {runner.start_key("fitted", target): {"path": f"prepared/starts/{target}.pt"}
+                       for target in (0.2, 0.5, 0.8)},
+            "stream": {"path": "prepared/recovery-tokens.int32"},
+        }}
+        common = ["prepared prepared/test.int32", "prepared prepared/piqa.json", "prepared prepared/monitoring.pt",
+                  "prepared prepared/kl.int32", "reference swiglu-8/fitted-target-0.2-run-001/result.json",
+                  "prepared prepared/starts/0.2.pt"]
+        one_billion = ["reference swiglu-7/prepare-001/result.json",
+                       "reference swiglu-7/prepare-001/prepared/recovery-tokens.int32"]
+        self.assertEqual(runner.variant_inputs(self.settings, "b-fitted-0.2-100m-int3", prepared),
+                         [*common, "prepared prepared/recovery-tokens.int32"])
+        self.assertEqual(runner.variant_inputs(self.settings, "b-fitted-0.2-1b-int4", prepared),
+                         [*common, *one_billion])
+        self.assertEqual(runner.variant_inputs(self.settings, "b-fitted-0.2-1b-int3", prepared),
+                         [*common, *one_billion, "reference stacking-1/b-fitted-0.2-100m-int3-002/result.json"])
+
+    def test_1b_stream_must_start_with_the_100m_stream(self):
+        tokens = struct.pack("<8i", *range(8))
+        with tempfile.TemporaryDirectory() as temporary:
+            sources = Path(temporary) / "sources"
+            stream_path = sources / runner.SWIGLU7_PREPARE / runner.SWIGLU7_STREAM
+            stream_path.parent.mkdir(parents=True)
+            stream_path.write_bytes(tokens)
+            record = {"path": runner.SWIGLU7_STREAM, "token_count": 8, "sequence_length": 2,
+                      "sha256": hashlib.sha256(tokens).hexdigest()}
+            write_json_atomic(sources / runner.SWIGLU7_PREPARE / "result.json", {"results": {"stream": record}})
+            settings = deepcopy(self.settings)
+            preparation = sources / runner.SWIGLU7_PREPARE / "result.json"
+            settings["sources"]["swiglu7_prepare_sha256"] = file_digest(preparation)
+            prefix = {"token_count": 4, "sha256": hashlib.sha256(tokens[:16]).hexdigest()}
+            context = self.context(temporary, "b-fitted-0.2-1b-int4", settings,
+                                   prepared={"results": {"stream": prefix}}, source_root=sources)
+            recovery = {"target_tokens": 8, "sequence_length": 2}
+            record, path, source = runner.recovery_stream(context, recovery)
+            self.assertEqual((Path(path).resolve(), source), (stream_path.resolve(), "swiglu-7 prepare-001"))
+            self.assertTrue(context.artifact["results"]["acceptance"]["K7-stream"]["passed"])
+            prefix["sha256"] = hashlib.sha256(tokens[4:20]).hexdigest()
+            with self.assertRaises(AcceptanceFailure):
+                runner.recovery_stream(context, recovery)
+            with self.assertRaisesRegex(ValueError, "does not cover"):
+                runner.recovery_stream(context, {"target_tokens": 16, "sequence_length": 2})
+
+    def test_twin_must_be_a_completed_fixed_quantizer_100m_run(self):
+        stream = "a" * 64
+        twin = {"status": "completed", "identity": {"variant": "b-fitted-0.2-100m-int3"},
+                "configuration": {"recovery": self.settings["recovery"]}, "recovery_stream": {"sha256": stream},
+                "results": {"acceptance": {"K3": {"passed": True}, "K6-start": {"passed": True}},
+                            "recovery": {"validation_history": [monitoring_row(0, 0.5, 20.0)]}}}
+        with tempfile.TemporaryDirectory() as temporary:
+            sources = Path(temporary) / "sources"
+            path = sources / "stacking-1" / "b-fitted-0.2-100m-int3-002" / "result.json"
+            settings = deepcopy(self.settings)
+
+            def history(variant, artifact):
+                write_json_atomic(path, artifact)
+                settings["sources"]["b1b_twins"]["b-fitted-0.2-1b-int3"]["result_sha256"] = file_digest(path)
+                context = self.context(temporary, variant, settings, source_root=sources,
+                                       prepared={"results": {"stream": {"sha256": stream}}})
+                return runner.twin_history(context), context.artifact["results"]
+
+            rows, results = history("b-fitted-0.2-1b-int3", twin)
+            self.assertEqual(rows, twin["results"]["recovery"]["validation_history"])
+            self.assertEqual(results["twin"]["run"], "b-fitted-0.2-100m-int3-002")
+            self.assertEqual(history("b-fitted-0.2-1b-int4", twin), (None, {"twin": None}))
+            self.assertEqual(history("b-fitted-0.2-100m-int3", twin), (None, {}))
+            # An invalid -001 INT3 run has no K6 record.
+            invalid = deepcopy(twin)
+            del invalid["results"]["acceptance"]["K6-start"]
+            with self.assertRaisesRegex(ValueError, "fixed-quantizer"):
+                history("b-fitted-0.2-1b-int3", invalid)
+
+    def test_k7_stops_only_on_token_zero_and_reviews_10m_to_100m(self):
+        twin = [monitoring_row(0, 0.5, 20.0), monitoring_row(10_000_000, 0.4, 18.0),
+                monitoring_row(75_000_000, 0.3)]
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.context(temporary, "b-fitted-0.2-1b-int3")
+            runner.check_twin(context, None)
+            self.assertNotIn("acceptance", context.artifact["results"])
+            own = [monitoring_row(0, 0.5, 20.0), monitoring_row(10_000_000, 0.4, 18.0),
+                   monitoring_row(75_000_000, 0.33), monitoring_row(125_000_000, 0.2)]
+            context.artifact["results"]["recovery"] = {"validation_history": own}
+            runner.check_twin(context, twin)
+            acceptance = context.artifact["results"]["acceptance"]
+            self.assertTrue(acceptance["K7-start"]["passed"])
+            review = acceptance["K7-review"]
+            self.assertEqual(sorted({check["tokens"] for check in review["checks"]}), [10_000_000, 75_000_000])
+            self.assertEqual([(check["tokens"], check["metric"]) for check in review["checks"] if not check["passed"]],
+                             [(75_000_000, "recovery_validation_kl")])
+            own[0]["recovery_validation_kl"] = 0.5001
+            with self.assertRaises(AcceptanceFailure):
+                runner.check_twin(context, twin)
+
+    @unittest.skipUnless((LOCAL_RESULTS / "stacking-1").is_dir(), "Downloaded results are not present")
+    def test_pins_match_the_downloaded_artifacts(self):
+        twins = self.settings["sources"]["b1b_twins"]
+        for twin in twins.values():
+            self.assertEqual(file_digest(LOCAL_RESULTS / "stacking-1" / twin["run"] / "result.json"),
+                             twin["result_sha256"])
+        preparation = LOCAL_RESULTS / runner.SWIGLU7_PREPARE / "result.json"
+        self.assertEqual(file_digest(preparation), self.settings["sources"]["swiglu7_prepare_sha256"])
+        self.assertEqual(read_json(preparation)["results"]["stream"]["path"], runner.SWIGLU7_STREAM)
+        prepared = read_json(LOCAL_RESULTS / "swiglu-8" / "prepare-001" / "result.json")
+        with tempfile.TemporaryDirectory() as temporary:
+            for variant in twins:
+                context = self.context(temporary, variant, source_root=LOCAL_RESULTS, prepared=prepared)
+                self.assertEqual([row["requested_tokens"] for row in runner.twin_history(context)],
+                                 [[0], [10_000_000], [25_000_000], [50_000_000], [75_000_000], [100_000_000]])
 
 
 @unittest.skipUnless(TORCHAO_AVAILABLE, "TorchAO is not installed")

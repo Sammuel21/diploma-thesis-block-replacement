@@ -699,10 +699,13 @@ The `mismatched` list must be empty for all 66 projections; then submit 10.6.
 If the run stops instead, its `.err` file says "INT4 fake-quantized weights
 differ": stop and tell the assistant.
 
+While the job runs, its record is on scratch; it is copied to
+`$PERUN_RESULTS` only when the job ends.
+
 ```bash
 source "$PERUN_LOG_DIR/quantization-1-int4-rerun_submission.txt"
 squeue -j "$QINT4"
-python -c "import json; r = json.load(open('$PERUN_RESULTS/quantization-1/qat-int4-100m-002/result.json')); c = r['results'].get('int4_fake_quantization_check'); print(r['status'], 'check:', c and (c['projections'], c['mismatched']))"
+python -c "import json; r = json.load(open('$PERUN_SCRATCH/job_$QINT4/results/qat-int4-100m-002/result.json')); c = r['results'].get('int4_fake_quantization_check'); print(r['status'], 'check:', c and (c['projections'], c['mismatched']))"
 tail -n 5 "$PERUN_LOG_DIR/quantization-1_$QINT4.err"
 ```
 
@@ -1063,6 +1066,7 @@ refuses changed code.
 | Update and pre-submission checks (done 2026-10-20) | 10.1 | - | minutes | Every line OK; your queue is empty |
 | Submit all 48 tasks: order B (6), order A at 100M (33), order A at 1B (9) (done 2026-10-20) | 10.2 | 6 h (B) or 2 h (A), 128 GB | 1.5-3 h (B), 0.3-0.5 h (A) | K1, K2, K4, K5 (order A); K3, K4, K5 (order B) |
 | Rerun the three order-B INT3 tasks as `-002` (stage 1, with 11.5) | 10.5 | 3 h, 128 GB | 1.2-1.6 h | K3, K5, K6 (K4 covers INT8 and INT4 only) |
+| Order B at 1B: six tasks in one array (`b1b`, `-001`) | 10.7 | 18 h, 128 GB | 10-12.5 h | K3, K4 (INT4), K5, K6, K7 (`K7-start` and `K7-review` for INT3 only) |
 
 At the original submission, PERUN accepted at most 48 submitted tasks,
 counting each array task, and refused every new `sbatch` while 4 of your jobs
@@ -1073,7 +1077,7 @@ for SwiGLU-9. Both limits have since changed (perun-status.md, 2026-10-25):
 
 Task maps come from the runner, not the job script:
 `python -m workflows.runs.model.stacking.stacking_1 list-variants --group b`
-(or `a100m`, `a1b`) prints the variants in array order.
+(or `a100m`, `a1b`, `b1b`) prints the variants in array order.
 
 Run 1.2, 1.3, and 1.4 first.
 
@@ -1301,6 +1305,131 @@ fi
 preparation with `AcceptanceFailure` and `K6-start` in its `.err` file; a
 mismatch at conversion stops it with "Deployed INT4 weights differ". Either
 way, stop and tell the assistant.
+
+### 10.7 Order B at 1B (`b1b`)
+
+Design, checks K7, and resource plan:
+[stacking-1.md](../../experiments/model/stacking/stacking-1.md#order-b-at-1b-plan-2026-11-01).
+Six tasks in one array, all running at once, about 10-12.5 h each with an
+18 h limit. Submit only after the researcher's go. 4.6 and 10.6 run from
+`b59da5c`, which does not contain the 1B code. Update the checkout (1.4) only
+after their jobs have *finished*, because a resume refuses changed code. The
+check below confirms that the updated checkout still contains the INT4 fix.
+Do not update the checkout again until all six tasks have *finished*.
+
+Task map: 0 fitted 0.2 INT4, 1 fitted 0.2 INT3, 2 fitted 0.5 INT4, 3 fitted
+0.5 INT3, 4 fitted 0.8 INT4, 5 fitted 0.8 INT3.
+
+**Pre-submission checks. Safe to re-run.** Run 1.2, 1.3, and 1.4 first. Every
+hash line must print OK (the 4 GB stream takes about a minute). The stream
+size must be 4000000000. `list-variants` must print the six variants in
+task-map order. The `--test-only` line must be accepted, and no 1B output
+may exist yet.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+git log -1 --oneline
+git merge-base --is-ancestor b59da5c HEAD && echo "INT4 fix included" || echo "MISSING the INT4 fix commit"
+# Every pinned 1B input exists and matches the configuration.
+python - <<'EOF'
+import hashlib, json, os
+config = json.load(open("workflows/configs/model/stacking/stacking-1.json"))
+sources = config["sources"]
+root = os.environ["PERUN_RESULTS"]
+def sha(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+expected = {"swiglu-8/prepare-001/result.json": sources["swiglu8_prepare_sha256"],
+            "swiglu-7/prepare-001/result.json": sources["swiglu7_prepare_sha256"]}
+for target in ("0.2", "0.5", "0.8"):
+    model = sources["models"][f"fitted-{target}-100m"]
+    expected[f"{model['workflow']}/{model['run']}/result.json"] = model["result_sha256"]
+for twin in sources["b1b_twins"].values():
+    expected[f"stacking-1/{twin['run']}/result.json"] = twin["result_sha256"]
+preparation = os.path.join(root, "swiglu-7/prepare-001/result.json")
+if os.path.isfile(preparation):
+    stream = json.load(open(preparation))["results"]["stream"]
+    expected[f"swiglu-7/prepare-001/{stream['path']}"] = stream["sha256"]
+for relative, digest in expected.items():
+    path = os.path.join(root, relative)
+    print("MISSING " if not os.path.isfile(path) else "OK      " if sha(path) == digest else "MISMATCH", relative)
+EOF
+stat -c '%s %n' "$PERUN_RESULTS/swiglu-7/prepare-001/prepared/recovery-tokens.int32"
+ls "$PERUN_RESULTS"/swiglu-8/prepare-001/prepared/starts/fitted-target-0.{2,5,8}.pt
+pip show torch torchao mslk 2>/dev/null | grep -E '^(Name|Version)'
+PYTHONPATH=src python -m workflows.runs.model.stacking.stacking_1 list-variants --group b1b
+bash -n workflows/jobs/perun/stacking_1.sbatch && echo "launcher syntax OK"
+find "$PERUN_RESULTS/stacking-1" -maxdepth 1 -name 'b-fitted-*-1b-*' | grep . || echo "no 1B outputs yet"
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=18:00:00 --array=0-5 \
+  workflows/jobs/perun/stacking_1.sbatch group b1b
+squeue -u "$USER"
+perunfsusage    # PROJECT needs about 10 GB; SCRATCH about 20 GB per task
+```
+
+**Submits jobs. Run once,** after the checks are clean. It writes the job ID
+to `$PERUN_LOG_DIR/stacking-1-b1b_submission.txt`. If the ID prints empty,
+`sbatch` was refused: tell the assistant before submitting again.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+EXISTING=$(find "$PERUN_RESULTS/stacking-1" -maxdepth 1 -name 'b-fitted-*-1b-*')
+if [[ -n "$EXISTING" ]]; then
+    echo "STOP: an order-B 1B output or lock already exists:"; echo "$EXISTING"
+else
+    B1B=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=18:00:00 --array=0-5 \
+        --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        workflows/jobs/perun/stacking_1.sbatch group b1b)
+    printf 'B1B=%s\n' "${B1B%%;*}" | tee "$PERUN_LOG_DIR/stacking-1-b1b_submission.txt"
+    echo "<- record this in local/perun/runs/stacking-1.md"
+fi
+```
+
+**Watch. Safe to re-run.** A failed stopping check (K3-K7) ends a task with
+`AcceptanceFailure` in its `.err` file: stop and tell the assistant.
+`K7-start` runs in the first minutes, before the first update. `K7-review`
+never stops a task. A flagged value (more than 1% from the 100M twin, at
+10-100M) must be investigated before any result is used; tell the assistant.
+
+```bash
+B1B=$(sed -n 's/^B1B=//p' "$PERUN_LOG_DIR/stacking-1-b1b_submission.txt")
+squeue -j "$B1B" -o "%.18i %.10T %.10M %.11l %R"
+for FILE in "$PERUN_LOG_DIR"/stacking-1_"$B1B"_*.out; do
+    LAST=$(grep '^variant=.*tokens=' "$FILE" | tail -n 1)
+    DONE=$(grep -l 'Verified persistent output' "$FILE")
+    FAILED=$(grep -l -E 'AcceptanceFailure|Traceback' "${FILE%.out}.err" 2>/dev/null)
+    echo "$(basename "$FILE"): ${LAST:-starting}${DONE:+ | done}${FAILED:+   <- check its .err}"
+done
+# Checks of the running tasks (their result.json is on SCRATCH until the task ends).
+python - <<'EOF'
+import json, os
+from pathlib import Path
+for result in sorted(Path(os.environ["PERUN_SCRATCH"]).glob("job_*/results/b-fitted-*-1b-*/result.json")):
+    acceptance = json.loads(result.read_text()).get("results", {}).get("acceptance", {})
+    flags = [f"{row['tokens']:,} {row['metric']} {row['relative_difference']:.2%}"
+             for row in acceptance.get("K7-review", {}).get("checks", []) if not row["passed"]]
+    print(result.parent.name, {group: summary["passed"] for group, summary in acceptance.items()},
+          "| K7-review flags:", flags or "none")
+EOF
+gpu-status
+```
+
+**Resume a stopped task** only after the cause is understood, as in 10.4. A
+resume continues from the last 25M-token checkpoint and refuses changed code.
+Replace the index:
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=18:00:00 --array=3 \
+  --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+  workflows/jobs/perun/stacking_1.sbatch group b1b --resume
+```
+
+Right after the last task finishes, run section 7 for the job ID (scheduler
+records expire), then copy the results home (section 6,
+`EXPERIMENT=stacking-1`).
 
 ## 11. Quantization-2
 

@@ -150,6 +150,41 @@
     "optimizer_state_dtype": "float32",
     "disk_reserve_fraction": 0.15
   },
+  "recovery_1b": {
+    "target_tokens": 1000000000,
+    "segment_endpoints": [
+      100000000,
+      1000000000
+    ],
+    "checkpoint_interval_tokens": 25000000,
+    "validation_interval_tokens": 25000000,
+    "monitoring_ppl_tokens": [
+      10000000,
+      25000000,
+      50000000,
+      100000000,
+      250000000,
+      500000000,
+      1000000000
+    ],
+    "optimizer": "AdamW",
+    "optimizer_backend": "fused",
+    "learning_rate": 3e-05,
+    "weight_decay": 0.0,
+    "temperature": 1.0,
+    "ce_weight": 0.0,
+    "scheduler": "constant",
+    "warmup_fraction": 0.0,
+    "final_lr_ratio": 1.0,
+    "sequence_length": 8192,
+    "microbatch_sequences": 1,
+    "gradient_accumulation_steps": 1,
+    "effective_batch_tokens": 8192,
+    "forward_autocast_dtype": "bfloat16",
+    "trainable_parameter_dtype": "float32",
+    "optimizer_state_dtype": "float32",
+    "disk_reserve_fraction": 0.15
+  },
   "long_context": {
     "source": {
       "path": "allenai/c4",
@@ -304,10 +339,23 @@
         4,
         3
       ]
+    },
+    "b1b": {
+      "order": "B",
+      "starts": [
+        "fitted-0.2",
+        "fitted-0.5",
+        "fitted-0.8"
+      ],
+      "bits": [
+        4,
+        3
+      ]
     }
   },
   "sources": {
     "swiglu8_prepare_sha256": "e91c9d313e02d08d62d2e73c35366f6ff78a2d882100f408b258f49f8fa9ce39",
+    "swiglu7_prepare_sha256": "98d330de18415842eeca66b84a68c0e0945192cbafde9b22c405dbd828dab3c8",
     "models": {
       "fitted-0.2-100m": {
         "workflow": "swiglu-8",
@@ -434,6 +482,20 @@
         "recovery_tokens": 1000000000,
         "result_sha256": "69b86261078aa63d45c5acafdfe2f03b4c25a8c2b0cb0a1a99369592dcbc959d",
         "bundle_sha256": "1f384bb4e9af4fddf58669bf921eaa9ebed89b6774434012e9cf3f4481ea862f"
+      }
+    },
+    "b1b_twins": {
+      "b-fitted-0.2-1b-int3": {
+        "run": "b-fitted-0.2-100m-int3-002",
+        "result_sha256": "e26adf0a270c76d238c96d27b9bc394790959b7dc14457c6233f108a4bdb2ced"
+      },
+      "b-fitted-0.5-1b-int3": {
+        "run": "b-fitted-0.5-100m-int3-002",
+        "result_sha256": "b73a22db623bdad0be1ef5796edf4a5fb70297e8c1e4729ff2132b0a7b85ad04"
+      },
+      "b-fitted-0.8-1b-int3": {
+        "run": "b-fitted-0.8-100m-int3-002",
+        "result_sha256": "8d9a8f3d5ae747923dc1e53b10f36b2b4ee3b60a1f1b2f2a9d49e9aa752c9543"
       }
     }
   },

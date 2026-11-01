@@ -2,8 +2,10 @@
 
 ``run --variant ID`` executes one variant's ordered stage list from the
 configuration. Order A quantizes a recovered SwiGLU-7, -8, or -9 model after
-recovery (PTQ). Order B recovers SwiGLU-8's fitted token-zero start for 100M
-tokens while quantization is simulated (QAT), then converts it. Quantization
+recovery (PTQ). Order B recovers SwiGLU-8's fitted token-zero start while
+quantization is simulated (QAT), then converts it: for 100M tokens on SwiGLU-8's
+stream (group ``b``), or for 1B tokens with SwiGLU-7's recipe on SwiGLU-7's 1B
+stream (group ``b1b``), like the order-A 1B sources. Quantization
 of the dense model alone is a baseline and belongs to Quantization-2, not
 here. Every variant is evaluated like SwiGLU-8's final evaluation plus the
 shared 8K teacher KL.
@@ -59,6 +61,7 @@ from ..swiglu.swiglu_8 import (
     is_digest,
     monitoring_checks,
     pinned_json,
+    record_checks,
     record_failure,
     release_memory,
     start_key,
@@ -70,11 +73,15 @@ from ..swiglu.swiglu_9 import load_swiglu8_prepared
 WORKFLOW = "stacking-1"
 SCHEMA_VERSION = 1
 DEFAULT_CONFIG = Path("workflows/configs/model/stacking/stacking-1.json")
+SWIGLU7_CONFIG = Path("workflows/configs/model/swiglu/swiglu-7.json")
 SWIGLU8_CONFIG = Path("workflows/configs/model/swiglu/swiglu-8.json")
 QUANTIZATION_CONFIG = Path("workflows/configs/model/baseline/quantization-1.json")
 DEFAULT_SOURCE_ROOT = Path("data/results/workflows/model")
 MEASURE_MODULE = "workflows.runs.model.stacking.stacking_1"
-GROUPS = ("a100m", "a1b", "b")
+GROUPS = ("a100m", "a1b", "b", "b1b")
+# SwiGLU-7's preparation holds the 1B stream, under the path its record names.
+SWIGLU7_PREPARE = "swiglu-7/prepare-001"
+SWIGLU7_STREAM = "prepared/recovery-tokens.int32"
 # Decided stage lists (decision log, 2026-10-17). Upstream stages ran in SwiGLU-7, -8,
 # or -9 and are recorded for provenance only.
 ORDERS = {
@@ -96,19 +103,23 @@ A100M_SOURCES = [
 # Fitted only: fitted versus slice-only at 1B is SwiGLU-9's question (decision log, 2026-10-17).
 A1B_SOURCES = ["fitted-0.2-1b", "fitted-0.5-1b", "fitted-0.8-1b"]
 B_STARTS = ["fitted-0.2", "fitted-0.5", "fitted-0.8"]
-# 48 runs, stacked models only (decision log, 2026-10-20).
+# 48 runs, stacked models only (decision log, 2026-10-20), and order B at 1B (stacking-1.md, 2026-11-01).
 GRID = {
     "a100m": {"order": "A", "sources": A100M_SOURCES, "bits": [8, 4, 3]},
     "a1b": {"order": "A", "sources": A1B_SOURCES, "bits": [8, 4, 3]},
     "b": {"order": "B", "starts": B_STARTS, "bits": [4, 3]},
+    "b1b": {"order": "B", "starts": B_STARTS, "bits": [4, 3]},
 }
+# Each order-B group's token label and recovery block: SwiGLU-8's 100M recipe, or the
+# SwiGLU-7 1B recipe that the order-A 1B sources used.
+B_GROUPS = {"b": ("100m", "recovery"), "b1b": ("1b", "recovery_1b")}
 
 
 # Configuration and variants
 
 
 def load_settings(path):
-    """Load the configuration and check every block it shares with SwiGLU-8 and Quantization-1."""
+    """Load the configuration and check every block it shares with SwiGLU-7, SwiGLU-8, and Quantization-1."""
 
     path = resolve_path(Path(path))
     settings = read_json(path)
@@ -120,6 +131,8 @@ def load_settings(path):
     for key in ("model", "data", "evaluation", "strategies", "recovery", "long_context"):
         if settings.get(key) != swiglu8[key]:
             raise ValueError(f"Stacking-1 must reuse SwiGLU-8's {key} contract")
+    if settings.get("recovery_1b") != read_json(resolve_path(SWIGLU7_CONFIG))["recovery"]:
+        raise ValueError("Stacking-1 order B at 1B must reuse SwiGLU-7's 1B recovery contract")
     if settings.get("acceptance") != {"exact_relative": swiglu8["acceptance"]["exact_relative"]}:
         raise ValueError("Stacking-1 uses SwiGLU-8's exact token-zero tolerance")
     quantization = read_json(resolve_path(QUANTIZATION_CONFIG))
@@ -134,8 +147,28 @@ def load_settings(path):
         raise ValueError("Stacking-1 fixes the decided run grid")
     sources = settings.get("sources", {})
     models = sources.get("models", {})
-    if set(sources) != {"swiglu8_prepare_sha256", "models"} or not is_digest(sources["swiglu8_prepare_sha256"]):
-        raise ValueError("Stacking-1 pins SwiGLU-8's preparation by sha256")
+    preparations = ("swiglu8_prepare_sha256", "swiglu7_prepare_sha256")
+    if (
+        set(sources) != {*preparations, "models", "b1b_twins"}
+        or not all(is_digest(sources[key]) for key in preparations)
+    ):
+        raise ValueError("Stacking-1 pins SwiGLU-8's and SwiGLU-7's preparations by sha256")
+    if sources["swiglu7_prepare_sha256"] != swiglu8["sources"]["swiglu7_prepare_sha256"]:
+        raise ValueError("Stacking-1 pins the SwiGLU-7 preparation that SwiGLU-8 pins")
+    # INT3 only: the INT4 twins are the 100M -002 reruns with the fixed INT4 quantizer,
+    # which run after this configuration was frozen; the analysis compares them.
+    twins = sources["b1b_twins"]
+    if set(twins) != {f"b-{start}-1b-int3" for start in B_STARTS}:
+        raise ValueError("Stacking-1 pins exactly the 100M INT3 twins of its 1B order-B runs")
+    for name, twin in twins.items():
+        counterpart, unused_separator, attempt = str(twin.get("run")).rpartition("-")
+        if (
+            set(twin) != {"run", "result_sha256"}
+            or counterpart != name.replace("-1b-", "-100m-")
+            or not (len(attempt) == 3 and attempt.isdigit())
+            or not is_digest(twin["result_sha256"])
+        ):
+            raise ValueError(f"The 100M twin of {name} is not pinned consistently")
     if set(models) != {*A100M_SOURCES, *A1B_SOURCES}:
         raise ValueError("Stacking-1 pins exactly the models of its order-A grid")
     for name, model in models.items():
@@ -159,12 +192,20 @@ def variant_table(settings):
         for source in grid[group]["sources"]:
             for bits in grid[group]["bits"]:
                 table[f"a-{source}-int{bits}"] = {"group": group, "order": "A", "bits": bits, "source": source}
-    for start in grid["b"]["starts"]:
-        for bits in grid["b"]["bits"]:
-            table[f"b-{start}-100m-int{bits}"] = {
-                "group": "b", "order": "B", "bits": bits, "start": start, "reference": f"{start}-100m",
-            }
+    for group, (tokens, unused_block) in B_GROUPS.items():
+        for start in grid[group]["starts"]:
+            for bits in grid[group]["bits"]:
+                # K3's reference is SwiGLU-8's 100M run at every budget: its token-zero row comes from the start.
+                table[f"b-{start}-{tokens}-int{bits}"] = {
+                    "group": group, "order": "B", "bits": bits, "start": start, "reference": f"{start}-100m",
+                }
     return table
+
+
+def recovery_settings(settings, spec):
+    """The recovery recipe of an order-B variant's group."""
+
+    return settings[B_GROUPS[spec["group"]][1]]
 
 
 def start_artifact(output_dir, settings, command, resume, identity):
@@ -357,7 +398,8 @@ def load_start(context):
         "training_tokens": 0,
     }
     # K3: the start before padding and fake quantization equals SwiGLU-8's token-zero row.
-    row = monitoring_row(context, 0, [0], 0, 0.0, None, [settings["recovery"]["learning_rate"]], True)
+    row = monitoring_row(context, 0, [0], 0, 0.0, None,
+                         [recovery_settings(settings, context.spec)["learning_rate"]], True)
     context.artifact["results"]["start_monitoring"] = row
     checks = [{**check, "check": "K3"} for check in monitoring_checks(
         row, reference["results"]["recovery"]["validation_history"], settings["acceptance"])]
@@ -420,18 +462,92 @@ def ptq_stage(context):
 
 
 def qat_groups(context, trainable):
+    recovery = recovery_settings(context.settings, context.spec)
     return [{
         "name": "replacements",
         "parameters": trainable,
         "parameter_names": parameter_names(context.model, trainable),
         "parameter_count": sum(value.numel() for value in trainable),
-        "learning_rate": context.settings["recovery"]["learning_rate"],
-        "weight_decay": context.settings["recovery"]["weight_decay"],
+        "learning_rate": recovery["learning_rate"],
+        "weight_decay": recovery["weight_decay"],
     }]
 
 
+def recovery_stream(context, recovery):
+    """Verify the variant's recovery stream: SwiGLU-8's 100M stream, or SwiGLU-7's 1B stream."""
+
+    prepared_stream = context.prepared["results"]["stream"]
+    if context.spec["group"] == "b":
+        record, root, source = prepared_stream, context.prepared_root, "swiglu-8 prepare-001"
+    else:
+        record = pinned_json(context.source_root, f"{SWIGLU7_PREPARE}/result.json",
+                             context.settings["sources"]["swiglu7_prepare_sha256"],
+                             "SwiGLU-7 preparation")["results"]["stream"]
+        root, source = context.source_root / SWIGLU7_PREPARE, "swiglu-7 prepare-001"
+    if (
+        int(record["token_count"]) != int(recovery["target_tokens"])
+        or int(record["sequence_length"]) != int(recovery["sequence_length"])
+    ):
+        raise ValueError(f"The {source} stream does not cover this variant's recovery recipe")
+    path = verified_stream(root, record)
+    if context.spec["group"] != "b":
+        # K7-stream: the first 100M tokens are the stream of the 100M runs, as for SwiGLU-9's 1B runs.
+        enforce(context.artifact, context.output_dir, "K7-stream", [equality_check(
+            "K7", file_digest(path, 4 * int(prepared_stream["token_count"])), prepared_stream["sha256"],
+            metric="swiglu8_stream_is_prefix")])
+    return record, path, source
+
+
+def twin_history(context):
+    """Monitoring rows of a 1B INT3 variant's pinned 100M twin, or None (K7).
+
+    The twin trained the same start with the same recipe on the first 100M tokens of
+    the same stream, so the 1B run must retrace it until 100M.
+    """
+
+    if context.spec["group"] == "b":
+        return None
+    pin = context.settings["sources"]["b1b_twins"].get(context.variant)
+    if pin is None:
+        context.artifact["results"]["twin"] = None
+        return None
+    twin = pinned_json(context.source_root / WORKFLOW, f"{pin['run']}/result.json", pin["result_sha256"],
+                       f"100M twin {pin['run']}")
+    if (
+        twin.get("status") != "completed"
+        or twin["identity"]["variant"] != context.variant.replace("-1b-", "-100m-")
+        or twin["configuration"]["recovery"] != context.settings["recovery"]
+        or twin["recovery_stream"]["sha256"] != context.prepared["results"]["stream"]["sha256"]
+        or not twin["results"]["acceptance"].get("K6-start", {}).get("passed")
+    ):
+        raise ValueError(f"{pin['run']} is not a completed fixed-quantizer 100M twin of {context.variant}")
+    context.artifact["results"]["twin"] = dict(pin)
+    return twin["results"]["recovery"]["validation_history"]
+
+
+def check_twin(context, history):
+    """K7: stop unless token 0 equals the twin's; record 10-100M against the 1% review limit."""
+
+    if history is None:
+        return
+    covered = {tuple(int(value) for value in row["requested_tokens"]) for row in history}
+    checks = [
+        {**check, "check": "K7"}
+        for row in context.artifact["results"]["recovery"]["validation_history"]
+        if tuple(int(value) for value in row["requested_tokens"]) in covered
+        for check in monitoring_checks(row, history, context.settings["acceptance"])
+    ]
+    start = [check for check in checks if check["tokens"] == 0]
+    if not start:
+        raise ValueError("K7 compares the token-zero row first")
+    enforce(context.artifact, context.output_dir, "K7-start", start)
+    later = [check for check in checks if check["tokens"] > 0]
+    if later:
+        record_checks(context.artifact, context.output_dir, "K7-review", later)
+
+
 def qat_recover_stage(context):
-    """Recover for 100M tokens with fake quantization, on SwiGLU-8's stream and recipe."""
+    """Recover with fake quantization on the group's stream and recipe (SwiGLU-8's 100M or SwiGLU-7's 1B)."""
 
     import torch
     from mlp_replacement.compression.continuation import (
@@ -447,7 +563,7 @@ def qat_recover_stage(context):
 
     settings, artifact, output_dir = context.settings, context.artifact, context.output_dir
     bits = context.spec["bits"]
-    recovery = settings["recovery"]
+    recovery = recovery_settings(settings, context.spec)
     require_backend(settings["backend"], bits)
     load_teacher_and_validation(context)
     context.paths = eligible_paths(context)
@@ -471,12 +587,10 @@ def qat_recover_stage(context):
     artifact["results"]["trainable_scope"] = group_metadata(groups, context.model)
     artifact["results"]["storage_preflight"] = storage_preflight(
         output_dir, groups, context.model, recovery["disk_reserve_fraction"])
-    stream = context.prepared["results"]["stream"]
-    if int(stream["token_count"]) != int(recovery["target_tokens"]):
-        raise ValueError("SwiGLU-8's prepared stream does not cover the 100M-token recipe")
-    stream_path = verified_stream(context.prepared_root, stream)
+    stream, stream_path, stream_source = recovery_stream(context, recovery)
     artifact["recovery_stream"] = {"sha256": stream["sha256"], "token_count": int(stream["token_count"]),
-                                   "source": "swiglu-8 prepare-001"}
+                                   "source": stream_source}
+    twin = twin_history(context)
     cache = PackedTokenCache(stream_path, int(stream["token_count"]), recovery["sequence_length"], stream["sha256"])
     checkpoint_dir = output_dir / "checkpoint"
     results = artifact["results"].setdefault("recovery", {
@@ -518,12 +632,16 @@ def qat_recover_stage(context):
     else:
         optimizer_state = recovered["optimizer_state"]
     del recovered
+    # K7-start runs before the first update.
+    check_twin(context, twin)
     cursor, updates = int(results["tokens_seen"]), int(results["optimizer_updates"])
     final_tokens = int(recovery["target_tokens"])
     while cursor < final_tokens:
         origin = segment_origin(cursor, recovery["segment_endpoints"])
         end = next(value for value in recovery["segment_endpoints"] if value > cursor)
-        schedule = segment_schedule(origin, end, desired_requests(settings), recovery["effective_batch_tokens"])
+        # desired_requests reads only the recovery block.
+        schedule = segment_schedule(origin, end, desired_requests({"recovery": recovery}),
+                                    recovery["effective_batch_tokens"])
 
         def on_checkpoint(event, optimizer, first_step):
             started = perf_counter()
@@ -550,6 +668,7 @@ def qat_recover_stage(context):
                     {"variant": context.variant, "tokens_seen": event.tokens_seen, "target_tokens": final_tokens})
             print(f"variant={context.variant} tokens={event.tokens_seen:,} KL={row['recovery_validation_kl']:.6f}",
                   flush=True)
+            check_twin(context, twin)
 
         result = recover_exact_segment(
             origin=origin, end=end, cursor=cursor, schedule=schedule,
@@ -948,9 +1067,10 @@ def list_variants(args, settings):
             print(variant)
 
 
-def variant_inputs(settings, spec, prepared):
+def variant_inputs(settings, variant, prepared):
     """Name the files one variant reads, relative to the source root or SwiGLU-8's preparation."""
 
+    spec = variant_table(settings)[variant]
     results = prepared["results"]
     lines = [f"prepared {path}" for path in (
         *(record["path"] for record in results["evaluation_protocol"]["corpora"].values()),
@@ -965,15 +1085,21 @@ def variant_inputs(settings, spec, prepared):
         model = source_model(settings, spec["reference"])
         lines.append(f"reference {model['workflow']}/{model['run']}/result.json")
         lines.append(f"prepared {results['starts'][start_key('fitted', start_target(spec))]['path']}")
-        lines.append(f"prepared {results['stream']['path']}")
+        if spec["group"] == "b":
+            lines.append(f"prepared {results['stream']['path']}")
+        else:
+            lines.append(f"reference {SWIGLU7_PREPARE}/result.json")
+            lines.append(f"reference {SWIGLU7_PREPARE}/{SWIGLU7_STREAM}")
+            twin = settings["sources"]["b1b_twins"].get(variant)
+            if twin is not None:
+                lines.append(f"reference {WORKFLOW}/{twin['run']}/result.json")
     return lines
 
 
 def print_inputs(args, settings):
     """Print the staging list for a job script; reads only SwiGLU-8's preparation record."""
 
-    spec = variant_table(settings)[args.variant]
-    for line in variant_inputs(settings, spec, read_json(resolve_path(args.prepared))):
+    for line in variant_inputs(settings, args.variant, read_json(resolve_path(args.prepared))):
         print(line)
 
 
@@ -998,7 +1124,7 @@ def parse_args():
     run_parser.add_argument("--prepared", type=Path, required=True,
                             help="SwiGLU-8 prepare-001/result.json")
     run_parser.add_argument("--source-root", type=Path, default=DEFAULT_SOURCE_ROOT,
-                            help="Directory holding the swiglu-7, swiglu-8, and swiglu-9 run outputs")
+                            help="Directory holding the swiglu-7, swiglu-8, swiglu-9, and stacking-1 outputs")
     run_parser.add_argument("--work-dir", type=Path, required=True)
     run_parser.add_argument("--output-dir", type=Path, required=True)
     run_parser.add_argument("--resume", action="store_true")

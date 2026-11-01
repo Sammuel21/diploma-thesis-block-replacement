@@ -17,7 +17,8 @@ documents explain the research question, stage order, configuration choices,
 and interpretation of each pipeline.
 
 The [baseline index](baseline/README.md) connects the baseline documentation,
-notebooks, configurations, and runners.
+notebooks, configurations, and runners. Which experiment depends on which, and
+what is running now, is in [experiment dependencies](../dependencies.md).
 
 | Workflow | Main question | Status |
 | --- | --- | --- |

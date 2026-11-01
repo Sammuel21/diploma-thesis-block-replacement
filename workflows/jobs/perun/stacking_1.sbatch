@@ -19,6 +19,7 @@ usage() {
     echo "Usage: sbatch --array=0-32 $0 group a100m [--attempt NNN] [--resume]" >&2
     echo "   or: sbatch --array=0-8 $0 group a1b [--attempt NNN] [--resume]" >&2
     echo "   or: sbatch --array=0-5 $0 group b [--attempt NNN] [--resume]" >&2
+    echo "   or: sbatch --array=0-5 $0 group b1b [--attempt NNN] [--resume]" >&2
     echo "   or: sbatch $0 variant VARIANT_ID [--attempt NNN] [--resume]" >&2
     echo "Outputs are VARIANT_ID-NNN; NNN defaults to 001 (a rerun is a new attempt, never an overwrite)." >&2
 }
@@ -63,7 +64,7 @@ HF_HOME="$(realpath "$HF_HOME")"
 export HF_HOME
 
 PROJECT_RESULTS_ROOT="$PROJECT_ROOT/perun-results/stacking-1"
-# The swiglu-7, swiglu-8, and swiglu-9 outputs; the runner verifies every source by sha256.
+# The swiglu-7, swiglu-8, swiglu-9, and stacking-1 outputs; the runner verifies every source by sha256.
 SOURCES_ROOT="$PROJECT_ROOT/perun-results"
 SWIGLU8_PREPARED="$SOURCES_ROOT/swiglu-8/prepare-001"
 test -f "$SWIGLU8_PREPARED/result.json"
@@ -71,7 +72,7 @@ RUNNER=(env PYTHONPATH="$SUBMIT_DIR/src:$SUBMIT_DIR" "$PYTHON_BIN" -m workflows.
 case "$MODE" in
     group)
         # Array order comes from the runner's grid, so this script holds no variant list.
-        [[ "$SELECTOR" == a100m || "$SELECTOR" == a1b || "$SELECTOR" == b ]] || { usage; exit 2; }
+        [[ "$SELECTOR" == a100m || "$SELECTOR" == a1b || "$SELECTOR" == b || "$SELECTOR" == b1b ]] || { usage; exit 2; }
         [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]] || { usage; exit 2; }
         mapfile -t VARIANTS < <(cd "$SUBMIT_DIR" && "${RUNNER[@]}" list-variants --group "$SELECTOR")
         TASK_ID="$SLURM_ARRAY_TASK_ID"
@@ -174,7 +175,8 @@ for CODE_PATH in src workflows/runs workflows/configs workflows/__init__.py; do
     rsync -a --exclude='__pycache__/' "$SUBMIT_DIR/$CODE_PATH" "$SCRATCH_DIR/$(dirname "$CODE_PATH")/"
 done
 mkdir -p "$TMPDIR" "$SCRATCH_DIR/results"
-# Stage SwiGLU-8's preparation record, the files this variant reads, and its source run.
+# Stage SwiGLU-8's preparation record, the files this variant reads, and its source run. A
+# reference is one file: for group b1b also SwiGLU-7's 1B stream (4 GB) and the 100M twin.
 PREPARED_INPUT="$SCRATCH_DIR/inputs/swiglu-8-prepare"
 SOURCE_INPUT="$SCRATCH_DIR/inputs/sources"
 mkdir -p "$PREPARED_INPUT" "$SOURCE_INPUT"

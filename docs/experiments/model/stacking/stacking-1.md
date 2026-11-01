@@ -2,7 +2,7 @@
 title: Stacking-1 - SwiGLU Replacement Plus Weight Quantization
 status: active
 created: 2026-10-17
-modified: 2026-10-26
+modified: 2026-11-01
 ---
 
 # Stacking-1 - SwiGLU Replacement Plus Weight Quantization
@@ -29,6 +29,12 @@ other 45 runs are unaffected. The fixed INT3 quantizer was implemented the
 same day ([INT3 QAT fix](#int3-qat-fix-2026-10-25)). **Next step:** rerun the
 three order-B INT3 variants as `-002` (runbook 10.5), together with
 Quantization-2's INT3 QAT 100M rerun, after the researcher's go.
+
+**Update (2026-11-01):** order B goes to 1B tokens: six runs
+`b-fitted-{0.2,0.5,0.8}-1b-int{4,3}` (group `b1b`), implemented and tested
+on CPU, not yet run ([Order B at 1B](#order-b-at-1b-plan-2026-11-01)). Its
+decision row is proposed, not yet approved. **Next step:** the researcher
+approves the row and commits; submission follows runbook 10.7.
 
 ## Questions
 
@@ -143,7 +149,9 @@ SwiGLU models exist and quantizing them costs only an evaluation. Order B at
 gained almost nothing from 1B tokens over 100M in Quantization-1 (8K KL
 0.0352 against 0.0360), so 1B order-B runs are justified only if the 100M
 results show that order A and order B differ. That decision is taken after the
-100M results (decision log, 2026-10-20).
+100M results (decision log, 2026-10-20). *Update (2026-11-01):* they differ
+at every width, so order B goes to 1B
+([Order B at 1B](#order-b-at-1b-plan-2026-11-01)).
 
 **Why the fitted models, and why slice-only only at 100M.** SwiGLU-9 found
 that local fitting no longer matters after 1B recovery tokens (8K KL gap
@@ -267,6 +275,7 @@ Each check stops the run if it fails, except where noted.
 | K4 | INT8 and INT4: calculated eligible bytes equal measured eligible bytes | exact |
 | K5 | Padded models: the deployed bundle's padded neurons output exactly zero gate and up values on one monitoring batch; order B also checks that the padded master weights are still zero after training (`K5-training`) | exact |
 | K6 | Order-B INT3 and, from the INT4 `-002` reruns on, INT4 (decision log, 2026-11-01): after QAT preparation, before the first update, every projection's simulated weight equals the deployed recipe applied to the same weight (`K6-start`); at conversion, every deployed weight equals the trained simulated weight (`convert_qat`, recorded in `results.conversion.int{3,4}_fake_equals_deployed`). INT4 compares the weight `Int4Tensor` stores, not the MSLK kernel's arithmetic; see [Quantization-1](../baseline/quantization-1.md#int4-qat-conversion-gap-2026-11-01) | bitwise |
+| K7 | Order B at 1B: the first 100M tokens retrace the 100M run ([Order B at 1B](#order-b-at-1b-plan-2026-11-01)). All six: the 1B stream starts with SwiGLU-8's 100M stream (`K7-stream`). INT3: before the first update, the fake-quantized token-0 row equals the 100M `-002` twin's (`K7-start`); the 10-100M rows are compared with the twin's (`K7-review`, recorded, never stops) | exact; relative 1e-4; 1% review |
 
 The monitoring perplexity after padding (before quantization) is recorded but
 not enforced, because a matrix multiply over a longer row may sum in a
@@ -298,7 +307,7 @@ and -9 code is not modified; Stacking-1 imports their helpers.
 **Commands.** One variant per process; the variant id fixes everything else.
 
 ```bash
-python -m workflows.runs.model.stacking.stacking_1 list-variants --group a100m   # a100m, a1b, b
+python -m workflows.runs.model.stacking.stacking_1 list-variants --group a100m   # a100m, a1b, b, b1b
 bash workflows/jobs/local/stacking_1.sh run --variant a-fitted-0.2-100m-int3 \
   --prepared data/results/workflows/model/swiglu-8/prepare-001/result.json \
   --source-root data/results/workflows/model \
@@ -306,7 +315,7 @@ bash workflows/jobs/local/stacking_1.sh run --variant a-fitted-0.2-100m-int3 \
 ```
 
 Variant ids are `a-{arm}-{target}-{100m|1b}-int{8,4,3}` and
-`b-fitted-{target}-100m-int{4,3}`. Each output holds `result.json`, `run.json`, the
+`b-fitted-{target}-{100m|1b}-int{4,3}`. Each output holds `result.json`, `run.json`, the
 packed `model/` bundle, and the benchmark records; QAT runs keep a 25M-token
 checkpoint while running, deleted after the result is validated. A completed
 bundle is reused on resume, and the run fingerprint covers the configuration,
@@ -449,6 +458,137 @@ test perplexity at 8K, and macro is the five-task mean.
   `-001` first-step gradient norms were 5.37, 53.50, and 199.56 (INT4: 0.16,
   1.27, 3.16); a fixed run is expected to look INT4-like (recorded, not
   enforced).
+
+## Order B at 1B (plan, 2026-11-01)
+
+Planned and implemented on 2026-11-01; nothing has run on PERUN. The decision
+row is proposed and waits for the researcher's approval.
+
+**Why.** At 100M tokens order B beats order A at every width. 8K teacher KL
+from the result artifacts:
+
+| Width reduction | INT4: A 100M / B 100M / A 1B | INT3: A 100M / B 100M (`-002`) / A 1B |
+| --- | --- | --- |
+| 20% | 0.164 / 0.102 / 0.141 | 0.288 / 0.161 / 0.266 |
+| 50% | 0.318 / 0.255 / 0.239 | 0.432 / 0.288 / 0.360 |
+| 80% | 0.707 / 0.579 / 0.523 | 0.875 / 0.606 / 0.717 |
+
+- The order-B validation KL still fell 9-16% over the last 50M tokens in all
+  six runs, while dense INT4 QAT gained 2% from 1B tokens (0.0360 against
+  0.0352).
+- At INT3, order B at 100M already beats order A at 1B. The 1B runs add the
+  frontier above 52% byte saving and show how large the gap becomes.
+- At INT4, order A at 1B leads at 50% and 80%, so only an equal-token run
+  can tell whether the order matters there.
+- The B INT4 values above come from the `-001` runs, which used the INT4
+  quantizer that the 2026-11-01 fix replaced; the `-002` reruns (runbook 10.6)
+  replace them.
+
+**Design.** Only the token budget, the recipe, and the stream change against
+the 100M runs.
+
+| Item | Choice | Reason |
+| --- | --- | --- |
+| Runs | `b-fitted-{0.2,0.5,0.8}-1b-int{4,3}`, group `b1b`, outputs `-001` | 1B runs use the 20/50/80% targets (decision log, 2026-10-16) |
+| Start | SwiGLU-8's fitted token-0 starts, as at 100M | At 20% and 50% it equals SwiGLU-7's start at token 0 (SwiGLU-8's B1 check); SwiGLU-9's fitted 80% started from the same file |
+| Recipe | `recovery_1b`, equal to SwiGLU-7's recovery block: 1B tokens, segments ending at 100M and 1B, validation every 25M, perplexity at 10/25/50/100/250/500M and 1B | The recipe of the order-A 1B sources (SwiGLU-7's S7-0 at 20/50%, SwiGLU-9's fitted 80%) |
+| Stream | SwiGLU-7's 1B stream (sha256 `f78bf805…`), pinned through its preparation (`98d330de…`) | The order-A 1B sources trained on it; its first 100M tokens are SwiGLU-8's stream |
+| Quantizers | The deployed-path INT3 and INT4 fake quantizers, with K6 | Decision log, 2026-10-25 and 2026-11-01 |
+| Rest | Trainable scope, padding, conversion, export, and evaluation as at 100M | |
+
+Each 1B run pairs with order A at 1B of the same target and bits: the same
+start, stream, recipe, and token count. It also pairs with its own 100M
+order-B run, which shows what the extra 900M tokens give.
+
+**Checks.** K3-K6 apply as at 100M. K3 still compares the start with
+SwiGLU-8's 100M run, because the start file comes from it. The new check K7
+follows from the design: a 1B run has the same start, recipe, and stream as
+its 100M twin, and its first segment ends exactly at 100M. Its first 100M
+tokens therefore follow the same checkpoint schedule (a contract test checks
+this), and the run should retrace the twin there, apart from GPU drift.
+
+- `K7-stream`, all six runs, stops on failure: the first 100M tokens of the
+  1B stream hash to SwiGLU-8's 100M stream.
+- `K7-start`, INT3, stops on failure: before the first update, the
+  fake-quantized token-0 row (validation KL and monitoring perplexity) equals
+  the twin's within relative 1e-4. This catches a wrong quantizer, padding,
+  or start in the first minutes.
+- `K7-review`, INT3, recorded and never stopping: the 10, 25, 50, 75, and
+  100M rows are compared with the twin's against the 1% review limit, as
+  SwiGLU-8's B2 and SwiGLU-9's C2. A flagged value is investigated before any
+  result is used. It does not stop the run, because SwiGLU-9 saw a +43.7%
+  transient at 50M that recovered within 25M tokens.
+- INT4 has no in-run twin: its twins are the 100M INT4 `-002` reruns, which
+  have not run yet and cannot be pinned. The analysis makes the same
+  comparison once they are home.
+
+Monitoring perplexity enters only the token-0 equality check, never a quality
+judgement (experiment-audit session, 2026-10-25).
+
+**Analysis.** For each target and bit width: 8K KL, test perplexity, and task
+macro of B at 1B against A at 1B and against B at 100M; frontier membership
+by the [win criterion](#win-criterion). There is one run per variant, so
+there is no QAT noise estimate. The nearest reference is SwiGLU-9's 0.31%
+twin noise for BF16 recovery at 1B.
+
+**Implementation.**
+
+| File | Change |
+| --- | --- |
+| [stacking-1.json](../../../../workflows/configs/model/stacking/stacking-1.json) | `recovery_1b`; group `b1b`; `sources.swiglu7_prepare_sha256`; `sources.b1b_twins`, the three INT3 `-002` results by sha256 |
+| [stacking_1.py](../../../../workflows/runs/model/stacking/stacking_1.py) | Group `b1b`; the recipe per group; SwiGLU-7's stream with `K7-stream`; twin validation (completed, same recipe and stream, K6 passed) and K7; `inputs` stages the 1B stream and the twin instead of the 100M stream |
+| [stacking_1.sbatch](../../../../workflows/jobs/perun/stacking_1.sbatch) | Accepts `group b1b` |
+| [test_stacking1_contracts.py](../../../../tests/test_stacking1_contracts.py) | The recipe equals SwiGLU-7's; the first-100M schedule is identical; the staging list; `K7-stream`; twin validation (a twin without K6, like an invalid `-001` run, is rejected); K7 stops only at token 0; the pins match the downloaded artifacts |
+
+Group `b` keeps its variant ids, identities, and behaviour. Its run
+fingerprint changes with the code, which affects no completed run. The INT4
+`-002` reruns (runbook 10.6) run from `b59da5c`, before this change, so the
+PERUN checkout is updated only after they finish.
+
+**What was tested.** CPU only, 2026-11-01:
+
+- The project's Python: the full suite passes (139 tests, 10 skipped; 132
+  before).
+- The TorchAO 0.17.0 probe environment: all 25 Stacking-1 and 13 quantization
+  contract tests pass, none skipped.
+- On the downloaded artifacts: the three twin pins, the SwiGLU-7 preparation
+  pin, and the stream path match, and the twin validation accepts all three
+  twins and reads their 0-100M rows.
+- `list-variants --group b1b` and `inputs` print the expected lists, and the
+  runbook pre-check prints OK for every local file (the 4 GB stream is not
+  local).
+- `bash -n` passes on the launcher.
+
+Not tested: GPU execution, staging of the 4 GB stream, K7 on real runs, and
+the run time.
+
+### Pre-run resource plan (recorded 2026-11-01)
+
+Estimates, not measurements, under the
+[PERUN resource contract](../../../infrastructure/perun/perun-resources.md).
+
+| Group | Tasks | Per task, expected | GPU-h expected | Time limit | Ceiling GPU-h | Basis | Confidence |
+| --- | ---: | --- | ---: | --- | ---: | --- | --- |
+| B 1B (`b1b`) | 6 | 10-12.5 h | 60-75 | 18 h | 108 | Order-B 100M QAT training 0.95-1.15 h per 100M tokens (six runs), times ten; evaluation 0.21-0.31 h; SwiGLU-7 and SwiGLU-9 BF16 1B training 9.1-10.4 h | Medium: linear extrapolation, node-to-node variance unknown |
+
+- **Per task:** one H200, 8 CPUs, 128 GB RAM, `gpu_short` (2-day maximum); one
+  process, no communication between tasks. Expected CPU use 480-600
+  core-hours; ceiling 864.
+- **Parallelism:** one 6-task array. All six can run at once (20 running jobs
+  and 50 queued tasks; perun-status.md, 2026-10-25), so the critical path is
+  about one task once they start.
+- **Memory:** the 100M order-B runs peaked at 25.9-36.6 GiB VRAM and 6.1-9.0
+  GiB RAM. The model, batch, and sequence length are the same, so the same is
+  expected (reasoning, not a measurement).
+- **Storage:** SCRATCH needs about 20 GB per task: the 4 GB stream, the start
+  and inputs, and the checkpoint space that the 100M runs' storage preflight
+  estimated (8.4-14.8 GB). PROJECT needs about 9-11 GB of packed bundles (the
+  100M bundles were 1.33-2.12 GB); PROJECT held 253 of 1,000 GB on
+  2026-10-26.
+- **Time limit:** 18 h is about 45% above the upper estimate. A task that
+  runs out of time stages out at the TERM signal, 30 minutes before the limit,
+  and resumes from its last 25M-token checkpoint (runbook 10.7).
+- **Share:** under 1% of the project's 8,424 GPU-hours.
 
 ## Limits
 
