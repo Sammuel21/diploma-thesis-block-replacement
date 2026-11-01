@@ -135,6 +135,10 @@
 
 ## Delegation
 - Do not delegate to sub-agents or other models unless I ask.
+- Standing exception: read-only search sub-agents may be used without asking
+  when a lookup spans many files. Treat their output as a discovery aid and
+  read the cited lines directly before relying on it. The exception allows no
+  file edits, no smaller models, and no PERUN or git actions.
 - When I ask, give the agent the relevant scoped instructions, exact files or
   cells, reference examples, allowed changes, and completion checks. Do not use
   an active high-cost supervising agent for routine polling.

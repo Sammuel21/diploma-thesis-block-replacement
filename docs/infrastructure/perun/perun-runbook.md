@@ -2,7 +2,7 @@
 title: PERUN Runbook
 status: active
 created: 2026-10-11
-modified: 2026-10-25
+modified: 2026-10-26
 ---
 
 # PERUN Runbook
@@ -1000,11 +1000,12 @@ refuses changed code.
 | Submit all 48 tasks: order B (6), order A at 100M (33), order A at 1B (9) (done 2026-10-20) | 10.2 | 6 h (B) or 2 h (A), 128 GB | 1.5-3 h (B), 0.3-0.5 h (A) | K1, K2, K4, K5 (order A); K3, K4, K5 (order B) |
 | Rerun the three order-B INT3 tasks as `-002` (stage 1, with 11.5) | 10.5 | 3 h, 128 GB | 1.2-1.6 h | K3, K5, K6 (K4 covers INT8 and INT4 only) |
 
-PERUN accepts at most 48 submitted tasks, counting each array task, and
-refuses every new `sbatch` while 4 of your jobs run (perun-status.md).
-Stacking-1 is exactly 48 tasks, so all three arrays are submitted back to back
-while nothing of yours is queued, with a 10-minute delayed start, as for
-SwiGLU-9. Order B goes first because its tasks are the longest.
+At the original submission, PERUN accepted at most 48 submitted tasks,
+counting each array task, and refused every new `sbatch` while 4 of your jobs
+ran. Stacking-1 is exactly 48 tasks, so all three arrays were submitted back
+to back while nothing of yours was queued, with a 10-minute delayed start, as
+for SwiGLU-9. Both limits have since changed (perun-status.md, 2026-10-25):
+50 queued tasks, 20 running jobs, and no "4 running jobs" submit refusal.
 
 Task maps come from the runner, not the job script:
 `python -m workflows.runs.model.stacking.stacking_1 list-variants --group b`
@@ -1128,8 +1129,7 @@ gpu-status
 **Submits a job. Run once, after the cause is understood.** A finished bundle
 is reused; an order-B task continues from its last 25M-token checkpoint.
 Resume refuses changed code, configuration, or environment, and needs the
-run's `result.json` on PROJECT with no lock (see 5.2). Only possible while
-fewer than 4 of your jobs run.
+run's `result.json` on PROJECT with no lock (see 5.2).
 
 The `-001` tasks have all finished and cannot be resumed after the INT3 fix
 (their code fingerprint changed). For an order-B INT3 rerun task, keep
@@ -1206,17 +1206,16 @@ and writes to `perun-results/quantization-2/`. It reuses Quantization-1's
 `prepare-001`, so it has no preparation step. The three original runs were
 submitted on 2026-10-21 (jobs 123646-123648) after Stacking-1 had finished;
 11.1-11.2 are kept as the record of that submission. Both INT3 QAT runs are
-invalid and are rerun as `-002` with the fixed INT3 quantizer (11.5, 11.6).
-Once a rerun is submitted, do not update the checkout until it has finished:
-a resume refuses changed code.
+invalid. The 100M run was rerun as `-002` with the fixed INT3 quantizer
+(11.5); the 1B run is not rerun (decision log, 2026-10-26).
 
 | Run | Output | Expected | Time limit | Status |
 | --- | --- | --- | --- | --- |
 | INT3 PTQ | `int3-001` | 0.3-0.5 h | 2 h | Valid |
 | INT3 QAT 100M | `qat-int3-100m-001` | 1.6-3.5 h | 6 h | Invalid (INT3 QAT incident) |
 | INT3 QAT 1B | `qat-int3-1b-001` | 16-32 h | 36 h | Invalid (INT3 QAT incident) |
-| INT3 QAT 100M, rerun (stage 1, 11.5) | `qat-int3-100m-002` | 1.7-2.2 h | 4 h | Planned |
-| INT3 QAT 1B, rerun (stage 2, 11.6) | `qat-int3-1b-002` | 14-17 h | 24 h | Decided after stage 1 |
+| INT3 QAT 100M, rerun (stage 1, 11.5) | `qat-int3-100m-002` | 1.7-2.2 h | 4 h | Completed 2026-10-26 (job 132434) |
+| INT3 QAT 1B, rerun (stage 2, 11.6) | `qat-int3-1b-002` | 14-17 h | 24 h | Not run (decision log, 2026-10-26) |
 
 Run 1.2, 1.3, and 1.4 first.
 
@@ -1373,6 +1372,10 @@ in its `.err` file. A mismatch at conversion stops it with "Deployed INT3
 weights differ" before export. Either way, stop and tell the assistant.
 
 ### 11.6 Rerun INT3 QAT 1B as `-002` (stage 2)
+
+*Not run: the researcher decided on 2026-10-26 not to rerun INT3 QAT 1B
+(decision log, 2026-10-26; Quantization-2 "No INT3 QAT 1B rerun"). Kept only
+in case that decision is reopened.*
 
 **Only after the researcher's go on the stage-1 results** (decision log,
 2026-10-25). Same checks and form as 11.5, with the 1B output, budget, and

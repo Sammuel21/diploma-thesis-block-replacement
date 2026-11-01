@@ -2,7 +2,7 @@
 title: Quantization-2 Dense INT3 Baseline
 status: active
 created: 2026-10-20
-modified: 2026-10-25
+modified: 2026-10-26
 ---
 
 # Quantization-2
@@ -21,11 +21,15 @@ valid ([Results](#results-2026-10-25)). **Both INT3 QAT results are
 invalid:** the INT3 training-time quantizer does not reproduce the deployed
 INT3 format ([INT3 QAT incident](#int3-qat-incident-2026-10-25)). The
 fixed quantizer was implemented on 2026-10-25
-([INT3 QAT fix](#int3-qat-fix-2026-10-25)). **Next step:** submit
-`qat-int3-100m-002` together with Stacking-1's three order-B INT3 reruns
-(runbook 10.5 and 11.5, after the researcher's go); `qat-int3-1b-002` is
-decided after that. The reruns are documented here when they finish. The
-binding decisions are the 2026-10-20 and 2026-10-25 rows in the
+([INT3 QAT fix](#int3-qat-fix-2026-10-25)).
+
+**Update (2026-10-26):** `qat-int3-100m-002` ran on 2026-10-25/26 (job
+132434, commit `61b2b0d`) and completed with both weight checks passing.
+The INT3 QAT 1B rerun is not run
+([No INT3 QAT 1B rerun](#no-int3-qat-1b-rerun-2026-10-26)). **Next step:**
+copy the results home, compute the 100M run's task macro (the one open
+condition of that decision), and document the rerun's results here. The
+binding decisions are the 2026-10-20, 2026-10-25, and 2026-10-26 rows in the
 [shared decision log](../../../agents/decisions.md).
 
 ## Runs
@@ -35,13 +39,15 @@ binding decisions are the 2026-10-20 and 2026-10-25 rows in the
 | INT3 PTQ | Round the 66 MLP projections to INT3, then evaluate | 0 | `int3-001` |
 | INT3 QAT 100M | Train the 66 projections for 100M tokens with INT3 simulated, convert to real INT3, evaluate | 100M | `qat-int3-100m-001` |
 | INT3 QAT 1B | The same for 1B tokens | 1,000M | `qat-int3-1b-001` |
-| INT3 QAT 100M, rerun (planned) | As above, with the fixed INT3 quantizer | 100M | `qat-int3-100m-002` |
-| INT3 QAT 1B, rerun (decided after the 100M rerun) | As above, with the fixed INT3 quantizer | 1,000M | `qat-int3-1b-002` |
+| INT3 QAT 100M, rerun | As above, with the fixed INT3 quantizer | 100M | `qat-int3-100m-002` (completed 2026-10-26) |
+| ~~INT3 QAT 1B, rerun~~ | Not run (decision log, 2026-10-26) | — | — |
 
 The two `-001` QAT runs are invalid and kept as evidence
 ([INT3 QAT incident](#int3-qat-incident-2026-10-25)). The INT4 counterparts are Quantization-1's `int4`, `qat-int4-100m`, and
-`qat-int4-1b` runs. The 1B run gives Stacking-1's 1B stacked models an INT3
-competitor with equal training tokens (decision log, 2026-10-20).
+`qat-int4-1b` runs. The 1B run was planned to give Stacking-1's 1B stacked
+models an INT3 competitor with equal training tokens (decision log,
+2026-10-20); after the fixed 100M run it is no longer run
+([No INT3 QAT 1B rerun](#no-int3-qat-1b-rerun-2026-10-26)).
 
 ## Method
 
@@ -238,7 +244,7 @@ submitted together with Stacking-1's three order-B INT3 reruns
 | Run | Stage | Expected | Time limit | Ceiling GPU-h | Basis | Confidence |
 | --- | --- | --- | --- | ---: | --- | --- |
 | INT3 QAT 100M `-002` | 1 | 1.7-2.2 h | 4 h | 4 | `qat-int3-100m-001` 1.78 h of workflow time | Medium |
-| INT3 QAT 1B `-002` | 2, decided after stage 1 | 14-17 h | 24 h | 24 | `qat-int3-1b-001` 14.25 h | Medium |
+| INT3 QAT 1B `-002` | 2: **not run** (decision log, 2026-10-26) | 14-17 h | 24 h | 24 | `qat-int3-1b-001` 14.25 h | Medium |
 
 - **Per run:** one H200, 8 CPUs, 128 GB RAM, `gpu_short`, one process.
   Expected CPU use 14-18 core-hours (100M) and 112-136 (1B); ceilings 32 and
@@ -409,6 +415,73 @@ asymmetric INT3 (the assert in `_infer_fake_quantize_configs`; test
   zero point from the deployed path, with a real-weight equality test and
   in-run stops ([INT3 QAT fix](#int3-qat-fix-2026-10-25)). The reruns
   (`-002`) are documented here when they finish.
+
+## No INT3 QAT 1B rerun (2026-10-26)
+
+**Decision:** the INT3 QAT 1B run is not rerun with the fixed quantizer
+(decision log, 2026-10-26). The valid INT3 QAT point is
+`qat-int3-100m-002`; `qat-int3-1b-001` stays invalid and is kept as
+evidence. This saves an expected 14-17 GPU-hours (ceiling 24).
+
+The 1B run was planned so that Stacking-1's 1B stacked models would have a
+dense INT3 competitor trained on as many tokens (decision log, 2026-10-20).
+The fixed 100M run shows that this competitor would not change any
+conclusion on the KL and perplexity frontiers.
+
+**1. Longer training barely helps.** 8K KL to the dense model on the shared
+stream. The 0-50M rows are the training-time model, which after the fix has
+the same weights as the deployed model. The 100M value is the deployed
+model's final evaluation. All were read from the run's `result.json` on PERUN
+on 2026-10-25/26.
+
+| Tokens | 0 | 10M | 25M | 50M | 100M |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| INT3 QAT `-002` | 0.2227 | 0.0979 | 0.0885 | 0.0819 | 0.0804 |
+
+The last 50M tokens improved the KL by 1.8%. INT4 QAT behaved the same way:
+1B tokens gave 0.0352 against 0.0360 at 100M, a 2% gain, with test 8K
+perplexity 7.24 against 7.21 (Quantization-1).
+
+**2. Against the 1B stacked models, a 1B run changes nothing.** One model
+beats another when it saves at least as many bytes and is at least as good.
+The 100M INT3 QAT model sits at a 51.6% calculated whole-model byte saving,
+with 8K KL 0.0804 and test 8K perplexity 7.77. Every stacked model with equal
+or smaller saving was checked; the values below are from the local copies of
+Stacking-1's `result.json` files.
+
+| Stacked model (saving ≤ 51.6%) | Saving | 8K KL | Test PPL 8K | Against the 100M INT3 QAT model |
+| --- | ---: | ---: | ---: | --- |
+| Order A, fitted 20%, INT4, 1B | 50.9% | 0.141 | 8.09 | Beaten |
+| Order A, fitted 50%, INT8, 1B | 48.5% | 0.160 | 8.86 | Beaten |
+| Order A, fitted 20%, INT8, 1B | 38.8% | 0.060 | 7.56 | Better, at a smaller saving |
+| Order B, fitted 20%, INT4, 100M | 50.9% | 0.102 | 8.00 | Beaten |
+| Order A, fitted 20%, INT8, 100M | 38.8% | 0.0805 | 7.74 | Near-tie (KL 0.0001 worse, PPL 0.03 better) |
+
+All other stacked models with equal or smaller saving are beaten on both
+metrics.
+
+- **The 1B stacked models,** the planned run's purpose: the 100M INT3 QAT
+  model already beats two of the three. The third (order A, fitted 20%,
+  INT8) is better by a margin (KL 0.060, perplexity 7.56) that a gain of
+  about 2% cannot close.
+- **The 100M stacked models** already have their equal-token competitor in
+  the 100M run. Order A, fitted 20%, INT8 is a near-tie with it at a much
+  smaller saving, so it should be reported as a tie, not a win either way.
+  Interpretation: a 1B run could at most turn this tie into a narrow
+  unequal-token win. INT4's 1B run did not improve perplexity at all
+  (7.24 against 7.21).
+- A model with a 51.6% saving can never beat stacked models that save more
+  bytes, so training it longer cannot remove any of those from the frontier.
+
+**Open condition: task macro.** The 100M run's mean accuracy over the five
+tasks is not computed yet; it needs the downloaded task files. The decision
+is reopened if that macro lies within 0.01 below the macro of a stacked model
+with equal or smaller saving, where a 1B gain like INT4's (+0.008,
+0.658 → 0.666) could change which one wins. The highest stacked macros at
+equal or smaller saving are 0.641 (order A, fitted 20%, INT8, 1B), 0.629
+(the same at 100M), 0.625 (order B, fitted 20%, INT4), and 0.622 (order A,
+fitted 20%, INT4, 1B). Reopening matters mainly for the 1B models; the 100M
+ones already have their equal-token competitor.
 
 ## Measured resource use (2026-10-25)
 

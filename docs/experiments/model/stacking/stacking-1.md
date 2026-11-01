@@ -2,7 +2,7 @@
 title: Stacking-1 - SwiGLU Replacement Plus Weight Quantization
 status: active
 created: 2026-10-17
-modified: 2026-10-25
+modified: 2026-10-26
 ---
 
 # Stacking-1 - SwiGLU Replacement Plus Weight Quantization
@@ -131,7 +131,11 @@ which stay frozen as they are in order A.
 INT3 QAT runs planned here on 2026-10-17 moved to
 [Quantization-2](../baseline/quantization-2.md), which runs
 on Quantization-1's runner and adds INT3 QAT at 1B (decision log,
-2026-10-20).
+2026-10-20). After the INT3 QAT fix, the 1B run is not rerun: longer
+training barely helps the fixed 100M dense INT3 QAT model, and against the
+1B stacked models of equal or smaller byte saving a 1B run could not change
+the KL or perplexity comparison (decision log, 2026-10-26;
+[Quantization-2](../baseline/quantization-2.md#no-int3-qat-1b-rerun-2026-10-26)).
 
 **Why order B stays at 100M.** Order A already has 1B rows because the 1B
 SwiGLU models exist and quantizing them costs only an evaluation. Order B at
@@ -405,9 +409,9 @@ Submitted in one sitting with Quantization-2's INT3 QAT 100M rerun
   are kept. SCRATCH: the 0.4 GB stream and up to two checkpoint generations of
   the replacement weights.
 - **Stage 1 in total** (with Quantization-2's 100M rerun): 4 single-GPU jobs,
-  expected 5.3-7.0 GPU-hours, ceiling 13. Submit both while nothing of yours
-  is queued; the earlier "4 running jobs" submit refusal may have been lifted
-  by the 2026-10-25 limits (20 running, 50 queued), which is unconfirmed.
+  expected 5.3-7.0 GPU-hours, ceiling 13. The earlier "4 running jobs"
+  submit refusal no longer applies (perun-status.md, 2026-10-25); the limits
+  are now 20 running jobs and 50 queued tasks.
 
 ## INT3 order-B runs invalid (2026-10-25)
 
