@@ -60,7 +60,7 @@ flowchart LR
     BI[Block interaction<br/>notebook only]
   end
   subgraph hetero[model/heterogenous]
-    H[Heterogeneous replacement<br/>not started]
+    HB[Operator recipe study<br/>block level, to be defined] --> H[Heterogeneous-1<br/>to be defined]
   end
   subgraph reports[results snapshots]
     R1[Results 2026-10-15]
@@ -78,8 +78,8 @@ flowchart LR
   Q1 -. INT4 fix .-> ST1B
   Q1 --> SP1
   S8 --> SP1
-  BO --> H
-  BB -.-> H
+  BO --> HB
+  BB -.-> HB
   BI -.-> H
   S9 -. 1B homogeneous reference .-> H
   S8 --> R1
@@ -92,7 +92,7 @@ flowchart LR
 
   class S7,S8,S9,Q2,SP1,R1 done
   class Q1,ST1 running
-  class ST1B,H,R2 planned
+  class ST1B,HB,H,R2 planned
   class S26,BB,BO,CB,BI historical
 ```
 
@@ -112,19 +112,31 @@ Grey: historical or notebook-only.
 | [Stacking-1](model/stacking/stacking-1.md) | Ran 48/48; order-B INT3 rerun as `-002`; order-B INT4 rerun pending | SwiGLU-7/8/9 models, Quantization-1 backend, Quantization-2 INT3 fix |
 | Stacking-1 order B 1B | Planned (6 runs) | Order-B `-002` runs at 100M (INT3, INT4), SwiGLU-7 1B stream, SwiGLU-8 starts |
 | [Block interaction](model/interaction/block-interaction.md) | Notebook artifact only | - |
-| [Heterogeneous replacement](model/heterogenous/README.md) | Not started; block-level study per operator first | Block studies, SwiGLU-9 1B reference |
+| Operator recipe study (block level) | To be defined; one per operator family (decision log, 2026-10-11) | Block operator studies, SwiGLU-8 Part A recipe |
+| [Heterogeneous-1](model/heterogenous/README.md) | To be defined | Operator recipe study, SwiGLU-9 1B homogeneous reference |
 | [Results 2026-11-01](../results/2026-11-01-results.md) | WIP for the 2026-11-06 meeting | SwiGLU-9, Stacking-1, Quantization-2; heterogeneous later |
 
 Invalid and excluded runs (decision log, 2026-10-25): Quantization-2
 `qat-int3-{100m,1b}-001` and Stacking-1 `b-fitted-*-100m-int3-001`.
 
+## Heterogeneous experiments (to fill)
+
+Placeholder until the first heterogeneous experiment is designed. Add one row
+per experiment, and replace the two placeholder nodes in the experiment graph
+with the real ones.
+
+| Experiment | Question | Operators | Status | Depends on | Reused by |
+| --- | --- | --- | --- | --- | --- |
+| Operator recipe study | | | To be defined | Block operator studies | Heterogeneous-1 |
+| Heterogeneous-1 | | | To be defined | Operator recipe study, SwiGLU-9 | Results snapshot |
+
 ## Active and planned runs
 
 | Run | Experiment | Depends on | Owner | Job | Status |
 | --- | --- | --- | --- | --- | --- |
-| `qat-int4-100m-002` | Quantization-1 | INT4 fix, commit `b59da5c` | INT4-audit session | 140530 | Running; start check 66/66 equal |
-| `b-fitted-{0.2,0.5,0.8}-100m-int4-002` | Stacking-1 | INT4 fix, commit `b59da5c` | INT4-audit session | - | To submit (runbook 10.6) |
-| `qat-int4-1b-002` | Quantization-1 | `qat-int4-100m-002` result | Researcher decision | - | Undecided |
+| `qat-int4-100m-002` | Quantization-1 | INT4 fix, commit `b59da5c` | INT4-audit session | 140530 | Completed; deployed 8K KL 0.0291, no conversion gap |
+| `b-fitted-{0.2,0.5,0.8}-100m-int4-002` | Stacking-1 | INT4 fix, commit `b59da5c` | INT4-audit session | 140575 (array 0, 2, 4) | Completed; KL 0.102 / 0.249 / 0.564 (`-001`: 0.102 / 0.255 / 0.579) |
+| `qat-int4-1b-002` | Quantization-1 | `qat-int4-100m-002` result (gap removed) | INT4-audit session | 140605 | Running; start check 66/66 equal |
 | `b-fitted-{0.2,0.5,0.8}-1b-int{3,4}` | Stacking-1 order B 1B | Order-B INT4 `-002` (finished, for the INT4 twins), order-B INT3 `-002` (done) | Order-B-1B session | - | Planned |
 | TorchAO INT3 upstream check | Quantization-2 | - | TorchAO session | - | Investigation, no GPU |
 | Results-2 snapshot | Results | The runs above; heterogeneous | Results session | - | WIP |

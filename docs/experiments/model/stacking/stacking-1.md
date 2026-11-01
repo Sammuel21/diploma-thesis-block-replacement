@@ -459,6 +459,40 @@ test perplexity at 8K, and macro is the five-task mean.
   1.27, 3.16); a fixed run is expected to look INT4-like (recorded, not
   enforced).
 
+## Order-B INT4 reruns with the fixed quantizer (2026-11-01)
+
+**What and why.** The `-001` order-B INT4 runs trained with TorchAO's INT4
+fake quantizer. That quantizer rounds the FP32 master weight, while deployment
+rounds its BF16 cast ([Quantization-1](../baseline/quantization-1.md#int4-qat-conversion-gap-2026-11-01);
+decision log, 2026-11-01). The three runs were rerun as `-002` with the
+deployed-path INT4 quantizer.
+- Job 140575, array tasks 0, 2 and 4; commit `b59da5c`; 3 h limit; all
+  completed.
+- K6 passed at the start and at conversion: 66 of 66 projections bitwise
+  equal.
+- Values were read on PERUN; the files are not home yet.
+
+| Target | 8K KL `-001` → `-002` | Change | Test PPL 8K `-001` → `-002` | Macro `-001` → `-002` | Order A 100M INT4 KL | Order A 1B INT4 KL |
+| ---: | --- | ---: | --- | --- | ---: | ---: |
+| 20% | 0.1022 → 0.1023 | +0.1% | 8.00 → 8.00 | 0.6251 → 0.6230 | 0.1642 | 0.1409 |
+| 50% | 0.2554 → 0.2485 | -2.7% | 9.92 → 9.88 | 0.5535 → 0.5505 | 0.3185 | 0.2386 |
+| 80% | 0.5791 → 0.5645 | -2.5% | 15.71 → 15.39 | 0.4632 → 0.4678 | 0.7066 | 0.5225 |
+
+- **Much smaller than in dense INT4 QAT (-19%), as predicted.** Only the
+  replacement modules train with FP32 masters. The dense-kept projections stay
+  frozen BF16, on the grid, so they never mismatched.
+- **Prediction check:** the change in KL is -0.0069 at 50% and -0.0146 at 80%,
+  with none at 20%. An estimate made before the rerun, comparing `-001` INT4
+  with the bit-exact INT3 `-002`, gave 0.005-0.016 at 50% and 80% and none at
+  20%.
+- **Macro accuracy moves by at most 0.5 points.** It goes down at 20% and 50%
+  and up at 80%; single runs.
+- **The order comparison is unchanged.** Order B still beats order A at 100M at
+  every width.
+- **Against order A at 1B:** order B at 100M wins at 20% but not at 50% or 80%.
+- From here on, order-B INT4 uses the `-002` runs, including as the 100M
+  twins of order B at 1B.
+
 ## Order B at 1B (plan, 2026-11-01)
 
 Planned and implemented on 2026-11-01; nothing has run on PERUN. The decision

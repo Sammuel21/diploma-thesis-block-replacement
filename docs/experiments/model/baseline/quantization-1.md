@@ -15,9 +15,10 @@ family. Existing SwiGLU configurations, runners, and results are preserved.
 see [Results](#results-2026-10-13). The quantized models needed a loader fix
 and a separate evaluation step, described there.
 
-**Update 2026-11-01:** the INT4 QAT conversion gap is explained and fixed in
-code. Training simulated slightly different INT4 weights from the deployed
-ones. A `qat-int4-100m-002` validation rerun is pending; see
+**Update 2026-11-01:** the INT4 QAT conversion gap is explained and fixed.
+Training simulated slightly different INT4 weights from the deployed ones. The
+validation rerun `qat-int4-100m-002` removed the gap: deployed 8K KL 0.0291,
+against 0.0360 before. `qat-int4-1b-002` is being rerun; see
 [INT4 QAT conversion gap](#int4-qat-conversion-gap-2026-11-01).
 
 ## Status and open issues
@@ -445,11 +446,34 @@ converted model and stays valid. Training aimed at slightly different weights,
 so INT4 QAT is probably reported somewhat worse than a matched version would
 be (inference).
 
-**Reruns (`-002`, planned).**
-- `qat-int4-100m-002` is the end-to-end validation: the conversion gap should
-  vanish.
-- Stacking-1's three order-B INT4 runs also rerun.
-- Commands: [runbook 4.6 and 10.6](../../../infrastructure/perun/perun-runbook.md).
+**Validation run `qat-int4-100m-002` (job 140530, commit `b59da5c`, completed
+2026-11-01; values read on PERUN).** Both checks passed on the GPU: 66 of 66
+projections were bitwise equal at the start and at conversion. The training
+stream is the same as `-001` (equal sha256).
+
+| | `qat-int4-100m-001` (library quantizer) | `qat-int4-100m-002` (deployed-path quantizer) |
+| --- | ---: | ---: |
+| 8K KL at the end of training (simulated INT4) | 0.0286 | 0.0291 |
+| 8K KL of the deployed INT4 model | 0.0360 | **0.0291** |
+| Change at conversion | +26% | **0.0%** |
+| Test PPL at 8K | 7.214 | **7.171** |
+
+- **The conversion gap is fully explained.** With the training-time and
+  deployed weights equal, the deployed KL equals the training-time KL
+  (0.029109 against 0.02910).
+- **INT4 QAT was understated by about 19% in KL.** The fixed 100M model also
+  beats the old 1B model (0.0352).
+- **Training-time KL:** 0.0896 at token 0, then 0.0383, 0.0352, 0.0309, 0.0312
+  and 0.0291 at 10, 25, 50, 75 and 100M. It was still falling slightly at 100M.
+- Macro accuracy is read once the results are copied home.
+- Single run, single seed.
+
+**Reruns.**
+- `qat-int4-1b-002` is rerun as well, so that 100M against 1B, and dense
+  against Stacking-1 order B at 1B, compare the same quantizer (decision log,
+  2026-11-01). Expected 16-17 h, 24 h limit; `-001` took 15.83 h.
+- Stacking-1's three order-B INT4 runs are rerun as `-002` (job 140575).
+- Commands: [runbook 4.6, 4.7 and 10.6](../../../infrastructure/perun/perun-runbook.md).
 
 | Run | Tasks | Expected per task | Limit | Ceiling GPU-h | Basis | Confidence |
 | --- | ---: | --- | --- | ---: | --- | --- |

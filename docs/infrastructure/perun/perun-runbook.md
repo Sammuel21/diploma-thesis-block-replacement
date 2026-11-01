@@ -719,6 +719,44 @@ python -c "import json; r = json.load(open('$PERUN_RESULTS/quantization-1/qat-in
 for RUN in qat-int4-100m-001 qat-int4-100m-002; do python -c "import json; print('$RUN', json.load(open('$PERUN_RESULTS/quantization-1/$RUN/result.json'))['results']['recovery_stream']['sha256'])"; done
 ```
 
+### 4.7 Rerun INT4 QAT 1B as `-002`
+
+**After 4.6 completed with an empty conversion mismatch list** (decision log,
+2026-11-01). Same checkout as 4.6. The pre-checks follow 4.6, with the 1B
+output, budget, and limit.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+git log -1 --oneline
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=24:00:00 \
+  workflows/jobs/perun/quantization_1.sbatch run qat-int4-1b-002 --prepared "$Q1_PREPARED" \
+  --variant qat-int4 --qat-tokens 1000000000
+find "$PERUN_RESULTS/quantization-1" -maxdepth 1 -name 'qat-int4-1b-002*' | grep . || echo "no 1B -002 output yet"
+```
+
+**Submits a job. Run once,** after the checks are clean.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+EXISTING=$(find "$PERUN_RESULTS/quantization-1" -maxdepth 1 -name 'qat-int4-1b-002*')
+if [[ -n "$EXISTING" ]]; then
+    echo "STOP: the 1B -002 output or lock already exists:"; echo "$EXISTING"
+else
+    QINT4B=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=24:00:00 \
+        --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+        workflows/jobs/perun/quantization_1.sbatch run qat-int4-1b-002 --prepared "$Q1_PREPARED" \
+        --variant qat-int4 --qat-tokens 1000000000)
+    printf 'QINT4B=%s\n' "${QINT4B%%;*}" | tee "$PERUN_LOG_DIR/quantization-1-int4-1b-rerun_submission.txt"
+fi
+```
+
+**Watch** with the start check of 4.6, using `$QINT4B` and
+`qat-int4-1b-002`. After it finishes, use the two "after it finishes" lines of
+4.6 with `qat-int4-1b-001` and `qat-int4-1b-002`. A stopped run resumes with
+4.6's `run` line plus `--resume`, from the same checkout.
+
 ## 5. When a job fails
 
 ### 5.1 Capture the record
