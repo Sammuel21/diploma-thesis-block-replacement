@@ -246,7 +246,7 @@ class Int3Contracts(unittest.TestCase):
             handle.remove()
         # Trained FP32 masters leave the BF16 grid; training must still see the deployed weights.
         self.assertFalse(all(torch.equal(value, value.to(torch.bfloat16).float()) for value in parameters))
-        self.assertEqual(quantization.int3_fake_quantization_check(model, paths)["mismatched"], [])
+        self.assertEqual(quantization.fake_quantization_check(model, paths, 3)["mismatched"], [])
         record = quantization.convert_qat(model, paths, 3)
         self.assertEqual(record["int3_fake_equals_deployed"],
                          {"projections": len(paths), "mismatched": [], "comparison": "sha256-bf16"})
@@ -264,7 +264,7 @@ class Int3Contracts(unittest.TestCase):
         model = self.outlier_model()
         paths = quantization.projection_paths(model, [0, 1, 2])
         quantization.prepare_qat(model, paths, 3, [])
-        check = quantization.int3_fake_quantization_check(model, paths)
+        check = quantization.fake_quantization_check(model, paths, 3)
         self.assertEqual((check["projections"], check["mismatched"]), (len(paths), []))
         module = model.layers[0].mlp.down_proj
         with torch.no_grad():
@@ -280,7 +280,7 @@ class Int3Contracts(unittest.TestCase):
         quantization.prepare_qat(model, paths, 3, [])
         model.layers[0].mlp.down_proj.weight_fake_quantizer = IntxFakeQuantizer(
             IntxFakeQuantizeConfig(torch.int3, group_size=quantization.GROUP_SIZE, is_symmetric=False))
-        check = quantization.int3_fake_quantization_check(model, paths)
+        check = quantization.fake_quantization_check(model, paths, 3)
         self.assertEqual([row["path"] for row in check["mismatched"]], ["layers.0.mlp.down_proj"])
         with self.assertRaisesRegex(ValueError, "differ from the trained fake-quantized"):
             quantization.convert_qat(model, paths, 3)
@@ -361,7 +361,7 @@ class Int3RealWeightContracts(unittest.TestCase):
             for value in parameters:
                 value.add_(1e-4 * torch.randn(value.shape, generator=generator))
         self.assertFalse(any(torch.equal(value, value.to(torch.bfloat16).float()) for value in parameters))
-        check = quantization.int3_fake_quantization_check(model, paths)
+        check = quantization.fake_quantization_check(model, paths, 3)
         self.assertEqual((check["projections"], check["mismatched"]), (66, []))
         module = model.get_submodule(next(path for path in outliers if ".22." in path))
         with torch.no_grad():

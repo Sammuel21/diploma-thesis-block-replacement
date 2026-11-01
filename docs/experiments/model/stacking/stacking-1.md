@@ -266,7 +266,7 @@ Each check stops the run if it fails, except where noted.
 | K3 | Order B: the token-0 monitoring KL and perplexity of the start, before padding and fake quantization, equal SwiGLU-8's token-0 row | relative 1e-4 |
 | K4 | INT8 and INT4: calculated eligible bytes equal measured eligible bytes | exact |
 | K5 | Padded models: the deployed bundle's padded neurons output exactly zero gate and up values on one monitoring batch; order B also checks that the padded master weights are still zero after training (`K5-training`) | exact |
-| K6 | Order-B INT3, from `-002` on: after QAT preparation, before the first update, every projection's simulated INT3 weight equals the deployed recipe applied to the same weight (`K6-start`); at conversion, every deployed INT3 weight equals the trained simulated weight (`convert_qat`, recorded in `results.conversion.int3_fake_equals_deployed`) | bitwise |
+| K6 | Order-B INT3 and, from the INT4 `-002` reruns on, INT4 (decision log, 2026-11-01): after QAT preparation, before the first update, every projection's simulated weight equals the deployed recipe applied to the same weight (`K6-start`); at conversion, every deployed weight equals the trained simulated weight (`convert_qat`, recorded in `results.conversion.int{3,4}_fake_equals_deployed`). INT4 compares the weight `Int4Tensor` stores, not the MSLK kernel's arithmetic; see [Quantization-1](../baseline/quantization-1.md#int4-qat-conversion-gap-2026-11-01) | bitwise |
 
 The monitoring perplexity after padding (before quantization) is recorded but
 not enforced, because a matrix multiply over a longer row may sum in a
@@ -348,7 +348,7 @@ Order A, order-B INT4, and every PTQ path are unchanged.
 | File | Change |
 | --- | --- |
 | [quantization.py](../../../../src/mlp_replacement/compression/quantization.py) | `DeployedInt3FakeQuantizer`: scale and zero point from the deployed INT3 recipe, so simulated weights equal deployed weights bit for bit; `int3_fake_quantization_check`; `convert_qat` stops if a converted INT3 weight differs from the trained simulated weight |
-| [stacking_1.py](../../../../workflows/runs/model/stacking/stacking_1.py) | Check `K6-start` right after QAT preparation in order-B INT3, before the first update; the conversion half runs inside `convert_qat` |
+| [stacking_1.py](../../../../workflows/runs/model/stacking/stacking_1.py) | Check `K6-start` right after QAT preparation in order B (INT3; INT4 from 2026-11-01), before the first update; the conversion half runs inside `convert_qat` |
 | [stacking_1.sbatch](../../../../workflows/jobs/perun/stacking_1.sbatch) | Optional `--attempt NNN` (default `001`), placed before `--resume`; the output is `VARIANT-NNN`, so a rerun never overwrites the invalid `-001` evidence |
 | [test_stacking1_contracts.py](../../../../tests/test_stacking1_contracts.py) | Planted outlier, trained masters off the BF16 grid, the old TorchAO quantizer caught by both checks, and the pinned SmolLM2 weights |
 

@@ -652,6 +652,70 @@ sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time="$LIMIT" 
   workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json" --resume
 ```
 
+### 4.6 Rerun INT4 QAT 100M as `-002`
+
+**The end-to-end validation of the INT4 QAT fix,** submitted first. Submit
+10.6 after this run's start check passes. The fix and its checks are in
+[quantization-1.md](../../experiments/model/baseline/quantization-1.md#int4-qat-conversion-gap-2026-11-01).
+Run 1.2, 1.3, and 1.4 first: the checkout must contain the fix commit.
+
+**Pre-submission checks. Safe to re-run.** The `git log` line must show the
+fix commit, the `--test-only` line must be accepted, and `qat-int4-100m-002`
+must not exist.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+git log -1 --oneline
+bash -n workflows/jobs/perun/quantization_1.sbatch && echo "launcher syntax OK"
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 \
+  workflows/jobs/perun/quantization_1.sbatch run qat-int4-100m-002 --prepared "$Q1_PREPARED" \
+  --variant qat-int4 --qat-tokens 100000000
+find "$PERUN_RESULTS/quantization-1" -maxdepth 1 -name 'qat-int4-100m-002*' | grep . || echo "no -002 output yet"
+squeue -u "$USER"
+```
+
+**Submits a job. Run once,** after the checks are clean. It writes the job ID
+to `$PERUN_LOG_DIR/quantization-1-int4-rerun_submission.txt`.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+EXISTING=$(find "$PERUN_RESULTS/quantization-1" -maxdepth 1 -name 'qat-int4-100m-002*')
+if [[ -n "$EXISTING" ]]; then
+    echo "STOP: the -002 output or lock already exists:"; echo "$EXISTING"
+else
+    QINT4=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 \
+        --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+        workflows/jobs/perun/quantization_1.sbatch run qat-int4-100m-002 --prepared "$Q1_PREPARED" \
+        --variant qat-int4 --qat-tokens 100000000)
+    printf 'QINT4=%s\n' "${QINT4%%;*}" | tee "$PERUN_LOG_DIR/quantization-1-int4-rerun_submission.txt"
+    echo "<- record this in local/perun/runs/quantization-1.md"
+fi
+```
+
+**Start check. Safe to re-run,** about 10-20 minutes after the job starts.
+The `mismatched` list must be empty for all 66 projections; then submit 10.6.
+If the run stops instead, its `.err` file says "INT4 fake-quantized weights
+differ": stop and tell the assistant.
+
+```bash
+source "$PERUN_LOG_DIR/quantization-1-int4-rerun_submission.txt"
+squeue -j "$QINT4"
+python -c "import json; r = json.load(open('$PERUN_RESULTS/quantization-1/qat-int4-100m-002/result.json')); c = r['results'].get('int4_fake_quantization_check'); print(r['status'], 'check:', c and (c['projections'], c['mismatched']))"
+tail -n 5 "$PERUN_LOG_DIR/quantization-1_$QINT4.err"
+```
+
+**After it finishes** (about 2 h): a mismatch at conversion stops the run
+with "Deployed INT4 weights differ" before export. The two lines below must
+print `completed`, `[]`, and the same stream sha256 twice (same tokens as
+`-001`). Then do sections 7 and 6.
+
+```bash
+python -c "import json; r = json.load(open('$PERUN_RESULTS/quantization-1/qat-int4-100m-002/result.json')); print(r['status'], r['results']['conversion'].get('int4_fake_equals_deployed', {}).get('mismatched'))"
+for RUN in qat-int4-100m-001 qat-int4-100m-002; do python -c "import json; print('$RUN', json.load(open('$PERUN_RESULTS/quantization-1/$RUN/result.json'))['results']['recovery_stream']['sha256'])"; done
+```
+
 ## 5. When a job fails
 
 ### 5.1 Capture the record
@@ -1194,6 +1258,49 @@ fi
 task stops right after QAT preparation with `AcceptanceFailure` and `K6-start`
 in its `.err` file. A mismatch at conversion stops it with "Deployed INT3
 weights differ" before export. Either way, stop and tell the assistant.
+
+### 10.6 Rerun the order-B INT4 tasks as `-002`
+
+**After 4.6's start check passed.** The INT4 fix is in
+[quantization-1.md](../../experiments/model/baseline/quantization-1.md#int4-qat-conversion-gap-2026-11-01).
+Same checkout as 4.6.
+
+**Pre-submission checks. Safe to re-run.** The `list-variants` lines must
+print `b-fitted-0.2-100m-int4`, `b-fitted-0.5-100m-int4`, and
+`b-fitted-0.8-100m-int4`, in that order. The `--test-only` line must be
+accepted, and no `-002` INT4 output may exist yet.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+git log -1 --oneline
+# Array tasks 0, 2, and 4 of group b are the three INT4 variants:
+PYTHONPATH=src python -m workflows.runs.model.stacking.stacking_1 list-variants --group b | sed -n '1p;3p;5p'
+find "$PERUN_RESULTS/stacking-1" -maxdepth 1 -name 'b-fitted-*-100m-int4-002*' | grep . || echo "no -002 outputs yet"
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --array=0,2,4 \
+  workflows/jobs/perun/stacking_1.sbatch group b --attempt 002
+```
+
+**Submits jobs. Run once,** after the checks are clean. It writes the job ID
+to `$PERUN_LOG_DIR/stacking-1-int4-rerun_submission.txt`.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+EXISTING=$(find "$PERUN_RESULTS/stacking-1" -maxdepth 1 -name 'b-fitted-*-100m-int4-002*')
+if [[ -n "$EXISTING" ]]; then
+    echo "STOP: an order-B INT4 -002 output or lock already exists:"; echo "$EXISTING"
+else
+    BINT4=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --array=0,2,4 \
+        --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        workflows/jobs/perun/stacking_1.sbatch group b --attempt 002)
+    printf 'BINT4=%s\n' "${BINT4%%;*}" | tee "$PERUN_LOG_DIR/stacking-1-int4-rerun_submission.txt"
+    echo "<- record this in local/perun/runs/stacking-1.md"
+fi
+```
+
+**Watch** with 10.3. A start mismatch stops a task right after QAT
+preparation with `AcceptanceFailure` and `K6-start` in its `.err` file; a
+mismatch at conversion stops it with "Deployed INT4 weights differ". Either
+way, stop and tell the assistant.
 
 ## 11. Quantization-2
 

@@ -2,7 +2,7 @@
 title: Quantization-1 MLP Compression Baseline
 status: active
 created: 2026-10-02
-modified: 2026-10-15
+modified: 2026-11-01
 ---
 
 # Quantization-1
@@ -14,6 +14,11 @@ family. Existing SwiGLU configurations, runners, and results are preserved.
 **Status (2026-10-15):** completed on PERUN. All five models are evaluated;
 see [Results](#results-2026-10-13). The quantized models needed a loader fix
 and a separate evaluation step, described there.
+
+**Update 2026-11-01:** the INT4 QAT conversion gap is explained and fixed in
+code. Training simulated slightly different INT4 weights from the deployed
+ones. A `qat-int4-100m-002` validation rerun is pending; see
+[INT4 QAT conversion gap](#int4-qat-conversion-gap-2026-11-01).
 
 ## Status and open issues
 
@@ -102,7 +107,8 @@ interval; `*` marks an interval that excludes zero:
   fell from 0.0897 at token 0 to 0.0286 at 100M. The 1B run was lowest at 275M
   (0.0272) and drifted to 0.0295 by 1B under the constant learning rate.
   Validation PPL at 8K was lowest at 100M (7.410) and 7.459 at 1B. Converting
-  to real INT4 adds 0.006-0.007 KL.
+  to real INT4 adds 0.006-0.007 KL. The probable cause was found on
+  2026-11-01: see [INT4 QAT conversion gap](#int4-qat-conversion-gap-2026-11-01).
 - QAT 1B against 100M: about the same KL, slightly worse perplexity, mixed
   tasks (ARC-Easy better, ARC-Challenge worse). One run each, constant learning
   rate.
@@ -352,7 +358,10 @@ bash workflows/jobs/local/quantization_1.sh run --variant qat-int4 \
 ```
 
 The alternative is to set `qat.target_tokens` in a separately retained config.
-QAT uses native `QATConfig` prepare/convert with the same INT4 base recipe.
+QAT uses `QATConfig` convert with the same INT4 base recipe. The `-001` runs
+used TorchAO's native INT4 fake quantizer; from `-002` on, preparation uses the
+project's deployed-path quantizer
+([INT4 QAT conversion gap](#int4-qat-conversion-gap-2026-11-01)).
 Only eligible MLP weights train; fake quantization is enabled from the start,
 with FP32 master parameters/Adam state and BF16 forward autocast. Before final
 conversion, master weights are cast to BF16 so the deployed metadata/kernel
@@ -375,6 +384,81 @@ stream/configuration/source fingerprints. Work data is disposable; a Perun
 resume regenerates and hash-verifies the same recovery stream if needed. The
 checkpoint survives failure and is removed only after successful complete
 evaluation. No best-test-checkpoint selection or extra LoRA scope is included.
+
+### INT4 QAT conversion gap (2026-11-01)
+
+**Observation.** At the end of QAT the simulated INT4 model has 8K KL 0.0286
+(100M); the converted INT4 model has 0.0360. The fixed INT3 QAT, whose training
+and deployed weights are bitwise equal, changes only from 0.0795 to 0.0804.
+
+**Cause** (source reading of TorchAO 0.17.0 and MSLK 1.1.0, then a CPU audit).
+- **Training:** TorchAO's `Int4WeightFakeQuantizer` (`qat/fake_quantizer.py`,
+  `_bf16_activations_forward`) rounds the FP32 master weight and keeps an FP32
+  scale and zero point.
+- **Deployment:** `convert_qat` casts the master to BF16. `Int4Tensor.from_hp`
+  then quantizes it with MSLK's `int4_row_quantize_zp`
+  (`mslk/quantize/shuffle.py`) and stores the scale and zero point in BF16
+  (`int4_tensor.py`).
+- The formula is the same; the inputs differ. They agree at token 0, where the
+  masters are BF16 values. Training moves them off that grid, and the BF16 cast
+  at conversion then lands some weights on a different code. The FP32 masters
+  are the standard mixed-precision setup (FP32 trainable weights under BF16
+  autocast) used since SwiGLU-3.
+
+**Audit** (CPU, real SmolLM2 weights, all 66 projections). Training side:
+TorchAO's real quantizer. Deployed side: a replication of MSLK's function,
+because MSLK runs on CUDA only.
+
+| Masters | INT4 codes differ | Difference / INT4 rounding error | Largest difference |
+| --- | ---: | ---: | ---: |
+| On the BF16 grid (token 0) | 0% | 2.8% | 0.075 steps |
+| Moved 0.5, 1, or 4 BF16 steps (seeded noise) | 0.86% | 32% | 1.08 steps |
+
+The nudges are random, not the trained masters, which are only on PERUN.
+Trained weights may sit closer to rounding boundaries (not measured).
+
+**Fix (decision log, 2026-11-01).** `DeployedInt4FakeQuantizer` in
+[quantization.py](../../../../src/mlp_replacement/compression/quantization.py):
+- It computes TorchAO's formula, with the same gradients, on the BF16 cast of
+  the master, and dequantizes with the BF16 scale and zero point.
+- `prepare_qat` installs it, like the INT3 quantizer, in TorchAO's
+  `FakeQuantizedLinear`, so the convert step is unchanged.
+- **Start check:** both runners stop before the first update unless
+  `fake_quantization_check` finds every training-time weight bitwise equal to
+  the stored deployed weight (`int4_fake_quantization_check`; Stacking-1 K6).
+- **Conversion check:** `convert_qat` repeats the comparison on the trained
+  weights (`int4_fake_equals_deployed`).
+- The stored weight is unpacked from `Int4Tensor` (code × scale + zero point).
+  The MSLK kernel's internal arithmetic is not compared.
+
+**Tested (CPU, TorchAO 0.17.0 probe environment; 38 QAT tests pass).**
+- After three training steps, training sees only the BF16 cast of the master,
+  and TorchAO's own quantizer does not.
+- The training-time weights equal a reconstruction of the stored weight from a
+  transcription of MSLK's quantizer and packing, including a +9.375 outlier.
+- The real deployed INT4 comparison needs CUDA, so the in-run checks on PERUN
+  are the authority.
+- The project Python suite passes: 132 tests, 10 skipped.
+
+**Effect on results.** Every reported INT4 QAT number was measured on the real
+converted model and stays valid. Training aimed at slightly different weights,
+so INT4 QAT is probably reported somewhat worse than a matched version would
+be (inference).
+
+**Reruns (`-002`, planned).**
+- `qat-int4-100m-002` is the end-to-end validation: the conversion gap should
+  vanish.
+- Stacking-1's three order-B INT4 runs also rerun.
+- Commands: [runbook 4.6 and 10.6](../../../infrastructure/perun/perun-runbook.md).
+
+| Run | Tasks | Expected per task | Limit | Ceiling GPU-h | Basis | Confidence |
+| --- | ---: | --- | --- | ---: | --- | --- |
+| Quantization-1 INT4 QAT 100M `-002` | 1 | 1.7-2.3 h | 4 h | 4 | `-001` training 1.51 h, workflow 1.63 h, plus evaluation now in the same job | Medium |
+| Stacking-1 B INT4 `-002` | 3 | 1.2-1.6 h | 3 h | 9 | `-001` training 0.99-1.15 h; INT3 `-001` tasks 1.20-1.42 h in total | Medium |
+| **Total** | **4** | **5.3-7.1 GPU-h** | | **13** | | |
+
+Each task uses 1 H200, 8 CPUs, and 128 GB on `gpu_short`. PROJECT storage
+grows by about 7-9 GB, because the `-001` outputs are kept.
 
 ## Perun resource and deployment contract
 

@@ -288,36 +288,99 @@ class QuantizationTensorContracts(unittest.TestCase):
 
         def make_model():
             model = nn.Module()
-            model.eligible = nn.Linear(128, 128, bias=False).to(torch.bfloat16)
+            model.block = nn.Module()  # QAT swaps a child of a parent module, as in a model
+            model.block.eligible = nn.Linear(128, 128, bias=False).to(torch.bfloat16)
             model.protected = nn.Linear(128, 128, bias=False).to(torch.bfloat16)
             return model
 
         model = make_model()
-        parameters = quantization.prepare_int4_qat(model, ("eligible",))
-        self.assertEqual([name for name, value in model.named_parameters() if value.requires_grad], ["eligible.weight"])
+        parameters = quantization.prepare_int4_qat(model, ("block.eligible",))
+        self.assertEqual([name for name, value in model.named_parameters() if value.requires_grad], ["block.eligible.weight"])
         self.assertEqual(parameters[0].dtype, torch.float32)
-        self.assertIsNone(model.eligible.activation_fake_quantizer)
-        self.assertEqual(model.eligible.weight_fake_quantizer.config.group_size, 128)
+        self.assertIsNone(model.block.eligible.activation_fake_quantizer)
+        self.assertIsInstance(model.block.eligible.weight_fake_quantizer, quantization.DeployedInt4FakeQuantizer)
         optimizer = torch.optim.AdamW(parameters, lr=3e-5)
         parameters[0].grad = torch.ones_like(parameters[0])
         optimizer.step()
         with tempfile.TemporaryDirectory() as temporary:
             payload = {"run_fingerprint": "contract", "tokens_seen": 8192,
-                       "eligible_state": model.eligible.state_dict(), "optimizer": optimizer.state_dict(), **capture_rng()}
+                       "eligible_state": model.block.eligible.state_dict(), "optimizer": optimizer.state_dict(), **capture_rng()}
             commit_single_checkpoint(temporary, payload)
             expected = torch.rand(5)
             restored, descriptor = restore_checkpoint(temporary, "contract")
             target = make_model()
-            restored_parameters = quantization.prepare_int4_qat(target, ("eligible",))
-            target.eligible.load_state_dict(restored["eligible_state"], strict=True)
+            restored_parameters = quantization.prepare_int4_qat(target, ("block.eligible",))
+            target.block.eligible.load_state_dict(restored["eligible_state"], strict=True)
             restored_optimizer = torch.optim.AdamW(restored_parameters, lr=3e-5)
             restored_optimizer.load_state_dict(restored["optimizer"])
             restore_rng(restored)
             self.assertTrue(torch.equal(torch.rand(5), expected))
-            self.assertTrue(torch.equal(model.eligible.weight, target.eligible.weight))
+            self.assertTrue(torch.equal(model.block.eligible.weight, target.block.eligible.weight))
             self.assertTrue(torch.equal(optimizer.state[parameters[0]]["exp_avg"], restored_optimizer.state[restored_parameters[0]]["exp_avg"]))
             with self.assertRaisesRegex(ValueError, "different experiment"):
                 restore_checkpoint(temporary, "foreign")
+
+    @unittest.skipUnless(TORCHAO_AVAILABLE, "Pinned TorchAO is unavailable")
+    def test_int4_training_sees_only_the_bf16_cast_master(self):
+        import torch
+        import torch.nn as nn
+        from torchao.quantization.qat.fake_quantize_config import Int4WeightFakeQuantizeConfig
+        from torchao.quantization.qat.fake_quantizer import Int4WeightFakeQuantizer
+
+        torch.manual_seed(0)
+        model = nn.Module()
+        model.block = nn.Module()
+        model.block.eligible = nn.Linear(256, 16, bias=False).to(torch.bfloat16)
+        parameters = quantization.prepare_int4_qat(model, ("block.eligible",))
+        optimizer = torch.optim.AdamW(parameters, lr=1e-3, weight_decay=0.0)
+        for unused_step in range(3):
+            optimizer.zero_grad()
+            model.block.eligible(torch.randn(4, 256)).pow(2).mean().backward()
+            optimizer.step()
+        master = parameters[0].detach()
+        # Trained FP32 masters leave the BF16 grid; conversion quantizes their BF16 cast.
+        self.assertFalse(torch.equal(master, master.to(torch.bfloat16).float()))
+        fake = model.block.eligible.weight_fake_quantizer
+        with torch.no_grad():
+            trained = fake(master).to(torch.bfloat16)
+            self.assertTrue(torch.equal(trained, fake(master.to(torch.bfloat16).float()).to(torch.bfloat16)))
+            library = Int4WeightFakeQuantizer(Int4WeightFakeQuantizeConfig(group_size=128,
+                                                                           activation_dtype=torch.bfloat16))
+            self.assertFalse(torch.equal(trained, library(master).to(torch.bfloat16)))
+        self.assertTrue(parameters[0].grad.isfinite().all() and parameters[0].grad.ne(0).any())
+
+    @unittest.skipUnless(TORCHAO_AVAILABLE, "Pinned TorchAO is unavailable")
+    def test_int4_fake_quantization_equals_the_stored_mslk_weight(self):
+        import torch
+        from torchao.quantization.quantize_.workflows import Int4Tensor
+
+        def mslk_int4_row_quantize_zp(x):
+            """Transcribed from MSLK 1.1.0 `mslk/quantize/shuffle.py` (`int4_row_quantize_zp`, `pack_int4`).
+
+            MSLK runs on CUDA only; on PERUN the runners compare against the real library.
+            """
+
+            chunks = torch.split(x.to(torch.float), 128, dim=-1)
+            low = [chunk.amin(dim=1, keepdim=True) for chunk in chunks]
+            scales = [(chunk.amax(dim=1, keepdim=True) - minimum).clamp(min=1e-6) / 15
+                      for chunk, minimum in zip(chunks, low)]
+            zeros = [minimum + scale * 8 for minimum, scale in zip(low, scales)]
+            codes = torch.cat([(chunk.sub(minimum).div(scale).round().clamp_(0, 15) - 8).to(torch.int8)
+                               for chunk, minimum, scale in zip(chunks, low, scales)], dim=-1)
+            packed = torch.bitwise_or(torch.bitwise_and(codes[:, ::2], 0xF),
+                                      torch.bitwise_left_shift(codes[:, 1::2], 4)).contiguous()
+            return packed, torch.cat(scales, dim=-1).t().contiguous(), torch.cat(zeros, dim=-1).t().contiguous()
+
+        torch.manual_seed(0)
+        weight = (torch.randn(8, 256) * 0.05).to(torch.bfloat16)
+        weight[3, 17] = 9.375  # a SmolLM2-like outlier
+        master = weight.float() + torch.randn(8, 256) * 1e-4  # off the BF16 grid, as after training
+        # Int4Tensor.from_hp on the BF16 cast that convert_qat applies, with its BF16 scale and zero point.
+        packed, scale, zero_point = mslk_int4_row_quantize_zp(master.to(torch.bfloat16))
+        stored = Int4Tensor(packed, scale.to(torch.bfloat16), zero_point.to(torch.bfloat16), [1, 128], weight.shape)
+        with torch.no_grad():
+            fake = quantization.DeployedInt4FakeQuantizer()(master).to(torch.bfloat16)
+        self.assertTrue(torch.equal(fake.view(torch.int16), quantization.stored_weight(stored, 4).view(torch.int16)))
 
 
 if __name__ == "__main__":
