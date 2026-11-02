@@ -40,8 +40,10 @@ approves the row and commits; submission follows runbook 10.7.
 140758) and completed. Order B beats order A at 1B at every width and both
 bit widths, by 24-52% in 8K KL
 ([Order B at 1B results](#order-b-at-1b-results-2026-11-02)). The decision row
-is in the log (2026-11-01). **Next step:** frontier plots and the results
-snapshot.
+is in the log (2026-11-01). The frontier analysis of all 60 Stacking-1
+outputs is in the [Results-2 snapshot](../../../results/2026-11-01-results.md),
+and the PERUN job log has entries for all three submissions (added
+2026-11-02). **Next step:** none; order C stays deferred.
 
 ## Questions
 

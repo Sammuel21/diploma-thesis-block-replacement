@@ -2,7 +2,7 @@
 title: TUKE Perun Experiment Log
 status: active
 created: 2026-09-25
-modified: 2026-10-25
+modified: 2026-11-02
 ---
 
 # TUKE Perun Experiment Log
@@ -342,6 +342,36 @@ Entries are appended below in submission order.
 - Experiment document: [SwiGLU-9](../../experiments/model/swiglu/swiglu-9.md#part-b-results-2026-10-18)
 - Notes: `scontrol` records had expired by the time they were requested, so scheduler state, exit codes, and elapsed times come from the job logs and the result records.
 
+## [2026-10-20, about 21:30 UTC] 122867-122869 | Stacking-1 orders A and B, 48 runs
+
+- Plan: about 22-40 GPU-hours expected, ceiling 120 ([resource plan](../../experiments/model/stacking/stacking-1.md#pre-run-resource-plan)):
+  - order B: 6 × 1.5-3 h (6-hour limit), low confidence;
+  - order A 100M and 1B: 33 + 9 × 0.3-0.5 h (2-hour limit), medium confidence.
+- Outcome: all 48 COMPLETED with structured status `completed`; no retries.
+  - The three order-B INT3 results were later found scientifically invalid (INT3 fake-quantizer mismatch, 2026-10-25). The jobs themselves ran as designed.
+- Submission: `workflows/jobs/perun/stacking_1.sbatch group b` (122867, 6 tasks), `group a100m` (122868, 33 tasks), and `group a1b` (122869, 9 tasks).
+  - Three array submissions in one sitting with `--begin=now+10minutes`, order B first (runbook 10.2).
+- Provenance: commit `d7d7c1e`; configuration sha256 `61f30ea5…`; all 29 pinned sources matched before submission.
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, 128 GB requested memory per task; nodes Unknown.
+- Consumption (workflow timing):
+  - 18.6 h in total: order B 1.20-1.42 h per task (7.96 h), order A 100M 0.22-0.32 h (8.41 h), order A 1B 0.22-0.32 h (2.27 h).
+  - Last log writes 21:57-23:09 UTC on 2026-10-20.
+  - Allocation GPU-hours Unknown.
+  - Order-B peak VRAM 25.9-36.6 GiB and peak RAM 6.1-9.0 GiB; order-A peak memory not recorded.
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown.
+- Outputs: PROJECT `perun-results/stacking-1/{a,b}-*-001/`, 78 GB in total. Analysis copy on the PC in `data/results/workflows/model/stacking-1/`.
+- Continuation: completed; order-B checkpoints removed at completion.
+- Verification:
+  - 48 of 48 `result.json` `completed`; no leftover locks.
+  - Order A passed K1, K2, K4, and K5; order B passed K3, K4, and K5.
+  - No check compared the INT3 fake quantizer with the deployed INT3, which is where the order-B INT3 defect was.
+- Variance: below plan (18.6 against 22-40 GPU-hours). Order-A tasks took 0.22-0.32 h against 0.3-0.5 h; order-B tasks took 1.20-1.42 h against 1.5-3 h.
+- Experiment documents: [Stacking-1](../../experiments/model/stacking/stacking-1.md); results in the [Results-2 snapshot](../../results/2026-11-01-results.md).
+- Notes:
+  - Recorded on 2026-11-02.
+  - `sacct` refused (no scheduler records) and the `scontrol` records had expired, so the times come from the job logs and result records.
+  - The submission time is the researcher's note (about 23:30 local time).
+
 ## [2026-10-21, started 09:31 UTC; submission time unrecorded] 123646-123648 | Quantization-2 INT3 PTQ, INT3 QAT 100M, and INT3 QAT 1B
 
 - Plan: PTQ 0.3-0.5 h (2-hour limit), QAT 100M 1.6-3.5 h (6-hour limit), QAT 1B 16-32 h (36-hour limit); about 18-36 GPU-hours expected, ceiling 44 ([resource plan](../../experiments/model/baseline/quantization-2.md#pre-run-resource-plan)); medium confidence for PTQ, low for QAT
@@ -357,6 +387,30 @@ Entries are appended below in submission order.
 - Variance: PTQ and QAT 100M within plan; QAT 1B faster than planned (14.25 h against 16-32 h)
 - Experiment document: [Quantization-2](../../experiments/model/baseline/quantization-2.md#results-2026-10-25)
 - Notes: `scontrol` returned "Invalid job id" for all three on 2026-10-25 and `sacct` is unavailable, so the times come from the job logs and result records. Incident record: [INT3 QAT incident](../../experiments/model/baseline/quantization-2.md#int3-qat-incident-2026-10-25).
+
+## [2026-10-25, evening; submission time unrecorded] 132436 | Stacking-1 order-B INT3 reruns as `-002`
+
+- Plan: 3 × 1.2-1.6 h (3-hour limit), 3.6-4.8 GPU-hours expected, ceiling 9 ([resource plan](../../experiments/model/stacking/stacking-1.md#reruns-with-the-fixed-quantizer-recorded-2026-10-25)); medium confidence.
+- Outcome: all 3 COMPLETED with structured status `completed`; no retries.
+  - K6 passed at the start: training-time INT3 weights bitwise equal to the deployed ones. At conversion, 0 projections mismatched.
+- Submission: `stacking_1.sbatch group b --attempt 002 --array=1,3,5` (runbook 10.5).
+  - Same sitting as Quantization-2's INT3 QAT 100M rerun (job 132434).
+- Provenance: commit `61b2b0d`; configuration sha256 `61f30ea5…`.
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, 128 GB requested memory per task; nodes Unknown.
+- Consumption (workflow timing):
+  - 1.21-1.43 h per task, 4.01 h in total.
+  - Last log writes 22:02-22:15 UTC.
+  - Allocation GPU-hours Unknown.
+  - Peak VRAM 25.9-33.3 GiB; peak RAM 6.1-9.0 GiB.
+- Efficiency: CPU Unknown; memory Unknown; GPU utilization Unknown.
+- Outputs: PROJECT `perun-results/stacking-1/b-fitted-{0.2,0.5,0.8}-100m-int3-002/`; size not recorded. The `-001` outputs are kept as evidence. Analysis copy on the PC.
+- Continuation: completed; checkpoints removed at completion.
+- Verification:
+  - K3, K5, and K6 passed.
+  - The outputs became the in-run twins of Stacking-1 order B at 1B, pinned by sha256 (2026-11-01).
+- Variance: within plan (4.01 against 3.6-4.8 GPU-hours).
+- Experiment document: [Stacking-1](../../experiments/model/stacking/stacking-1.md#int3-order-b-runs-invalid-2026-10-25).
+- Notes: recorded on 2026-11-02 from the job logs and result records; scheduler records unavailable.
 
 ## [2026-11-01, submission time unrecorded] 140530, 140575, 140605 | INT4 QAT fix: Quantization-1 INT4 QAT 100M and 1B, Stacking-1 order-B INT4 100M, all as `-002`
 
@@ -390,3 +444,31 @@ Entries are appended below in submission order.
   - `scontrol` records had expired when requested on 2026-11-02, so times come from the result records.
   - Project storage was 279 of 1,000 GB on 2026-11-02.
   - A runbook 4.6 start-check path was corrected during the run (the live record is on scratch).
+
+## [2026-11-01, about 20:00 UTC] 140758 | Stacking-1 order B at 1B, 6 runs
+
+- Plan: 6 × 10-12.5 h (18-hour limit), 60-75 GPU-hours expected, ceiling 108 ([resource plan](../../experiments/model/stacking/stacking-1.md#pre-run-resource-plan-recorded-2026-11-01)); medium confidence.
+- Outcome: all 6 COMPLETED with structured status `completed`; no retries.
+  - K3, K6 (start and conversion, 66 of 66 projections bitwise equal), and `K7-stream` passed in all six.
+  - `K7-start` passed in the three INT3 tasks.
+  - The recorded `K7-review` flagged two INT3 tasks, within run-to-run noise.
+- Submission: `stacking_1.sbatch group b1b --array=0-5 --time=18:00:00` (runbook 10.7), one array.
+- Provenance:
+  - Commit `d567d7a`, which adds only docs on top of `54ba71f`; configuration sha256 `7033abd5…`.
+  - All nine pinned inputs, including the 4 GB SwiGLU-7 stream, hashed OK before submission.
+  - The checkout was updated while job 140605 ran from `b59da5c`. That job runs from its SCRATCH copy of the code, and no file its resume check hashes changed.
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, 128 GB requested memory per task; nodes Unknown (`--test-only` projected gpu01).
+- Consumption (workflow timing):
+  - 9.78-12.11 h per task (training 9.52-11.88 h, evaluation 0.21-0.33 h), 66.9 h in total.
+  - Last log writes 05:51-08:11 UTC on 2026-11-02.
+  - Allocation GPU-hours Unknown; about 535 CPU core-hours (8 CPUs × workflow time, derived).
+  - Peak VRAM 25.96-38.31 GiB; peak RAM 6.13-9.17 GiB.
+- Efficiency: CPU Unknown; GPU utilization Unknown.
+- Outputs: PROJECT `perun-results/stacking-1/b-fitted-{0.2,0.5,0.8}-1b-int{4,3}-001/`, 1.4-2.1 GB each, 10.0 GB in total. PROJECT held 279 of 1,000 GB afterwards. Analysis copy on the PC.
+- Continuation: completed; checkpoints removed at completion.
+- Verification: "Verified persistent output" logged for all six; no tracebacks; no leftover locks.
+- Variance: within plan (66.9 against 60-75 GPU-hours). Peak VRAM was up to 1.7 GiB above the 36.6 GiB estimate, which does not matter on the H200.
+- Experiment document: [Stacking-1](../../experiments/model/stacking/stacking-1.md#order-b-at-1b-results-2026-11-02).
+- Notes:
+  - The `scontrol` records had expired when requested on 2026-11-02, so the times come from the result records and job-log write times.
+  - The submission time is from the researcher's session (about 21:00 local time).
