@@ -136,7 +136,7 @@ with the real ones.
 | --- | --- | --- | --- | --- | --- |
 | `qat-int4-100m-002` | Quantization-1 | INT4 fix, commit `b59da5c` | INT4-audit session | 140530 | Completed; deployed 8K KL 0.0291, no conversion gap |
 | `b-fitted-{0.2,0.5,0.8}-100m-int4-002` | Stacking-1 | INT4 fix, commit `b59da5c` | INT4-audit session | 140575 (array 0, 2, 4) | Completed; KL 0.102 / 0.249 / 0.564 (`-001`: 0.102 / 0.255 / 0.579) |
-| `qat-int4-1b-002` | Quantization-1 | `qat-int4-100m-002` result (gap removed) | INT4-audit session | 140605 | Running; start check 66/66 equal |
+| `qat-int4-1b-002` | Quantization-1 | `qat-int4-100m-002` result (gap removed) | INT4-audit session | 140605 | Completed; KL 0.0297 (100M: 0.0291), macro 67.06% (100M: 65.87%) |
 | `b-fitted-{0.2,0.5,0.8}-1b-int{3,4}` | Stacking-1 order B 1B | Order-B INT4 `-002` (finished, for the INT4 twins), order-B INT3 `-002` (done) | Order-B-1B session | - | Planned |
 | TorchAO INT3 upstream check | Quantization-2 | - | TorchAO session | - | Investigation, no GPU |
 | Results-2 snapshot | Results | The runs above; heterogeneous | Results session | - | WIP |

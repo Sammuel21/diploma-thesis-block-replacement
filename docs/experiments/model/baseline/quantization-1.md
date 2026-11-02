@@ -18,7 +18,7 @@ and a separate evaluation step, described there.
 **Update 2026-11-01:** the INT4 QAT conversion gap is explained and fixed.
 Training simulated slightly different INT4 weights from the deployed ones. The
 validation rerun `qat-int4-100m-002` removed the gap: deployed 8K KL 0.0291,
-against 0.0360 before. `qat-int4-1b-002` is being rerun; see
+against 0.0360 before. The 1B rerun `qat-int4-1b-002` reached KL 0.0297 (100M: 0.0291) but the best macro accuracy (67.06%); see
 [INT4 QAT conversion gap](#int4-qat-conversion-gap-2026-11-01).
 
 ## Status and open issues
@@ -457,6 +457,7 @@ stream is the same as `-001` (equal sha256).
 | 8K KL of the deployed INT4 model | 0.0360 | **0.0291** |
 | Change at conversion | +26% | **0.0%** |
 | Test PPL at 8K | 7.214 | **7.171** |
+| Macro accuracy, 5 tasks | 65.84% | 65.87% |
 
 - **The conversion gap is fully explained.** With the training-time and
   deployed weights equal, the deployed KL equals the training-time KL
@@ -465,14 +466,42 @@ stream is the same as `-001` (equal sha256).
   beats the old 1B model (0.0352).
 - **Training-time KL:** 0.0896 at token 0, then 0.0383, 0.0352, 0.0309, 0.0312
   and 0.0291 at 10, 25, 50, 75 and 100M. It was still falling slightly at 100M.
-- Macro accuracy is read once the results are copied home.
+- Macro accuracy is unchanged (+0.03 points). Read from the downloaded task
+  files on 2026-11-02.
 - Single run, single seed.
 
+**1B rerun `qat-int4-1b-002` (job 140605, commit `b59da5c`, completed
+2026-11-02; values read on PERUN).** Both checks passed (66 of 66), and the
+stream is the same as `-001`.
+
+| | `qat-int4-100m-002` | `qat-int4-1b-002` | `qat-int4-1b-001` (library quantizer) |
+| --- | ---: | ---: | ---: |
+| 8K KL at the end of training | 0.0291 | 0.0296 | 0.0295 |
+| 8K KL of the deployed INT4 model | **0.0291** | 0.0297 | 0.0352 |
+| Test PPL at 8K | **7.171** | 7.297 | 7.24 |
+| Macro accuracy, 5 tasks | 65.87% | **67.06%** | 66.64% |
+
+- **No conversion gap at 1B either:** the deployed KL is 0.02965, against
+  0.02963 at the end of training.
+- **1B tokens do not beat 100M.** The training-time KL was lowest at 275M
+  (0.0270). It then drifted up to 0.0296 by 1B, under the constant learning
+  rate.
+- The `-001` run showed the same pattern (lowest 0.0272 at 275M), so the drift
+  is real and not a quantizer artifact.
+- The deployed 1B model is 2% worse than 100M on KL and 1.8% worse on test PPL.
+- Against `-001`, the fixed 1B KL is 16% lower, but its test PPL is 0.8% higher.
+- **Mixed result for longer training.** On KL and perplexity, 100M is best. On
+  macro accuracy, 1B is best: 67.06%, against 67.14% for dense BF16 and
+  65.87% at 100M.
+- Like `-001` (66.64% against 65.84%), longer training helps the tasks while
+  KL drifts.
+- Single runs, single seed. The task differences are about 1 point, which is
+  within typical run-to-run spread for these benchmarks (not measured here).
+
 **Reruns.**
-- `qat-int4-1b-002` is rerun as well, so that 100M against 1B, and dense
-  against Stacking-1 order B at 1B, compare the same quantizer (decision log,
-  2026-11-01). Expected 16-17 h, 24 h limit; `-001` took 15.83 h.
-- Stacking-1's three order-B INT4 runs are rerun as `-002` (job 140575).
+- Stacking-1's three order-B INT4 runs were rerun as `-002` (job 140575).
+  Their results are in
+  [stacking-1.md](../stacking/stacking-1.md#order-b-int4-reruns-with-the-fixed-quantizer-2026-11-01).
 - Commands: [runbook 4.6, 4.7 and 10.6](../../../infrastructure/perun/perun-runbook.md).
 
 | Run | Tasks | Expected per task | Limit | Ceiling GPU-h | Basis | Confidence |
