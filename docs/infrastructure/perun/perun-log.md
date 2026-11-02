@@ -357,3 +357,36 @@ Entries are appended below in submission order.
 - Variance: PTQ and QAT 100M within plan; QAT 1B faster than planned (14.25 h against 16-32 h)
 - Experiment document: [Quantization-2](../../experiments/model/baseline/quantization-2.md#results-2026-10-25)
 - Notes: `scontrol` returned "Invalid job id" for all three on 2026-10-25 and `sacct` is unavailable, so the times come from the job logs and result records. Incident record: [INT3 QAT incident](../../experiments/model/baseline/quantization-2.md#int3-qat-incident-2026-10-25).
+
+## [2026-11-01, submission time unrecorded] 140530, 140575, 140605 | INT4 QAT fix: Quantization-1 INT4 QAT 100M and 1B, Stacking-1 order-B INT4 100M, all as `-002`
+
+- Plan:
+  - QAT 100M: 1.7-2.3 h (4-hour limit).
+  - Order B: 3 × 1.2-1.6 h (3-hour limit).
+  - QAT 1B: 16-17 h (24-hour limit, decided after the 100M result).
+  - About 21-24 GPU-hours expected ([resource plan](../../experiments/model/baseline/quantization-1.md#int4-qat-conversion-gap-2026-11-01)); medium confidence.
+- Outcome: all 5 COMPLETED with structured status `completed`; no retries.
+  - Every INT4 start and conversion check passed: 66 of 66 projections bitwise equal.
+- Submission:
+  - `quantization_1.sbatch run qat-int4-100m-002 --variant qat-int4 --qat-tokens 100000000` (140530; runbook 4.6).
+  - `stacking_1.sbatch group b --attempt 002 --array=0,2,4` (140575; runbook 10.6), after 140530's start check.
+  - `quantization_1.sbatch run qat-int4-1b-002 --qat-tokens 1000000000` (140605; runbook 4.7), after 140530 completed.
+- Provenance: commit `b59da5c`. Quantization-1's default configuration and `prepare-001`. Both QAT streams equal `-001` (sha256).
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, 128 GB requested memory per task; nodes gpu17 and gpu18.
+- Consumption (workflow timing):
+  - QAT training elapsed: 1.55 h (100M) and 15.40 h (1B).
+  - Order-B tasks: 1.41 / 1.41 / 1.22 h each, QAT recovery plus evaluation.
+  - About 21.0 GPU-hours workflow proxy, a lower bound: Quantization-1 evaluation time is not recorded separately.
+  - Allocation GPU-hours Unknown.
+- Efficiency: order-B peak RAM 6.1-8.5 GiB and peak VRAM 28.4-38.3 GiB; Quantization-1 memory not read; CPU and GPU utilization Unknown.
+- Outputs: PROJECT `perun-results/quantization-1/qat-int4-{100m,1b}-002/` (1.8 GB each) and `perun-results/stacking-1/b-fitted-{0.2,0.5,0.8}-100m-int4-002/` (1.4-1.7 GB). Analysis copy on the PC.
+- Continuation: completed; checkpoints removed after validation.
+- Verification: staged out; the in-run bitwise checks passed; streams matched `-001`.
+- Variance: within plan. The 1B run is slightly faster than `-001` (15.40 against 15.83 h).
+- Experiment documents:
+  - [Quantization-1](../../experiments/model/baseline/quantization-1.md#int4-qat-conversion-gap-2026-11-01)
+  - [Stacking-1](../../experiments/model/stacking/stacking-1.md#order-b-int4-reruns-with-the-fixed-quantizer-2026-11-01)
+- Notes:
+  - `scontrol` records had expired when requested on 2026-11-02, so times come from the result records.
+  - Project storage was 279 of 1,000 GB on 2026-11-02.
+  - A runbook 4.6 start-check path was corrected during the run (the live record is on scratch).

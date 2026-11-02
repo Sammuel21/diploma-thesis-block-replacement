@@ -16,6 +16,8 @@ execution result is defined by this scaffold.
 Planned requirement (decision log, 2026-10-11): each operator family gets a
 block-level recipe-selection study comparable with SwiGLU-8 Part A, so local
 fitting can be compared between the homogeneous and heterogeneous pipelines.
+Tuning each family first also keeps model-level comparisons about the operator
+itself, not about how well it happened to be tuned.
 It is scheduled after Quantization-1 and SwiGLU-8 are deployed.
 
 | Area | Location |

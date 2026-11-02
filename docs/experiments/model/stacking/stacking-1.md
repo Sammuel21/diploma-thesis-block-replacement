@@ -2,7 +2,7 @@
 title: Stacking-1 - SwiGLU Replacement Plus Weight Quantization
 status: active
 created: 2026-10-17
-modified: 2026-11-01
+modified: 2026-11-02
 ---
 
 # Stacking-1 - SwiGLU Replacement Plus Weight Quantization
@@ -35,6 +35,13 @@ Quantization-2's INT3 QAT 100M rerun, after the researcher's go.
 on CPU, not yet run ([Order B at 1B](#order-b-at-1b-plan-2026-11-01)). Its
 decision row is proposed, not yet approved. **Next step:** the researcher
 approves the row and commits; submission follows runbook 10.7.
+
+**Update (2026-11-02):** the six order-B 1B runs ran on 2026-11-01/02 (array
+140758) and completed. Order B beats order A at 1B at every width and both
+bit widths, by 24-52% in 8K KL
+([Order B at 1B results](#order-b-at-1b-results-2026-11-02)). The decision row
+is in the log (2026-11-01). **Next step:** frontier plots and the results
+snapshot.
 
 ## Questions
 
@@ -495,8 +502,9 @@ deployed-path INT4 quantizer.
 
 ## Order B at 1B (plan, 2026-11-01)
 
-Planned and implemented on 2026-11-01; nothing has run on PERUN. The decision
-row is proposed and waits for the researcher's approval.
+Planned and implemented on 2026-11-01 (decision log, 2026-11-01); ran on
+2026-11-01/02 ([results](#order-b-at-1b-results-2026-11-02)). The plan below
+is kept as written before the runs.
 
 **Why.** At 100M tokens order B beats order A at every width. 8K teacher KL
 from the result artifacts:
@@ -623,6 +631,83 @@ Estimates, not measurements, under the
   runs out of time stages out at the TERM signal, 30 minutes before the limit,
   and resumes from its last 25M-token checkpoint (runbook 10.7).
 - **Share:** under 1% of the project's 8,424 GPU-hours.
+
+## Order B at 1B results (2026-11-02)
+
+**Runs.**
+- Array 140758, tasks 0-5, submitted on 2026-11-01 at about 21:00 from commit `d567d7a`. That commit only adds docs on top of `54ba71f`, so the code is identical.
+- All six completed. Their result files are dated 06:51-09:10 on 2026-11-02.
+- The values below are read from the downloaded `result.json` files.
+- The PERUN checkout was updated while Quantization-1's `qat-int4-1b-002` (job 140605) was running from `b59da5c`. This was safe for three reasons:
+  - a job copies its code to SCRATCH when it starts;
+  - from `b59da5c` to `54ba71f`, only the three Stacking-1 files changed under `src/` and `workflows/`;
+  - Quantization-1's resume check hashes only `src/mlp_replacement`, its runner, and its configuration.
+
+**Result.** Each cell gives 8K teacher KL / test perplexity at 8K / task macro accuracy:
+
+| Width reduction | Bits | A at 1B | B at 100M (`-002`) | B at 1B | KL, B 1B against A 1B |
+| --- | --- | --- | --- | --- | ---: |
+| 20% | INT4 | 0.1409 / 8.09 / 0.6216 | 0.1023 / 8.00 / 0.6230 | 0.0770 / 7.78 / 0.6330 | -45% |
+| 50% | INT4 | 0.2386 / 9.55 / 0.5731 | 0.2485 / 9.88 / 0.5505 | 0.1726 / 9.04 / 0.5816 | -28% |
+| 80% | INT4 | 0.5225 / 14.01 / 0.4791 | 0.5645 / 15.39 / 0.4678 | 0.3952 / 12.70 / 0.4985 | -24% |
+| 20% | INT3 | 0.2656 / 9.22 / 0.6057 | 0.1612 / 8.68 / 0.6015 | 0.1276 / 8.34 / 0.6119 | -52% |
+| 50% | INT3 | 0.3600 / 10.89 / 0.5659 | 0.2881 / 10.50 / 0.5395 | 0.2150 / 9.66 / 0.5639 | -40% |
+| 80% | INT3 | 0.7169 / 17.41 / 0.4647 | 0.6064 / 16.29 / 0.4541 | 0.4353 / 13.68 / 0.4840 | -39% |
+
+- **Order B beats order A at equal tokens at every width and both bit widths.**
+  - 8K KL is 24-45% lower at INT4 and 39-52% lower at INT3, and test perplexity is lower everywhere.
+  - This settles the open INT4 cases at 50% and 80%, where order A at 1B had led order B at 100M.
+- **Macro accuracy** is 0.6-1.9 points higher for B, except INT3 at 50% (-0.2 points). These are single runs, so differences under about a point are not resolved.
+- **INT3 against INT4 across orders:** INT3 with order B at 1B has lower 8K KL than INT4 with order A at 1B at every width. Its test perplexity is lower only at 80% (13.68 against 14.01); at 20% and 50% it is higher (8.34 against 8.09, 9.66 against 9.55).
+- **The extra 900M tokens** lower order B's 8K KL by 21-31%.
+  - Over the last 500M tokens, the validation KL fell another 4-12% in five runs.
+  - The sixth (INT4 80%) is distorted by the final-row rise described below.
+- **Not yet evaluated:** frontier membership by the [win criterion](#win-criterion), and the plots.
+
+**Checks.**
+- **All six:** K3, K6 at the start and at conversion (66 of 66 projections bitwise equal), and `K7-stream` passed.
+- **INT4 only:** K4 passed.
+- **K5** passed where widths are padded (20% and 80%). At 50%, no width is padded, so K5 does not apply, as in the 100M runs.
+- **`K7-start`** passed in the three INT3 runs.
+- **`K7-review` flagged two INT3 runs.** Under the decision-log rule (2026-11-01), both are run-to-run noise: the signed gap changes sign or falls back between 10M and 100M.
+
+  | Run | Flagged rows | Signed gap in validation KL at 10 / 25 / 50 / 75 / 100M |
+  | --- | --- | --- |
+  | INT3 50% | 10M and 100M; monitoring perplexity +2.39% at 100M | +1.74 / +0.42 / +0.60 / -0.14 / +1.76% |
+  | INT3 80% | 25M and 50M | +0.41 / +1.09 / -3.04 / +0.66 / +0.17% |
+- **INT4 against its 100M `-002` runs:** the same comparison, made after the runs, stays within -1.10% to +0.83% in validation KL at 10-100M.
+- **First QAT noise estimate:** up to 3% at a single checkpoint, mostly under 1%. SwiGLU-9 measured 0.31% for BF16 recovery. So differences of a few percent between QAT runs are within noise. The gaps between orders A and B are far larger.
+
+**Unexplained: the final validation row rises.** In five of the six runs, the validation KL at 1B is higher than at 975M, while the training KL keeps falling smoothly.
+
+| Run | Change from 975M to 1B |
+| --- | ---: |
+| INT4 80% | +13.3% (0.3785 → 0.4291) |
+| INT3 20% | +4.6% |
+| INT4 20% | +3.2% |
+| INT3 80% | +1.9% |
+| INT3 50% | +1.2% |
+| INT4 50% | -0.7% |
+
+- **It is a real measurement of the final model:**
+  - the 1B row is computed like every other row;
+  - the deployed model reproduces the 1B monitoring perplexity (30.62 for INT4 80%).
+- **It does not appear in comparable runs on the same 1B stream:**
+  - SwiGLU-9's BF16 1B runs, with the same recipe: -0.9% to +1.5% at the final row;
+  - the dense QAT 1B runs (`qat-int4-1b-001`, `qat-int4-1b-002`, `qat-int3-1b-001`): -0.8% to +0.6% in 8K KL.
+- **The reported 8K KL is affected much less.** For INT4 80%, it lies about 2.5% above the value the 975M row implies. This is an estimate that assumes the twin's ratio of 8K KL to validation KL at 100M also holds at 1B. No 975M checkpoint is kept, so it cannot be checked further.
+- **It changes no conclusion.** A few percent cannot close the 24-52% gaps to order A, and it can only make order B look worse. The cause is unknown, and no rerun is planned.
+
+**Measured resources.** Times are workflow time from the result files. The scheduler records had expired.
+
+| Item | Plan | Measured |
+| --- | --- | --- |
+| Time per task | 10-12.5 h | 9.78-12.11 h (training 9.52-11.88 h, evaluation 0.21-0.33 h) |
+| GPU-hours | 60-75 (ceiling 108) | 66.9 |
+| CPU core-hours | 480-600 | About 535 (8 CPUs × workflow time; derived) |
+| Peak VRAM | 25.9-36.6 GiB | 25.96-38.31 GiB |
+| Peak RAM | 6.1-9.0 GiB | 6.13-9.17 GiB |
+| PROJECT | 9-11 GB | 10.0 GB (1.4-2.1 GB per run); 279 of 1,000 GB in use afterwards |
 
 ## Limits
 
