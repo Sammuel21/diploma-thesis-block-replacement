@@ -1,7 +1,8 @@
 # Heterogeneous Operator Perun Launchers
 
-Reserved for Perun Slurm launchers for heterogeneous operator experiments.
-No launcher or resource request is defined yet.
+Perun Slurm launchers for heterogeneous operator experiments.
+[`heterogeneous_1.sbatch`](heterogeneous_1.sbatch) runs Heterogeneous-1; see the
+[job README](../README.md#heterogeneous-1-workflow).
 
 Scientific configuration and computation belong in
 `workflows/configs/model/heterogenous/` and

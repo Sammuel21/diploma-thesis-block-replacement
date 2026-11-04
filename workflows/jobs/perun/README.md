@@ -6,9 +6,8 @@ environment. Before changing or using them, read the canonical
 owns the broader access, storage, environment, scratch, artifact, and
 validation assumptions. This README explains only the tracked job files.
 
-[`heterogenous/`](heterogenous/README.md) reserves launchers for the
-heterogeneous operator class. It contains directory scaffolding only; no
-Slurm job or resource request is defined yet.
+[`heterogenous/`](heterogenous/README.md) holds the launchers of the
+heterogeneous operator class.
 
 ## Files
 
@@ -20,6 +19,7 @@ Slurm job or resource request is defined yet.
 | `swiglu_8.sbatch` | Runs the SwiGLU-8 block check or preparation, or maps array tasks `0-15` onto its two arms at eight targets. |
 | `swiglu_9.sbatch` | Runs the SwiGLU-9 block check (tasks `0-2`, one per layer), the five 1B training runs (tasks `0-4`), or the 8K KL of SwiGLU-7's reused 1B bundles. |
 | `speed_1.sbatch` | Times the saved dense, quantized, and SwiGLU-8 bundles in one job on one GPU, so their speeds are comparable. |
+| `heterogenous/heterogeneous_1.sbatch` | Runs every Heterogeneous-1 stage: recipe selection, the cost tables, single-block recovery, the knapsack solve, and token-0 assembly. |
 
 `run_model.sbatch` defaults to the documented four-day `gpu_long` ceiling
 because the migrated studies contain long local-fitting loops. These are
@@ -269,6 +269,31 @@ The copy-paste commands are in the
   reference KL are on PROJECT.
 
 Resume any task with `--resume` after the mode and the same `--array` index.
+
+## Heterogeneous-1 workflow
+
+`heterogenous/heterogeneous_1.sbatch` uses the SwiGLU-9 lock, scratch, explicit
+code staging, and verified stage-out contract, without a resume path. Outputs go
+to `PROJECT/perun-results/heterogeneous-1/<run-id>`. SwiGLU-8's pinned inputs are
+read in place from `PROJECT/perun-results/swiglu-8/`; nothing there is written.
+Each submission needs the researcher's go. Pass the stage's planned `--time` and
+`--mem` from the
+[resource plan](../../../docs/experiments/model/heterogenous/heterogeneous-1.md#pre-run-resource-plan).
+The copy-paste commands are in the
+[PERUN runbook](../../../docs/infrastructure/perun/perun-runbook.md#12-heterogeneous-1).
+
+| Mode | Array | Output |
+| --- | --- | --- |
+| `select` | `0-23` | `select-001-task-NN` |
+| `baseline-table` | none | `baseline-table-001` |
+| `cost-table` | `0-21`, task i is layer i + 1 | `cost-table-001-layer-LL` |
+| `recover` | `0-2`, layers 3, 11, 19 | `recovery-001-layer-LL` |
+| `solve` | none, on `cpu_short` | `solve-001` |
+| `assemble` | `0-7`, the eight targets in order | `assemble-001-target-T` |
+
+`merge-select` and `summarize` run on the login node. `solve` is the only mode
+without a GPU, so its launcher skips the GPU checks. To rerun a failed task, move
+its output aside first; the launcher refuses an existing output.
 
 ## Results and logs
 

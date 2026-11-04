@@ -2,6 +2,7 @@
 
 from .modules import (
     BottleneckMLPReplacement,
+    DenseHybridReplacement,
     GatedMLPReplacement,
     HybridReplacement,
     LinearReplacement,
@@ -26,6 +27,7 @@ from .training import (
 
 __all__ = [
     "BottleneckMLPReplacement",
+    "DenseHybridReplacement",
     "GatedMLPReplacement",
     "GatedReconstructionResult",
     "HybridReplacement",

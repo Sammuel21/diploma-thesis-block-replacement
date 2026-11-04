@@ -1,0 +1,355 @@
+{
+  "schema_version": 1,
+  "workflow": "heterogeneous-1",
+  "seed": 21,
+  "targets": [
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.75,
+    0.8
+  ],
+  "strategies": {
+    "S7-0": {
+      "slug": "replacement-only",
+      "trainable_scope": "replacement_only"
+    }
+  },
+  "model": {
+    "model_id": "HuggingFaceTB/SmolLM2-1.7B",
+    "revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "tokenizer_revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+    "device": "cuda",
+    "dtype": "bfloat16",
+    "trust_remote_code": false,
+    "hidden_size": 2048,
+    "intermediate_size": 8192,
+    "num_layers": 24,
+    "tie_word_embeddings": true
+  },
+  "data": {
+    "sequence_length": 128,
+    "capture_batch_size": 2,
+    "local_source": {
+      "path": "allenai/c4",
+      "name": null,
+      "split": "train",
+      "text_column": "text",
+      "revision": "1588ec454efa1a09f29cd18ddd04fe05fc8653a2",
+      "data_file": "en/c4-train.00000-of-01024.json.gz",
+      "streaming": false
+    },
+    "recovery_source": {
+      "path": "allenai/c4",
+      "revision": "1588ec454efa1a09f29cd18ddd04fe05fc8653a2",
+      "text_column": "text",
+      "first_shard": 1,
+      "shard_count": 1024
+    },
+    "model_validation_source": {
+      "path": "Salesforce/wikitext",
+      "name": "wikitext-2-raw-v1",
+      "split": "validation",
+      "text_column": "text",
+      "revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+      "data_file": null,
+      "streaming": false
+    },
+    "model_validation_batches": 24,
+    "partition_batches": {
+      "calibration": 48,
+      "operator_validation": 24,
+      "old_recovery": 64,
+      "recovery_validation": 24,
+      "additional_calibration": 336,
+      "allocation_selection": 12,
+      "appended_calibration": 1152
+    }
+  },
+  "long_context": {
+    "source": {
+      "path": "allenai/c4",
+      "name": null,
+      "split": "train",
+      "text_column": "text",
+      "revision": "1588ec454efa1a09f29cd18ddd04fe05fc8653a2",
+      "data_file": "en/c4-train.00000-of-01024.json.gz",
+      "streaming": true
+    },
+    "sequence_length": 8192,
+    "kl_sequences": 24,
+    "selection_sequences": 24,
+    "calibration_sequences": 48,
+    "validation_sequences": 1
+  },
+  "calibration": {
+    "selected_pairs": 393216,
+    "pair_counts": [
+      393216
+    ]
+  },
+  "local_fitting": {
+    "parameter_dtype": "float32",
+    "optimizer": "AdamW",
+    "learning_rate": 0.001,
+    "batch_size": 2048,
+    "weight_decay": 0.0,
+    "max_epochs": 64,
+    "early_stopping_patience": 3,
+    "early_stopping_min_delta": 0.0,
+    "scheduler": "constant",
+    "initialization": "importance_teacher_subset",
+    "capture_group_size": 6
+  },
+  "allocation": {
+    "eligible_layers": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22
+    ],
+    "protected_layers": [
+      0,
+      23
+    ],
+    "width_ratios": [
+      0.0625,
+      0.125,
+      0.25,
+      0.375,
+      0.5,
+      0.625,
+      0.75,
+      0.875,
+      1.0
+    ],
+    "selection_metric": "singleton_fixed_teacher_kl_t1",
+    "allow_dense_layers": true,
+    "boundary_width_policy": "best_interpolated_marginal_gain"
+  },
+  "recovery": {
+    "target_tokens": 100000000,
+    "segment_endpoints": [
+      100000000
+    ],
+    "checkpoint_interval_tokens": 25000000,
+    "validation_interval_tokens": 25000000,
+    "monitoring_ppl_tokens": [
+      10000000,
+      25000000,
+      50000000,
+      100000000
+    ],
+    "optimizer": "AdamW",
+    "optimizer_backend": "fused",
+    "learning_rate": 3e-05,
+    "weight_decay": 0.0,
+    "temperature": 1.0,
+    "ce_weight": 0.0,
+    "scheduler": "constant",
+    "warmup_fraction": 0.0,
+    "final_lr_ratio": 1.0,
+    "sequence_length": 8192,
+    "microbatch_sequences": 1,
+    "gradient_accumulation_steps": 1,
+    "effective_batch_tokens": 8192,
+    "forward_autocast_dtype": "bfloat16",
+    "trainable_parameter_dtype": "float32",
+    "optimizer_state_dtype": "float32",
+    "disk_reserve_fraction": 0.15
+  },
+  "acceptance": {
+    "exact_relative": 0.0001,
+    "fit_relative": 0.001,
+    "teacher_self_kl_absolute": 1e-06
+  },
+  "recipe_selection": {
+    "layers": [
+      3,
+      11,
+      19
+    ],
+    "seeds": [
+      21,
+      22,
+      23
+    ],
+    "reference_setting": "c1e-3-128",
+    "ridge": 0.0001,
+    "anchor_width": 2048,
+    "swiglu_reference_width": 683,
+    "sizes": {
+      "swiglu": [
+        1024
+      ],
+      "linear": [
+        0
+      ],
+      "plain_mlp": [
+        1536,
+        3072
+      ],
+      "linear_swiglu": [
+        341,
+        1365
+      ],
+      "linear_plain_mlp": [
+        512,
+        2048
+      ]
+    }
+  },
+  "cost_tables": {
+    "swiglu_new_width": 256,
+    "widths": {
+      "linear": [
+        0
+      ],
+      "plain_mlp": [
+        768,
+        1536,
+        3072,
+        4608,
+        6144,
+        7680,
+        9216,
+        10752
+      ],
+      "linear_swiglu": [
+        341,
+        1365,
+        2389,
+        3413,
+        4437,
+        5461,
+        6485
+      ],
+      "linear_plain_mlp": [
+        512,
+        2048,
+        3584,
+        5120,
+        6656,
+        8192,
+        9728
+      ]
+    }
+  },
+  "single_block_recovery": {
+    "tokens": 10000000,
+    "checkpoints": [
+      1000000,
+      5000000,
+      10000000
+    ],
+    "swap_margin": 0.05,
+    "size_groups": {
+      "8.33": [
+        [
+          "swiglu",
+          683
+        ],
+        [
+          "linear",
+          0
+        ]
+      ],
+      "12.5": [
+        [
+          "swiglu",
+          1024
+        ],
+        [
+          "plain_mlp",
+          1536
+        ],
+        [
+          "linear_swiglu",
+          341
+        ],
+        [
+          "linear_plain_mlp",
+          512
+        ]
+      ],
+      "25": [
+        [
+          "swiglu",
+          2048
+        ],
+        [
+          "plain_mlp",
+          3072
+        ],
+        [
+          "linear_swiglu",
+          1365
+        ],
+        [
+          "linear_plain_mlp",
+          2048
+        ]
+      ]
+    }
+  },
+  "allocation_solve": {
+    "optional_targets": [
+      0.9
+    ],
+    "degradation_targets": [
+      0.2,
+      0.5,
+      0.8
+    ],
+    "forced_layers": [
+      1,
+      2,
+      4,
+      8
+    ]
+  },
+  "recipes": {
+    "select_sha256": null,
+    "settings": {
+      "linear": null,
+      "plain_mlp": null,
+      "linear_swiglu": null,
+      "linear_plain_mlp": null
+    }
+  },
+  "sources": {
+    "swiglu8_prepare_sha256": "e91c9d313e02d08d62d2e73c35366f6ff78a2d882100f408b258f49f8fa9ce39",
+    "swiglu8_block_check_sha256": "a268f1b0537579580eac5fe908ac6fccb06cf6912688a57a4db972fa28c32724",
+    "swiglu8_fitted_runs_sha256": {
+      "0.2": "7ffa2a9c8282ce5460999d90a611d4243d1e514545ba7f8b9d5da41308e029a8",
+      "0.3": "58c8b6efbf39157b77fdbbf893b08dfe7373f3a4696129c47abe839c2e1bbbe5",
+      "0.4": "2fa3e221ee3152bde7f5524575f480be4cc5a8dfcace571fe72f88585e45eeb0",
+      "0.5": "65d40568133b7eb16ec5a0b0dfea2d270778bed4876a7fd1ff0f6672119a13d0",
+      "0.6": "12a53b67fe0a2093dbee9525441d06100e0c62bd84402f34097d02081cb0f787",
+      "0.7": "ac6ecc0713dbb4376a001f34e61c017d1a2584f8f516794386cd9039cc0e612a",
+      "0.75": "daad02e630aa07e7b5f61aeb0467ad6e6c6864cb1f4c02691a64fea04b859dea",
+      "0.8": "ff86a7b64ddd4ed008243937f58f8aec758d615c5970860c1463fd20ee8ea4a5"
+    }
+  }
+}

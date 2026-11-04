@@ -2,7 +2,7 @@
 title: PERUN Runbook
 status: active
 created: 2026-10-11
-modified: 2026-11-03
+modified: 2026-11-04
 ---
 
 # PERUN Runbook
@@ -40,7 +40,8 @@ training runs, the three-task block check, and the reference KL. Stacking-1
 (section 10) adds three more, submitted back to back in one block: order B,
 order A at 100M, and order A at 1B, 48 tasks in total. Quantization-2
 (section 11) adds three single runs on Quantization-1's launcher, after
-Stacking-1 has finished.
+Stacking-1 has finished. Heterogeneous-1 (section 12) adds five sittings, each
+after a review of the one before.
 
 **Official PERUN rules these commands follow**, checked against the
 [PERUN wiki](https://wiki.hpc.tuke.sk/perun/perun/) on 2026-10-11:
@@ -1726,3 +1727,243 @@ EOF
 
 **Watch** with 11.3, replacing its first line as in 11.5. The stops are also
 those of 11.5.
+
+## 12. Heterogeneous-1
+
+Design, checks, and resource plan:
+[heterogeneous-1.md](../../experiments/model/heterogenous/heterogeneous-1.md).
+Every submission needs the researcher's go. Everything goes to
+`perun-results/heterogeneous-1/`.
+
+| Step | Block | Requested per task | Expected per task | Before the next step |
+| --- | --- | --- | --- | --- |
+| Update and pre-submission checks | 12.1 | - | minutes | Every line OK |
+| **Sitting 1:** recipe selection (24 tasks) and baseline table (1 job) | 12.2 | 4 h and 3 h, 64 GB | 1.2-2.4 h and 1.2-1.7 h | data-identity, check-6, check-2 pass in every task |
+| Merge and review | 12.4 | login node | minutes | You pin `recipes` in the configuration |
+| **Sitting 2:** cost tables (22 tasks) and recovery (3 tasks) | 12.5 | 3 h, 64 GB | 0.7-1.8 h | check-8 passes |
+| **Sitting 3:** knapsack solve (1 CPU job) | 12.6 | `cpu_short`, 2 h, 16 GB | 0.3-0.7 h | check-1 and check-4 pass |
+| **Sitting 4:** assembly (8 tasks) | 12.7 | 3 h, 128 GB | 0.2-1.5 h | check-7 and check-8 pass |
+| Summary | 12.8 | login node | minutes | - |
+
+Do not update the checkout while a job of yours is queued or running, including
+`qat-int3-1b-002`: a job copies the code when it starts, and a resume refuses
+changed code. Update it between sittings only for the `recipes` commit in 12.4.
+There is no resume in this experiment. To rerun a failed task, move its output
+aside first, because the job refuses an existing output.
+
+Run 1.2 and 1.3 first.
+
+### 12.1 Pre-submission checks
+
+**Safe to re-run, except the `git pull`, which needs an empty queue.** Every hash
+line must print OK, `squeue` must list no job when you pull, every `--test-only`
+line must be accepted, and no Heterogeneous-1 output may exist yet.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+squeue -u "$USER"   # must list no job before the pull below
+git status --short
+git pull --ff-only origin "$PERUN_BRANCH"
+git log -1 --oneline
+# Every pinned SwiGLU-8 input exists and matches the configuration.
+python - <<'EOF'
+import hashlib, json, os
+sources = json.load(open("workflows/configs/model/heterogenous/heterogeneous-1.json"))["sources"]
+expected = {
+    "swiglu-8/prepare-001/result.json": sources["swiglu8_prepare_sha256"],
+    "swiglu-8/block-check-001/result.json": sources["swiglu8_block_check_sha256"],
+}
+expected.update({f"swiglu-8/fitted-target-{target}-run-001/result.json": digest
+                 for target, digest in sources["swiglu8_fitted_runs_sha256"].items()})
+for relative, digest in expected.items():
+    path = os.path.join(os.environ["PERUN_RESULTS"], relative)
+    if not os.path.isfile(path):
+        print("MISSING ", relative)
+        continue
+    sha = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            sha.update(block)
+    print("OK      " if sha.hexdigest() == digest else "MISMATCH", relative)
+EOF
+ls "$PERUN_RESULTS/swiglu-8/prepare-001/prepared/recovery-tokens.int32" \
+   "$PERUN_RESULTS/swiglu-8/prepare-001/prepared/local-evaluation-batches.pt"
+
+# The environment matches the one SwiGLU-8's block check recorded.
+PYTHONPATH=src python - <<'EOF'
+import json, os
+from mlp_replacement.runlog import environment_record
+recorded = json.load(open(os.path.join(os.environ["PERUN_RESULTS"], "swiglu-8/block-check-001/result.json")))["environment"]
+current = environment_record()
+print("python  ", "OK" if recorded["python"] == current["python"] else f"DIFFERS {recorded['python']} -> {current['python']}")
+for name, version in sorted(recorded["packages"].items()):
+    now = current["packages"].get(name)
+    print(f"{name:12}", "OK" if now == version else f"DIFFERS {version} -> {now}")
+EOF
+
+# Configuration, launcher syntax, and whether Slurm would accept the jobs (nothing is submitted).
+PYTHONPATH=src python -c "from workflows.runs.model.heterogenous import heterogeneous_1 as h; s, p = h.load_settings(h.DEFAULT_CONFIG); print(s['workflow'], len(h.select_tasks(s)), 'select tasks')"
+JOB=workflows/jobs/perun/heterogenous/heterogeneous_1.sbatch
+bash -n "$JOB" && echo "launcher syntax OK"
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 --mem=64G --array=0-23 "$JOB" select
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --mem=64G "$JOB" baseline-table
+perunfsusage    # PROJECT needs under 1 GB; SCRATCH at most 5 GB per task
+ls "$PERUN_RESULTS/heterogeneous-1" 2>/dev/null || echo "no Heterogeneous-1 outputs yet"
+```
+
+### 12.2 Sitting 1: recipe selection and the baseline table
+
+**Submits jobs. Run once,** after 12.1 is clean. It writes the job IDs to
+`$PERUN_LOG_DIR/heterogeneous-1_submission.txt`. If an ID prints empty, that `sbatch`
+was refused: tell the assistant before submitting it again.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+JOB=workflows/jobs/perun/heterogenous/heterogeneous_1.sbatch
+EXISTING=$(find "$PERUN_RESULTS/heterogeneous-1" -mindepth 1 -maxdepth 1 2>/dev/null)
+if [[ -n "$EXISTING" ]] || squeue -u "$USER" -h -n heterogeneous-1 | grep -q .; then
+    echo "STOP: Heterogeneous-1 outputs exist or a heterogeneous-1 job is queued:"; echo "$EXISTING"
+else
+    SELECT=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 --mem=64G \
+        --array=0-23 --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        "$JOB" select)
+    BASELINE=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --mem=64G \
+        --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+        "$JOB" baseline-table)
+    printf 'SELECT=%s\nBASELINE=%s\n' "${SELECT%%;*}" "${BASELINE%%;*}" \
+        | tee "$PERUN_LOG_DIR/heterogeneous-1_submission.txt"
+    echo "<- record these in local/perun/runs/heterogeneous-1.md"
+fi
+```
+
+Task map: 0-2 SwiGLU 1024 at layers 3, 11, 19 (40 fits each). 3-5 linear (41 fits).
+6-11 plain MLP (39 fits), 12-17 linear + SwiGLU, and 18-23 linear + plain MLP
+(42 fits), each at layers 3, 11, 19 with both sizes per layer. Every task also fits
+one SwiGLU anchor first, so the watch counts below read one higher. Up to 20 run at
+once, so the last tasks wait for a free slot.
+
+### 12.3 Watch sitting 1
+
+**Safe to re-run.** Each task checks its data, the teacher against itself, and the
+SwiGLU anchor in its first minutes; a mismatch stops it with `AcceptanceFailure` in
+its `.err` file. Stop and tell the assistant before trusting any result.
+
+```bash
+source "$PERUN_LOG_DIR/heterogeneous-1_submission.txt"
+squeue -u "$USER" -n heterogeneous-1 -o "%.18i %.10T %.10M %.11l %R"
+for TASK in $(seq 0 23); do
+    LOG="$PERUN_LOG_DIR/heterogeneous-1_${SELECT}_${TASK}"
+    DONE=$(grep -c '^operator=' "$LOG.out" 2>/dev/null)
+    FINISHED=$(grep -l 'Verified persistent output' "$LOG.out" 2>/dev/null)
+    FAILED=$(grep -l -E 'AcceptanceFailure|Traceback' "$LOG.err" 2>/dev/null)
+    echo "select $TASK: ${DONE:-0} fits${FINISHED:+ | done}${FAILED:+   <- check its .err}"
+done
+grep -c '^table operator=' "$PERUN_LOG_DIR/heterogeneous-1_${BASELINE}.out" 2>/dev/null   # 66 when done
+python - <<'EOF'
+import json, os
+from pathlib import Path
+for result in sorted(Path(os.environ["PERUN_SCRATCH"]).glob("job_*/results/select-001-task-*/result.json")):
+    data = json.loads(result.read_text())
+    acceptance = data.get("results", {}).get("acceptance", {})
+    print(result.parent.name, data.get("status"), {group: row["passed"] for group, row in acceptance.items()},
+          (data.get("error") or "")[:120])
+EOF
+gpu-status
+```
+
+### 12.4 Merge and review
+
+**Safe to re-run.** When the 24 tasks have finished, merge them on the login node. It
+checks that they used identical configuration, code, software, and data, applies the
+adoption rule per operator, and writes `heterogeneous-1/select-001`.
+
+```bash
+PYTHONPATH=src python -m workflows.runs.model.heterogenous.heterogeneous_1 merge-select \
+  --results-root "$PERUN_RESULTS/heterogeneous-1"
+```
+
+It prints each operator's selected recipe, the overfitting indicator, and the sha256
+for `recipes.select_sha256`. If it prints `STOP`, the indicator fired: plan the
+follow-up before going on. Then copy the results home (section 6,
+`EXPERIMENT=heterogeneous-1`) and review the adoption table.
+
+Then, **on your PC**, fill in `recipes` in
+`workflows/configs/model/heterogenous/heterogeneous-1.json`:
+
+```json
+"recipes": {
+  "select_sha256": "<sha256 printed by the merge>",
+  "settings": {
+    "linear": "<selected recipe>",
+    "plain_mlp": "<selected recipe>",
+    "linear_swiglu": "<selected recipe>",
+    "linear_plain_mlp": "<selected recipe>"
+  }
+},
+```
+
+Commit and push from your PC, then pull on PERUN (1.4) once your queue is empty.
+
+### 12.5 Sitting 2: cost tables and recovery
+
+**Submits jobs. Run once,** after 12.4. The block refuses while any heterogeneous-1
+job is queued, including the baseline table. If a job stops with "Pin the reviewed
+recipes", the checkout lacks the 12.4 commit.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+JOB=workflows/jobs/perun/heterogenous/heterogeneous_1.sbatch
+EXISTING=$(find "$PERUN_RESULTS/heterogeneous-1" -maxdepth 1 \( -name 'cost-table-*' -o -name 'recovery-*' \))
+if [[ -n "$EXISTING" ]] || squeue -u "$USER" -h -n heterogeneous-1 | grep -q .; then
+    echo "STOP: outputs exist or a heterogeneous-1 job is queued:"; echo "$EXISTING"
+else
+    COST=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --mem=64G \
+        --array=0-21 --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        "$JOB" cost-table)
+    RECOVER=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --mem=64G \
+        --array=0-2 --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        "$JOB" recover)
+    printf 'COST=%s\nRECOVER=%s\n' "${COST%%;*}" "${RECOVER%%;*}" \
+        | tee -a "$PERUN_LOG_DIR/heterogeneous-1_submission.txt"
+fi
+```
+
+### 12.6 Sitting 3: the knapsack solve
+
+**Submits a job. Run once,** after every cost-table task finished. It uses no GPU.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+SOLVE=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
+    --partition=cpu_short --gres=none --cpus-per-task=4 --mem=16G --time=02:00:00 \
+    --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
+    workflows/jobs/perun/heterogenous/heterogeneous_1.sbatch solve)
+printf 'SOLVE=%s\n' "${SOLVE%%;*}" | tee -a "$PERUN_LOG_DIR/heterogeneous-1_submission.txt"
+```
+
+### 12.7 Sitting 4: assembly
+
+**Submits jobs. Run once,** after the solve completed. Task i is target i of 20, 30, 40,
+50, 60, 70, 75, 80%. Each task first rebuilds SwiGLU-8's own model and stops unless it
+reproduces the recorded token-0 KL.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+ASSEMBLE=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --mem=128G \
+    --array=0-7 --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+    workflows/jobs/perun/heterogenous/heterogeneous_1.sbatch assemble)
+printf 'ASSEMBLE=%s\n' "${ASSEMBLE%%;*}" | tee -a "$PERUN_LOG_DIR/heterogeneous-1_submission.txt"
+```
+
+### 12.8 Summary
+
+**Safe to re-run.** When recovery and assembly have finished, on the login node:
+
+```bash
+PYTHONPATH=src python -m workflows.runs.model.heterogenous.heterogeneous_1 summarize \
+  --results-root "$PERUN_RESULTS/heterogeneous-1"
+```
+
+It prints the hybrid targets, the ranking swaps, and whether Heterogeneous-2's forced
+runs are required. Right after each sitting, run section 7 for its job IDs (scheduler
+records expire), and copy the results home (section 6, `EXPERIMENT=heterogeneous-1`).

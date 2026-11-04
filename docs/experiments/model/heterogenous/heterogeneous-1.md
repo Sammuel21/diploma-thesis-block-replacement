@@ -7,7 +7,10 @@ modified: 2026-11-04
 
 # Heterogeneous-1 - Operator Recipes, Cost Tables, and Hybrid Allocation
 
-**Status:** design settled on 2026-11-04 in a grilling session; not implemented.
+**Status:** design settled on 2026-11-04 in a grilling session and implemented
+the same day (see [Implementation](#implementation)); nothing has run yet.
+**Next step:** the first submission, recipe selection and the baseline table
+([runbook](../../../infrastructure/perun/perun-runbook.md#12-heterogeneous-1)).
 The binding decisions are in the
 [shared decision log](../../../agents/decisions.md) (2026-11-04 entries); this
 page explains them. If the two disagree, the log wins until the conflict is
@@ -131,10 +134,18 @@ run once.
   least-squares down projection transferred 7-9% worse to 8K KL than gradient
   training, so the closed form should not be assumed best.
 - **Hybrids** add one comparison at the reference setting: joint training against
-  fitting the linear part first.
+  fitting the linear part first. Both start from the same point: the nonlinear
+  part at its start, and the linear part as the ridge fit of what that start
+  leaves unexplained. A fit of the whole output would count twice what the teacher
+  slice already explains (38-73% of the output at widths 1024-4096). Joint training
+  trains both parts; linear first freezes the linear part, so only the freezing
+  differs.
 - **Calibration size and L2-SP** are added only if the overfitting indicator
   fires, and L2-SP only for teacher-start operators, because it pulls weights
-  toward their start.
+  toward their start. The indicator is SwiGLU-8's vote at each operator's largest
+  tested size: best epoch at most 3 while training MSE still falls, in most seeds
+  of a layer, in at least two of the three layers. If it fires, work stops and the
+  follow-up is planned then; neither option is pre-built.
 
 **SwiGLU check.** SwiGLU runs the same grid at width 1024. Each competitor tries
 about 14 settings at 12.5%, while SwiGLU's recipe was chosen at 25% and 50%. If it
@@ -165,14 +176,18 @@ refused it" must not be mistaken for "it cannot help".
 19, at both test sizes. Freeze everything else, train only that operator against
 the teacher with KL for 10M tokens, and measure single-block KL at 0, 1, 5, and
 10M. 10M was chosen because most of the slice-only handicap in SwiGLU-8 closed
-within it. About 27 short runs.
+within it. About 30 short runs: the 27 of the decision, plus SwiGLU 683 at each
+layer so that linear has an equal-size partner.
 
 **Reading.** At each layer and size, rank the equal-size operators by damage
-before and after. A swap counts when the new leader is ahead by more than 5%, the
-project's usual bar. Invented example at layer 11, 25%: SwiGLU 0.017, then 0.015;
-plain MLP 0.030, then 0.014. The plain MLP looks worst before recovery but ends
-best, so the knapsack would wrongly refuse it. A swap, or no new operator being
-picked at any target, makes the forced runs in Heterogeneous-2 required.
+before and after. The 8K selection KL decides, because it is Part A's deciding
+score, recovery trains at 8K, and it has 196,608 positions against 3,072; the
+128-token KL is reported beside it. A swap counts when the new leader's KL is more
+than 5% below the old leader's at 10M, the project's usual bar. Invented example at
+layer 11, 25%: SwiGLU 0.017, then 0.015; plain MLP 0.030, then 0.014. The plain MLP
+looks worst before recovery but ends best, so the knapsack would wrongly refuse
+it. A swap, or no new operator being picked at any target, makes the forced runs
+in Heterogeneous-2 required.
 
 This is single-block recovery, so it does not show joint recovery, and early
 rankings can flip later ([SwiGLU-7](../swiglu/swiglu-7.md#scope-ranking-against-recovery-budget-read-only-check-2026-11-04)).
@@ -226,16 +241,24 @@ linear part stops paying.
 ## Stage 5 - assembled hybrids and the degradation curve
 
 Build the chosen hybrids and measure their real token-0 KL against the predicted
-sum, compared with SwiGLU's 1.23-1.55×.
+sum, compared with SwiGLU's 1.23-1.55×. The real KL is the same monitoring KL as
+that comparison, with the 128-token and 8K selection KL beside it.
 
 **Degradation curve.** Force 1, 2, 4, and 8 layers to non-SwiGLU operators at the
 same budget, at the layers with the smallest predicted extra damage, and let the
 knapsack solve the rest. If near-homogeneous is best, that stands as the result,
 and this curve shows what each added non-SwiGLU layer costs and whether damage
-grows as predicted. Token-0 points cost minutes each.
+grows as predicted. It runs at 20, 50, and 80%. A layer's extra damage is the
+predicted total with that layer limited to non-SwiGLU items, minus the unrestricted
+total; dense counts as SwiGLU. Layers are ranked by that value, ties by layer, so
+layers already non-SwiGLU come first. A point equal to the unrestricted solve is
+recorded and not rebuilt.
 
 **Output of the experiment:** the list of targets where the hybrid differs from
-SwiGLU-8's model, which decides the size of Heterogeneous-2.
+SwiGLU-8's model, which decides the size of Heterogeneous-2. A target counts only
+if its solve has at least one non-SwiGLU layer. SwiGLU-only width changes are
+reported separately: at 50% the solver already differs from SwiGLU-8's model at
+layers 7 and 11, because that model kept SwiGLU-7's widths.
 
 ## Order of work
 
@@ -250,7 +273,7 @@ After R (the researcher reviews the adoption table), in parallel:
   D  single-block recovery
 
 After C, Z, and S:
-  K  knapsack solves (CPU, seconds)
+  K  knapsack solves (CPU job, about 30 minutes)
 
 After K, one task per target, in parallel:
   T  assembled hybrids and degradation curve at token 0
@@ -258,9 +281,10 @@ After K, one task per target, in parallel:
 After T and D: report, then Heterogeneous-2 is designed
 ```
 
-R is the only stage that meets a PERUN limit: at one task per setting it is about
-70 tasks, and the queue allows 50, with each array task counted. It needs grouping
-or two batches.
+R runs as 24 tasks, one per operator, layer, and size, which fits PERUN's limits of
+20 running jobs and 50 queued. K is a job because one full-menu solve takes 8.5-21 s
+and the forcing rule needs about 26 solves per target (offline calculation with
+placeholder costs, 2026-11-04).
 
 ## What changes in the workflow
 
@@ -271,7 +295,7 @@ or two batches.
 | Fitting new operators | Yes | Small: modules and fitters exist; the hybrid forms need one module |
 | Single-block KL | No | No, it accepts any module |
 | Knapsack | No new conditions | Yes: menu items are hard-wired to width and SwiGLU's price formula |
-| Building the model | No | Yes: only SwiGLU is built today |
+| Building the model | No | Not here: token-0 assembly swaps modules in temporarily. Heterogeneous-2 needs it, because only SwiGLU is built today |
 | Recovery (S7-0) | No | No, it trains what the replaced modules contain |
 | Saving and loading models | No | Yes, for Heterogeneous-2 only |
 | Final evaluation | No | No |
@@ -311,19 +335,140 @@ C4, and both are before recovery.
 - **Three layers and two sizes** select each recipe, as in Part A.
 - Layers 1, 7, and 22 are not in the recipe study; the old layer-22 anomaly can
   only appear in the 22-layer tables.
+- **The 64-epoch cap may bind.** In SwiGLU-8, 9 of 18 `c1e-4-128` fits used all 64
+  epochs even from a teacher start, and random starts will do so more often. The
+  merge reports the share per setting, so a low-rate setting that was cut off can
+  be read as such.
 
-## Resources
+## Implementation
 
-Rough estimates from SwiGLU-8's measured timing; not a PERUN resource plan, which
-the implementation plan must add.
+Implemented on 2026-11-04 without any run. Runner:
+[`heterogeneous_1.py`](../../../../workflows/runs/model/heterogenous/heterogeneous_1.py).
+Configuration:
+[`heterogeneous-1.json`](../../../../workflows/configs/model/heterogenous/heterogeneous-1.json).
+PERUN job:
+[`heterogeneous_1.sbatch`](../../../../workflows/jobs/perun/heterogenous/heterogeneous_1.sbatch).
+Copy-paste commands: the
+[PERUN runbook](../../../infrastructure/perun/perun-runbook.md#12-heterogeneous-1).
+The load-only analysis notebook comes after the results. Results copied home go to
+`data/results/workflows/model/heterogeneous-1/`.
 
-| Stage | GPU-hours |
-| --- | ---: |
-| Recipe selection, 4 operators | 30-50 |
-| SwiGLU check at 1024 and 683 | 3-4 |
-| Single-block recovery | about 3 |
-| 22-layer tables | 18-30 |
-| **Total** | **55-90** |
+| Command | Stage | Does | Output (`perun-results/heterogeneous-1/`) |
+| --- | --- | --- | --- |
+| `select --task-index i` | R | One operator's grid at one layer and size, 24 tasks. Tasks 0-2 SwiGLU 1024 (with one fit at 683), 3-5 linear, 6-11 plain MLP, 12-17 linear + SwiGLU, 18-23 linear + plain MLP | `select-001-task-NN/` |
+| `baseline-table` | Z, S | Zero, mean, and SwiGLU 256 at all 22 layers | `baseline-table-001/` |
+| `merge-select` | Adoption | Login node. Checks that every task used identical configuration, code, software, and data; applies the adoption rule per operator; reports the overfitting indicator and the share of fits at the epoch cap. Safe to re-run | `select-001/` |
+| `cost-table --task-index i` | C | All 23 non-SwiGLU items at one layer, 22 tasks | `cost-table-001-layer-LL/` |
+| `recover --task-index i` | D | One layer's 10 single-block recoveries, 3 tasks | `recovery-001-layer-LL/` |
+| `solve` | K | `cpu_short`. Check 1, SwiGLU with width 256, the full menu at 20-80% and 90%, and the forcing rule | `solve-001/` |
+| `assemble --task-index i` | T | One target's models at token 0, 8 tasks | `assemble-001-target-T/` |
+| `summarize` | Report | Login node. Swap tables, picked operators, hybrid targets, real against predicted damage, and whether Heterogeneous-2's forced runs are required. Safe to re-run | `summary-001/` |
+
+Between `merge-select` and the next stages the researcher reviews the adoption
+table and pins the recipes and the merge's sha256 under `recipes` in the
+configuration. `cost-table`, `recover`, `solve`, and `assemble` refuse to start
+otherwise. SwiGLU menu items always keep `c1e-3-128`.
+
+**Fit details**, settled in the implementation plan on 2026-11-04:
+
+| Item | Choice |
+| --- | --- |
+| Plain MLP | SiLU, as in the old study and the algebra above; no bias; PyTorch's default initialization |
+| Linear | No bias, because its price is $d^2$; gradient settings start from the default initialization |
+| Closed form | `ridge-128`, `ridge-8k`: ridge `1e-4` scaled by the mean Gram diagonal, the old study's value, solved in FP64 |
+| Random starts | Built on the CPU in FP32 right after seeding with the setting's seed, so seeds change the start reproducibly |
+| SwiGLU part | Top neurons from SwiGLU-8's ranking, recomputed from the 393,216 pairs and checked by digest; 8K settings reuse it |
+| Mean | FP64 mean of the 393,216 128-token targets |
+| Single-block recovery | S7-0's recipe unchanged: AdamW, constant `3e-5`, zero weight decay, temperature-1 KL, no cross-entropy, 8,192-token sequences, effective batch 8,192, seed 21, on the first 10M tokens of SwiGLU-8's stream |
+| Allocator rules | Mean costs one budget unit (2,048 values); smoothing runs within each family; leftover budget widens SwiGLU layers only |
+
+**Data.** Every GPU task rebuilds the 128-token partitions and 8K streams with
+SwiGLU-8's code and checks them against its block check, as SwiGLU-9 did. SwiGLU-8's
+`prepare-001` holds only the KL stream, and rebuilding takes about a minute.
+Calibration pairs are captured per layer. The final-evaluation KL stream is never
+scored.
+
+**Shared code**, each extension leaving SwiGLU-only behaviour unchanged:
+
+- `SwiGLUWidthCurvePoint` gains `operator`, and `build_operator_curve` builds a
+  non-SwiGLU family. `build_swiglu_width_curve` cannot: it rejects widths above
+  8,192, prices at $3dk$, and would read linear + plain MLP width 8,192 as dense.
+- `allocate_discrete_swiglu_widths` widens SwiGLU items only, and names an operator
+  in a row only when it is not SwiGLU. Its output on SwiGLU-8's curves is identical
+  to the previous code at all eight targets and at 90% (offline comparison,
+  2026-11-04).
+- `DenseHybridReplacement` is the one new module. `HybridReplacement` stays low-rank.
+- `fit_ridge_linear(..., dtype=torch.float32)` gains an optional precision.
+
+**Stored.** JSON only. No fitted state is kept: `assemble` refits what it needs,
+which avoids about 47 GB and makes each refit a reproduction check. There is no
+resume: a task takes at most about 2.3 h, setup about a minute, and a failed task's
+partial JSON is still staged out.
+
+### Acceptance checks
+
+These are part of the real runs. A failed check stops the stage after recording
+its values; r is the relative difference.
+
+| # | Check | Reference | Tolerance | Where |
+| --- | --- | --- | --- | --- |
+| 1 | SwiGLU-only allocator at eight targets | 60-80%: recorded allocations. 20-50%: the recorded re-solve, because SwiGLU-8 kept SwiGLU-7's widths | exact widths; predicted KL r ≤ 1e-12 | start of `solve` |
+| 2 | SwiGLU `c1e-3-128`, seed 21, width 2048 | SwiGLU-8's block check at that layer | r ≤ 1e-3 | first fit of all 24 `select` tasks |
+| 3 | SwiGLU 1024, same recipe | SwiGLU-8's curve KL and fit | r ≤ 1e-3 | `select` tasks 0-2 |
+| 4 | Item parameter count, a multiple of the hidden size | Size tables above | exact | every item; again in `solve` |
+| 5 | Hybrid with a zero linear part | Its nonlinear part alone | r ≤ 1e-4 | start of hybrid `select` tasks |
+| 6 | Teacher against itself, 128-token and 8K selection KL | 0 | ≤ 1e-6 absolute | every GPU task |
+| 7 | SwiGLU-8's model reassembled | Its recorded token-0 monitoring KL | r ≤ 1e-4 | first point of every `assemble` task |
+| 8 | Refit item | Its `select` row in `recover`, its price in `assemble` | r ≤ 1e-3 | `recover`, `assemble` |
+| D | Window digest, stream sha256, neuron ranking digest | SwiGLU-8 | exact | every GPU task |
+
+Checks 7 and 8 go beyond the design. They are cheap, and check 7 tests the whole
+assembly path against a recorded value before anything new is measured. Check 6's
+128-token path compares an autocast forward pass with a non-autocast cached result;
+zero is expected but unproven, and a failure appears in the first two minutes.
+
+**Not yet verified.** `tests/test_heterogeneous1_contracts.py` covers the allocator
+rules, check 1 on SwiGLU-8's recorded curves, prices, the residual start, linear
+first, the forcing and swap rules, the merge, the job mapping, and stage D's real
+recovery loop on a tiny random model on the CPU. GPU execution, real data, memory
+use, fit lengths, and checks 2, 3, and 5-8 have not run; the first real stages are
+also the first execution test.
+
+## Pre-run resource plan
+
+Recorded 2026-11-04 under
+[PERUN resource accounting](../../../infrastructure/perun/perun-resources.md),
+before any submission, to be compared with measured use afterward. This is
+workflow-timing arithmetic, not scheduler allocation. All GPU stages use
+`gpu_short`, one H200, and 8 CPUs.
+
+| Stage | Tasks | Time limit, RAM | Expected per task | Expected GPU-h | Ceiling GPU-h | CPU core-h | Peak RAM / VRAM |
+| --- | ---: | --- | --- | ---: | ---: | ---: | --- |
+| R `select` | 24 (array 0-23) | 4 h, 64 GB | 1.2-2.4 h | 30-50 | 96 | 240-400 | ≤ 30 GB / ≤ 25 GB |
+| Z, S `baseline-table` | 1 | 3 h, 64 GB | 1.2-1.7 h | 1.2-1.7 | 3 | 10-14 | ≤ 30 GB / ≤ 20 GB |
+| C `cost-table` | 22 (array 0-21) | 3 h, 64 GB | 0.7-1.4 h | 15-30 | 66 | 120-240 | ≤ 30 GB / ≤ 25 GB |
+| D `recover` | 3 (array 0-2) | 3 h, 64 GB | 1-1.8 h | 3-5.5 | 9 | 24-44 | ≤ 30 GB / ≤ 34 GiB |
+| K `solve` | 1 | `cpu_short`, 4 CPUs, 16 GB, 2 h | 0.3-0.7 h | 0 | 0 | ≤ 8 | ≤ 4 GB / none |
+| T `assemble` | 8 (array 0-7) | 3 h, 128 GB | 0.2-1.5 h | 4-8 | 24 | 32-64 | ≤ 60 GB / ≤ 25 GB |
+| **Total** | **59** | | critical path about 9-12 h, plus queue and review | **about 55-95** | **198** | **about 430-770** | |
+
+Storage: PROJECT under 1 GB, SCRATCH at most 5 GB per task, local export tens of MB.
+Project use so far is about 410 of 8,424 GPU-hours. No sitting queues more than 25
+tasks or two arrays.
+
+**Evidence** (offline calculation on SwiGLU-8's records, 2026-11-04):
+
+- Local fits take 3.4-4.7 s per epoch. Teacher-start width 512-1024 runs about 50-55
+  epochs, and width 4096 and above about 5.
+- A block-check task's setup takes about 1.2 minutes, not the 20-40 minutes in
+  SwiGLU-8's plan, and scoring a fit at both contexts about 4 s.
+- A `select` task is bounded by its grid: 3 seeds × (6 constant × 64 epochs + 6
+  cosine × 32 epochs + batch 256 × 64 epochs) is about 2.3 h.
+- S7-0 trained at 27,150-30,750 tokens per second, so 10M tokens take about 6 minutes.
+- The page's earlier rough estimate was 55-90 GPU-hours.
+
+**Confidence:** medium for teacher-start fits. Low for random-start epoch counts,
+which are the main uncertainty; peak RAM is arithmetic, not measured.
 
 ## Sources and attribution
 

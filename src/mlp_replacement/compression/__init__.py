@@ -4,6 +4,7 @@ from .allocation import (
     DiscreteSwiGLUAllocation,
     SwiGLUWidthCurvePoint,
     allocate_discrete_swiglu_widths,
+    build_operator_curve,
     build_swiglu_width_curve,
 )
 from .recovery import (
@@ -18,6 +19,7 @@ __all__ = [
     "SwiGLUWidthCurvePoint",
     "TeacherFinalHiddenCache",
     "allocate_discrete_swiglu_widths",
+    "build_operator_curve",
     "build_swiglu_width_curve",
     "build_teacher_final_hidden_cache",
     "cached_hidden_distillation_loss",

@@ -1,7 +1,9 @@
 # Heterogeneous Operator Configurations
 
-Reserved for versioned scientific configurations for heterogeneous model-level
-experiments. No experiment configuration or scientific default is defined yet.
+Versioned scientific configurations for heterogeneous experiments.
+[`heterogeneous-1.json`](heterogeneous-1.json) configures Heterogeneous-1; its
+blocks shared with SwiGLU-8 must stay equal to `swiglu-8.json`, and `recipes`
+stays null until the researcher has reviewed the adoption table.
 
 Matching runners belong in
 [`workflows/runs/model/heterogenous/`](../../../runs/model/heterogenous/README.md).

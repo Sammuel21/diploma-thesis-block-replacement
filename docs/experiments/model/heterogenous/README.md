@@ -19,10 +19,10 @@ tuned (decision log, 2026-10-11).
 
 | Experiment | Main question | Status |
 | --- | --- | --- |
-| [Heterogeneous-1](heterogeneous-1.md) | How should each operator be fitted, which operators get picked, and can their pre-recovery prices be trusted? | Design settled 2026-11-04; not implemented |
+| [Heterogeneous-1](heterogeneous-1.md) | How should each operator be fitted, which operators get picked, and can their pre-recovery prices be trusted? | Implemented 2026-11-04; not yet run |
 | [Heterogeneous-2](heterogeneous-2.md) | How do hybrids compare with SwiGLU after recovery, with which retraining scope, and does local fitting matter? | Outline; designed after Heterogeneous-1 reports |
 
-No scientific configuration or execution result exists yet.
+No execution result exists yet.
 
 | Area | Location |
 | --- | --- |
@@ -33,9 +33,9 @@ No scientific configuration or execution result exists yet.
 | Local launchers | [workflows/jobs/local/heterogenous/](../../../../workflows/jobs/local/heterogenous/README.md) |
 | Perun launchers | [workflows/jobs/perun/heterogenous/](../../../../workflows/jobs/perun/heterogenous/README.md) |
 
-The local results area is `data/results/workflows/model/heterogenous/` and
-remains ignored by Git under the existing data policy. Concrete experiment
-identities and run layouts will be defined with their implementations.
+Heterogeneous-1's local results go to
+`data/results/workflows/model/heterogeneous-1/`, ignored by Git under the existing
+data policy.
 
 The [homogeneous SwiGLU family](../swiglu/README.md) remains the reference
 experiment class. Its notebooks, configurations, workflow identities, and

@@ -60,7 +60,7 @@ flowchart LR
     BI[Block interaction<br/>notebook only]
   end
   subgraph hetero[model/heterogenous]
-    H1[Heterogeneous-1<br/>block level, designed] --> H2[Heterogeneous-2<br/>model level, after H1]
+    H1[Heterogeneous-1<br/>block level, implemented] --> H2[Heterogeneous-2<br/>model level, after H1]
   end
   subgraph reports[results snapshots]
     R1[Results 2026-10-15]
@@ -115,7 +115,7 @@ Grey: historical or notebook-only.
 | [Stacking-1](model/stacking/stacking-1.md) | Ran 48/48; order-B INT3 and INT4 rerun as `-002` (INT4 completed 2026-11-01) | SwiGLU-7/8/9 models, Quantization-1 backend, Quantization-2 INT3 fix |
 | [Stacking-1 order B 1B](model/stacking/stacking-1.md#order-b-at-1b-results-2026-11-02) | Done 2026-11-02: 6/6 completed; order B beats order A at 1B by 24-52% in 8K KL | Order-B `-002` runs at 100M (INT3, INT4), SwiGLU-7 1B stream, SwiGLU-8 starts |
 | [Block interaction](model/interaction/block-interaction.md) | Notebook artifact only | - |
-| [Heterogeneous-1](model/heterogenous/heterogeneous-1.md) | Design settled 2026-11-04; not implemented | SwiGLU-8 (Part A protocol, streams, cost tables); block operator studies as background |
+| [Heterogeneous-1](model/heterogenous/heterogeneous-1.md) | Implemented 2026-11-04; not yet run | SwiGLU-8 (Part A protocol, streams, cost tables); block operator studies as background |
 | [Heterogeneous-2](model/heterogenous/heterogeneous-2.md) | Outline; designed after Heterogeneous-1 reports | Heterogeneous-1, SwiGLU-8 (100M pairs), SwiGLU-7 and SwiGLU-9 (1B references) |
 | [Results 2026-11-01](../results/2026-11-01-results.md) | WIP for the 2026-11-06 meeting | SwiGLU-9, Stacking-1, Quantization-2; heterogeneous later |
 
@@ -128,7 +128,7 @@ The order of work inside each experiment is on its page.
 
 | Experiment | Question | Operators | Status | Depends on | Reused by |
 | --- | --- | --- | --- | --- | --- |
-| Heterogeneous-1 | How should each operator be fitted, which get picked, can pre-recovery prices be trusted? | Zero, mean, linear, plain MLP, linear + SwiGLU, linear + plain MLP | Designed 2026-11-04 | SwiGLU-8 | Heterogeneous-2, results snapshot |
+| Heterogeneous-1 | How should each operator be fitted, which get picked, can pre-recovery prices be trusted? | Zero, mean, linear, plain MLP, linear + SwiGLU, linear + plain MLP | Implemented 2026-11-04; not yet run | SwiGLU-8 | Heterogeneous-2, results snapshot |
 | Heterogeneous-2 | How do hybrids compare after recovery, with which scope, and does local fitting matter? | Those Heterogeneous-1 picks | Outline | Heterogeneous-1, SwiGLU-7/8/9 | Results snapshot |
 
 ## Active and planned runs
@@ -140,5 +140,6 @@ The order of work inside each experiment is on its page.
 | `qat-int4-1b-002` | Quantization-1 | `qat-int4-100m-002` result (gap removed) | INT4-audit session | 140605 | Completed; KL 0.0297 (100M: 0.0291), macro 67.06% (100M: 65.87%) |
 | `b-fitted-{0.2,0.5,0.8}-1b-int{3,4}` | Stacking-1 order B 1B | Order-B INT3 `-002` (in-run twins), order-B INT4 `-002` (compared afterwards) | Order-B-1B session | 140758 (array 0-5) | Completed 2026-11-02; 8K KL INT4 0.077 / 0.173 / 0.395, INT3 0.128 / 0.215 / 0.435 |
 | `qat-int3-1b-002` | Quantization-2 | SwiGLU-7 1B stream, Quantization-1 `prepare-001`, `qat-int3-100m-002` (twin rows) | INT3-1B session | 142928 | Submitted 2026-11-03 from `20f0889` (decision log, 2026-11-03) |
+| `select-001`, `baseline-table-001` | Heterogeneous-1 | SwiGLU-8 `prepare-001` and `block-check-001` | Heterogeneous-1 session | - | Implemented; first submission pending |
 | TorchAO INT3 upstream check | Quantization-2 | - | TorchAO session | - | Investigation, no GPU |
 | Results-2 snapshot | Results | The runs above; heterogeneous | Results session | - | WIP |

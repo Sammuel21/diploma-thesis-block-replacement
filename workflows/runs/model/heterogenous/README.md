@@ -1,7 +1,7 @@
 # Heterogeneous Operator Runners
 
-Reserved for concrete Python entry points for heterogeneous model-level
-experiments. No executable runner is implemented yet.
+Concrete Python entry points for heterogeneous experiments.
+[`heterogeneous_1.py`](heterogeneous_1.py) runs Heterogeneous-1.
 
 Scientific choices belong in
 [`workflows/configs/model/heterogenous/`](../../../configs/model/heterogenous/README.md).

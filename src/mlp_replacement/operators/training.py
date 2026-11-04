@@ -570,18 +570,19 @@ def fit_replacement_operator(
     return fit_operator(module, training_pairs, validation_pairs, config, device)
 
 
-def fit_ridge_linear(training_pairs, ridge=1e-4, bias=False, device="cpu"):
+def fit_ridge_linear(training_pairs, ridge=1e-4, bias=False, device="cpu", dtype=torch.float32):
     """Fit a dense linear regression baseline by a regularized normal equation.
 
     ``ridge`` is scaled by the mean diagonal of ``X.T @ X`` so it remains
-    interpretable across activation scales.
+    interpretable across activation scales. ``dtype`` sets the precision of the
+    solve; the returned module is always float32.
     """
 
     if ridge < 0:
         raise ValueError("ridge must be non-negative")
     calculation_device = torch.device(device)
-    inputs = training_pairs.inputs.to(calculation_device, torch.float32)
-    targets = training_pairs.targets.to(calculation_device, torch.float32)
+    inputs = training_pairs.inputs.to(calculation_device, dtype)
+    targets = training_pairs.targets.to(calculation_device, dtype)
     if bias:
         input_mean = inputs.mean(dim=0)
         target_mean = targets.mean(dim=0)

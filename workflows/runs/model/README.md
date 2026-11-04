@@ -8,10 +8,9 @@ frontend.
 The [baseline runner index](baseline/README.md) links the compression and
 quantization entry points to their configurations and experiment guides.
 
-[`heterogenous/`](heterogenous/README.md) is reserved for the heterogeneous
-operator experiment class. It currently contains a README only, with no
-executable runner. Its configurations belong under
-`workflows/configs/model/heterogenous/`.
+[`heterogenous/`](heterogenous/README.md) holds the heterogeneous operator
+experiment class, currently the Heterogeneous-1 runner. Its configurations
+belong under `workflows/configs/model/heterogenous/`.
 
 ## Implementation ownership
 

@@ -46,11 +46,11 @@ added; its [environment pins](environments/quantization-1-requirements.txt)
 record the expected stack. Its local and Perun launchers leave the historical
 workflows unchanged. INT4 QAT requires an explicit positive token budget.
 
-The heterogeneous operator class has reserved directories under
+The heterogeneous operator class lives under
 [`runs/model/heterogenous/`](runs/model/heterogenous/README.md) and
 [`configs/model/heterogenous/`](configs/model/heterogenous/README.md), with
-matching local and Perun launcher areas. These contain directory scaffolding
-only; no heterogeneous workflow is executable yet.
+a Perun launcher area. Heterogeneous-1 is its first workflow, and it runs on
+Perun only; the local launcher area stays reserved.
 
 SwiGLU-5's context, fitting, candidate construction, recovery adaptation,
 search, and confirmation are separated under `runs/model/swiglu/swiglu5/`.

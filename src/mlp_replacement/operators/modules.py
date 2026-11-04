@@ -248,6 +248,20 @@ class HybridReplacement(nn.Module):
         return self.linear(inputs) + self.nonlinear(inputs)
 
 
+class DenseHybridReplacement(nn.Module):
+    """Add a dense hidden-size linear map to a compact nonlinear branch."""
+
+    def __init__(self, hidden_size, nonlinear):
+        super().__init__()
+        self.linear = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.nonlinear = nonlinear
+
+    def forward(self, inputs):
+        """Add the linear part and the nonlinear part."""
+
+        return self.linear(inputs) + self.nonlinear(inputs)
+
+
 def linear_svd(linear):
     """Compute one reusable float32 SVD of a dense linear replacement."""
 

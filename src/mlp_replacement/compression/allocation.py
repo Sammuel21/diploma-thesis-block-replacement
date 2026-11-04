@@ -31,6 +31,7 @@ class SwiGLUWidthCurvePoint:
     monotone_teacher_kl: float
     retains_dense_module: bool
     has_output_bias: bool
+    operator: str = "swiglu"
 
 
 @dataclass(frozen=True)
@@ -125,12 +126,51 @@ def build_swiglu_width_curve(
     )
 
 
+def build_operator_curve(layer, operator, original_width, items):
+    """Build one monotone singleton-KL curve for a non-SwiGLU operator family.
+
+    ``items`` holds dictionaries with ``width``, ``parameters``, and
+    ``teacher_kl``. Each item carries its own price, because a family's width
+    does not determine its parameters. Cost is smoothed within the family only,
+    in order of price, and no item is ever the dense module.
+    """
+
+    ordered = sorted(items, key=lambda item: int(item["parameters"]))
+    if not ordered:
+        raise ValueError("An operator curve requires at least one item")
+    if len({int(item["parameters"]) for item in ordered}) != len(ordered):
+        raise ValueError("Operator-curve items must have unique prices")
+    monotone = nonincreasing_isotonic(
+        [float(item["teacher_kl"]) for item in ordered]
+    )
+    return tuple(
+        SwiGLUWidthCurvePoint(
+            layer=int(layer),
+            original_width=int(original_width),
+            replacement_width=int(item["width"]),
+            replacement_width_ratio=int(item["width"]) / int(original_width),
+            replacement_parameters=int(item["parameters"]),
+            raw_teacher_kl=float(item["teacher_kl"]),
+            monotone_teacher_kl=monotone[index],
+            retains_dense_module=False,
+            has_output_bias=False,
+            operator=str(operator),
+        )
+        for index, item in enumerate(ordered)
+    )
+
+
 def allocate_discrete_swiglu_widths(
     curves,
     target_mlp_removal,
     hidden_size,
 ):
-    """Allocate fitted widths with a multiple-choice knapsack."""
+    """Allocate one menu item per layer with a multiple-choice knapsack.
+
+    A curve may mix operator families. Items are priced by their own parameter
+    count, and leftover budget widens a SwiGLU layer only. A row names its
+    operator only when it is not SwiGLU, so SwiGLU-only output is unchanged.
+    """
 
     hidden_size = int(hidden_size)
     if hidden_size < 1:
@@ -205,10 +245,13 @@ def allocate_discrete_swiglu_widths(
     if extra_neurons:
         choices = []
         for layer, point in selected_by_layer.items():
+            if point.operator != "swiglu":
+                continue
             wider = [
                 candidate
                 for candidate in by_layer[layer]
-                if candidate.replacement_width > point.replacement_width
+                if candidate.operator == "swiglu"
+                and candidate.replacement_width > point.replacement_width
             ]
             if not wider:
                 continue
@@ -256,6 +299,7 @@ def allocate_discrete_swiglu_widths(
             "retains_dense_module": point.retains_dense_module,
             "has_output_bias": point.has_output_bias,
             "is_boundary_width": layer == boundary_layer,
+            **({} if point.operator == "swiglu" else {"operator": point.operator}),
         }
         for layer, point in sorted(selected_by_layer.items())
     )
