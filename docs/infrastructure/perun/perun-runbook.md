@@ -1738,11 +1738,11 @@ Every submission needs the researcher's go. Everything goes to
 | Step | Block | Requested per task | Expected per task | Before the next step |
 | --- | --- | --- | --- | --- |
 | Update and pre-submission checks | 12.1 | - | minutes | Every line OK |
-| **Sitting 1:** recipe selection (24 tasks) and baseline table (1 job) | 12.2 | 4 h and 3 h, 64 GB | 1.2-2.4 h and 1.2-1.7 h | data-identity, check-6, check-2 pass in every task |
+| **Sitting 1:** recipe selection (24 tasks) and baseline table (1 job) | 12.2 | 4 h and 3 h, 64 GB | 1.2-2.4 h and 1.2-1.7 h | data-identity, check-6, check-2 pass in every task; the first linear fits are near their expected KL (12.3) |
 | Merge and review | 12.4 | login node | minutes | You pin `recipes` in the configuration |
 | **Sitting 2:** cost tables (22 tasks) and recovery (3 tasks) | 12.5 | 3 h, 64 GB | 0.7-1.8 h | check-8 passes |
 | **Sitting 3:** knapsack solve (1 CPU job) | 12.6 | `cpu_short`, 2 h, 16 GB | 0.3-0.7 h | check-1 and check-4 pass |
-| **Sitting 4:** assembly (8 tasks) | 12.7 | 3 h, 128 GB | 0.2-1.5 h | check-7 and check-8 pass |
+| **Sitting 4:** assembly (8 tasks) | 12.7 | 6 h, 128 GB | 0.2-1.5 h | check-7 and check-8 pass |
 | Summary | 12.8 | login node | minutes | - |
 
 Do not update the checkout while a job of yours is queued or running, including
@@ -1871,6 +1871,18 @@ EOF
 gpu-status
 ```
 
+**Early sanity gate, about 15 minutes after tasks 3 and 4 start. Safe to re-run.** The
+SwiGLU checks cannot test a new operator, so the first linear fit gives a reference:
+`kl128` should be near 0.076 in task 3 (layer 3) and 0.045 in task 4 (layer 11). If
+either is more than a factor of 2 away, stop and tell the assistant.
+
+```bash
+source "$PERUN_LOG_DIR/heterogeneous-1_submission.txt"
+for TASK in 3 4; do
+    grep -m1 '^operator=linear ' "$PERUN_LOG_DIR/heterogeneous-1_${SELECT}_${TASK}.out"
+done
+```
+
 ### 12.4 Merge and review
 
 **Safe to re-run.** When the 24 tasks have finished, merge them on the login node. It
@@ -1949,7 +1961,7 @@ reproduces the recorded token-0 KL.
 
 ```bash
 cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
-ASSEMBLE=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --mem=128G \
+ASSEMBLE=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --mem=128G \
     --array=0-7 --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
     workflows/jobs/perun/heterogenous/heterogeneous_1.sbatch assemble)
 printf 'ASSEMBLE=%s\n' "${ASSEMBLE%%;*}" | tee -a "$PERUN_LOG_DIR/heterogeneous-1_submission.txt"

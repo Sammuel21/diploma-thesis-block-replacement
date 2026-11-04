@@ -16,7 +16,7 @@ import numpy
 import torch
 from transformers import LlamaConfig, LlamaForCausalLM
 
-from mlp_replacement.artifacts import read_json
+from mlp_replacement.artifacts import read_json, write_json_atomic
 from mlp_replacement.capture import ActivationPairs
 from mlp_replacement.compression.allocation import (
     allocate_discrete_swiglu_widths,
@@ -407,6 +407,41 @@ class SelectionContracts(unittest.TestCase):
         self.assertEqual(h.operator_recipe(settings, "swiglu")[0], h.REFERENCE_SETTING)
         self.assertIsNone(h.operator_recipe(settings, "linear")[2])
         self.assertTrue(h.needs_long_pairs(settings, ["swiglu", "linear"]))
+
+
+class TableContracts(unittest.TestCase):
+    """A rerun under other settings must not mix into the knapsack's menu."""
+
+    def setUp(self):
+        self.unpinned, unused_path = h.load_settings(CONFIG)
+        self.pinned = {**self.unpinned, "recipes": {"select_sha256": "a" * 64, "settings": {"linear": "ridge-128"}}}
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.write("baseline-table-001", "baseline-table", self.unpinned)
+        for layer in self.unpinned["allocation"]["eligible_layers"]:
+            self.write(h.cost_output_name(layer), "cost-table", self.pinned)
+
+    def write(self, name, command, configuration):
+        write_json_atomic(self.root / name / "result.json", {
+            "workflow": h.WORKFLOW, "command": command, "status": "completed",
+            "configuration": configuration, "results": {"table": [{"operator": "zero"}]},
+        })
+
+    def test_the_baseline_table_may_predate_the_pinned_recipes(self):
+        rows, inputs = h.completed_table_rows(self.root, self.pinned)
+        self.assertEqual((len(rows), len(inputs)), (23, 23))
+
+    def test_a_cost_table_under_other_recipes_is_refused(self):
+        other = {**self.pinned, "recipes": {"select_sha256": "b" * 64, "settings": {"linear": "c1e-3-128"}}}
+        self.write(h.cost_output_name(5), "cost-table", other)
+        with self.assertRaises(ValueError):
+            h.completed_table_rows(self.root, self.pinned)
+
+    def test_a_table_under_another_configuration_is_refused(self):
+        self.write("baseline-table-001", "baseline-table", {**self.unpinned, "seed": 22})
+        with self.assertRaises(ValueError):
+            h.completed_table_rows(self.root, self.pinned)
 
 
 class RecoveryContracts(unittest.TestCase):

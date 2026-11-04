@@ -1067,8 +1067,10 @@ def forced_points(menu, target, hidden, counts):
 
     Each layer's extra damage is the predicted total with that layer limited to
     non-SwiGLU items, minus the unrestricted total. Layers rank by that value,
-    ties by layer, so layers already non-SwiGLU come first. Each point limits the
-    first N layers and lets the knapsack solve the rest.
+    ties by layer. Layers already non-SwiGLU score zero, so they normally come
+    first, but the boundary step sits outside the knapsack and can make another
+    layer's value negative. Each point limits the first N layers and lets the
+    knapsack solve the rest.
     """
 
     base = solve_record(menu, target, hidden)["predicted_teacher_kl"]
@@ -1089,7 +1091,11 @@ def forced_points(menu, target, hidden, counts):
 
 
 def completed_table_rows(root, settings):
-    """Read the baseline and cost tables; each must have completed."""
+    """Read the baseline and cost tables; each must have completed under this configuration.
+
+    The baseline table runs before the recipes are pinned, so only cost tables must
+    hold the pinned recipes. A rerun under other settings must not mix into the menu.
+    """
 
     layers = [int(value) for value in settings["allocation"]["eligible_layers"]]
     names = ["baseline-table-001", *(cost_output_name(layer) for layer in layers)]
@@ -1100,6 +1106,11 @@ def completed_table_rows(root, settings):
         artifact = read_json(path)
         if artifact.get("workflow") != WORKFLOW or artifact.get("status") != "completed":
             raise ValueError(f"Table {name} is not completed")
+        used = artifact["configuration"]
+        if without_recipes(used) != without_recipes(settings) or (
+            artifact["command"] == "cost-table" and used["recipes"] != settings["recipes"]
+        ):
+            raise ValueError(f"Table {name} used a different configuration")
         rows += artifact["results"]["table"]
         inputs[name] = file_digest(path)
     return rows, inputs
