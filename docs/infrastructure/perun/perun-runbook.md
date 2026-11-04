@@ -2,7 +2,7 @@
 title: PERUN Runbook
 status: active
 created: 2026-10-11
-modified: 2026-10-26
+modified: 2026-11-03
 ---
 
 # PERUN Runbook
@@ -1481,7 +1481,8 @@ and writes to `perun-results/quantization-2/`. It reuses Quantization-1's
 submitted on 2026-10-21 (jobs 123646-123648) after Stacking-1 had finished;
 11.1-11.2 are kept as the record of that submission. Both INT3 QAT runs are
 invalid. The 100M run was rerun as `-002` with the fixed INT3 quantizer
-(11.5); the 1B run is not rerun (decision log, 2026-10-26).
+(11.5); the 1B rerun was skipped on 2026-10-26 and reopened on 2026-11-03
+(11.6).
 
 | Run | Output | Expected | Time limit | Status |
 | --- | --- | --- | --- | --- |
@@ -1489,7 +1490,7 @@ invalid. The 100M run was rerun as `-002` with the fixed INT3 quantizer
 | INT3 QAT 100M | `qat-int3-100m-001` | 1.6-3.5 h | 6 h | Invalid (INT3 QAT incident) |
 | INT3 QAT 1B | `qat-int3-1b-001` | 16-32 h | 36 h | Invalid (INT3 QAT incident) |
 | INT3 QAT 100M, rerun (stage 1, 11.5) | `qat-int3-100m-002` | 1.7-2.2 h | 4 h | Completed 2026-10-26 (job 132434) |
-| INT3 QAT 1B, rerun (stage 2, 11.6) | `qat-int3-1b-002` | 14-17 h | 24 h | Not run (decision log, 2026-10-26) |
+| INT3 QAT 1B, rerun (stage 2, 11.6) | `qat-int3-1b-002` | 14-17 h | 24 h | Reopened (decision log, 2026-11-03) |
 
 Run 1.2, 1.3, and 1.4 first.
 
@@ -1647,22 +1648,37 @@ weights differ" before export. Either way, stop and tell the assistant.
 
 ### 11.6 Rerun INT3 QAT 1B as `-002` (stage 2)
 
-*Not run: the researcher decided on 2026-10-26 not to rerun INT3 QAT 1B
-(decision log, 2026-10-26; Quantization-2 "No INT3 QAT 1B rerun"). Kept only
-in case that decision is reopened.*
+*Reopened on 2026-11-03 (decision log, 2026-11-03), after being skipped on
+2026-10-26. Plan: Quantization-2 "INT3 QAT 1B rerun". Run 1.2, 1.3, and 1.4
+first; no code change is needed.*
 
-**Only after the researcher's go on the stage-1 results** (decision log,
-2026-10-25). Same checks and form as 11.5, with the 1B output, budget, and
-limit:
+**Pre-submission checks. Safe to re-run.** The checkout must contain
+`b59da5c`, the settings line must print `quantization-2 ['ptq-int3']`, the
+`--test-only` line must be accepted, and `qat-int3-1b-002` must not exist.
 
 ```bash
 cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
 CONFIG=workflows/configs/model/baseline/quantization-2.json
 Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
 git log -1 --oneline
+git merge-base --is-ancestor b59da5c HEAD && echo "checkout contains b59da5c"
+PYTHONPATH=src python -c "from workflows.runs.model.baseline import quantization as q; s = q.load_settings('$CONFIG'); print(s['workflow'], s['variants'])"
+bash -n workflows/jobs/perun/quantization_1.sbatch && echo "launcher syntax OK"
 sbatch --test-only --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=24:00:00 \
   workflows/jobs/perun/quantization_1.sbatch run qat-int3-1b-002 --config "$CONFIG" --prepared "$Q1_PREPARED" \
   --variant qat-int3 --qat-tokens 1000000000
+find "$PERUN_RESULTS/quantization-2" -maxdepth 1 -name 'qat-int3-1b-002*' | grep . || echo "no 1B -002 output yet"
+perunfsusage
+squeue -u "$USER"
+```
+
+**Submits a job. Run once,** after the checks are clean. It appends the job ID
+to `$PERUN_LOG_DIR/quantization-2-int3-rerun_submission.txt`.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+CONFIG=workflows/configs/model/baseline/quantization-2.json
+Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
 EXISTING=$(find "$PERUN_RESULTS/quantization-2" -maxdepth 1 -name 'qat-int3-1b-002*')
 if [[ -n "$EXISTING" ]]; then
     echo "STOP: the 1B -002 output or lock already exists:"; echo "$EXISTING"
@@ -1675,3 +1691,38 @@ else
     echo "<- record this in local/perun/runs/quantization-2.md"
 fi
 ```
+
+**Start check. Safe to re-run,** about 30 minutes after the job starts, and
+again about 2 h after it starts, for the 100M row. The start check must show 66 projections
+and 0 mismatched, and the token-0 KL must be near 0.2227. The first-step
+gradient norm should be near 0.56; it appears with the 10M row. The 10-100M rows
+compare with `qat-int3-100m-002`, which trained on the same first tokens; gaps
+of up to about 4% are noise. The 24-batch monitoring perplexity is not a gate.
+
+```bash
+python - <<'EOF'
+import json, os
+from pathlib import Path
+
+twin = {0: 0.22268, 10: 0.09793, 25: 0.0885, 50: 0.0819, 75: 0.07878, 100: 0.07954}
+found = sorted(Path(os.environ["PERUN_SCRATCH"]).glob("job_*/results/qat-int3-1b-002/result.json"))
+if not found:
+    print("no running copy on SCRATCH yet")
+for path in found:
+    data = json.loads(path.read_text())
+    results = data.get("results", {})
+    recovery = results.get("recovery", {})
+    check = results.get("int3_fake_quantization_check")
+    print(path.parts[-4], data.get("status"), data.get("current_stage"), "| error:", data.get("error"))
+    print("stream:", results.get("recovery_stream", {}).get("sha256", "-")[:8])
+    print("start check:", f"{check['projections']} projections, {len(check['mismatched'])} mismatched" if check else "not run yet")
+    print("first-step gradient norm:", (recovery.get("first_step") or {}).get("gradient_l2_norm"))
+    for row in recovery.get("history", []):
+        tokens, kl = row["tokens_seen"] // 1_000_000, row["kl"]["kl"]
+        reference = twin.get(tokens)
+        print(f"{tokens:>6}M KL {kl:.5f}" + (f"  twin {reference:.5f}  {kl / reference - 1:+.2%}" if reference else ""))
+EOF
+```
+
+**Watch** with 11.3, replacing its first line as in 11.5. The stops are also
+those of 11.5.

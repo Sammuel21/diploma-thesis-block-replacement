@@ -2,7 +2,7 @@
 title: Stacking-1 - SwiGLU Replacement Plus Weight Quantization
 status: active
 created: 2026-10-17
-modified: 2026-11-02
+modified: 2026-11-03
 ---
 
 # Stacking-1 - SwiGLU Replacement Plus Weight Quantization
@@ -146,11 +146,11 @@ which stay frozen as they are in order A.
 INT3 QAT runs planned here on 2026-10-17 moved to
 [Quantization-2](../baseline/quantization-2.md), which runs
 on Quantization-1's runner and adds INT3 QAT at 1B (decision log,
-2026-10-20). After the INT3 QAT fix, the 1B run is not rerun: longer
-training barely helps the fixed 100M dense INT3 QAT model, and against the
-1B stacked models of equal or smaller byte saving a 1B run could not change
-the KL or perplexity comparison (decision log, 2026-10-26;
-[Quantization-2](../baseline/quantization-2.md#no-int3-qat-1b-rerun-2026-10-26)).
+2026-10-20). After the INT3 QAT fix, the 1B run was first skipped (decision
+log, 2026-10-26;
+[Quantization-2](../baseline/quantization-2.md#no-int3-qat-1b-rerun-2026-10-26)),
+then reopened as `qat-int3-1b-002` once order B at 1B gave it an equal-token
+rival (decision log, 2026-11-03).
 
 **Why order B stays at 100M.** Order A already has 1B rows because the 1B
 SwiGLU models exist and quantizing them costs only an evaluation. Order B at

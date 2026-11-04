@@ -2,7 +2,7 @@
 title: Quantization-2 Dense INT3 Baseline
 status: active
 created: 2026-10-20
-modified: 2026-10-26
+modified: 2026-11-03
 ---
 
 # Quantization-2
@@ -32,6 +32,13 @@ condition of that decision), and document the rerun's results here. The
 binding decisions are the 2026-10-20, 2026-10-25, and 2026-10-26 rows in the
 [shared decision log](../../../agents/decisions.md).
 
+**Update (2026-11-03):** the INT3 QAT 1B run is reopened as `qat-int3-1b-002`
+(decision log, 2026-11-03), with the quantizer of `qat-int3-100m-002` and no
+code change. Its plan is in
+[INT3 QAT 1B rerun](#int3-qat-1b-rerun-recorded-2026-11-03). Submitted on
+2026-11-03 as job 142928 from commit `20f0889`. **Next step:** the start check
+(runbook 11.6), then the results.
+
 ## Runs
 
 | Run | What happens | Training tokens | Output |
@@ -40,14 +47,15 @@ binding decisions are the 2026-10-20, 2026-10-25, and 2026-10-26 rows in the
 | INT3 QAT 100M | Train the 66 projections for 100M tokens with INT3 simulated, convert to real INT3, evaluate | 100M | `qat-int3-100m-001` |
 | INT3 QAT 1B | The same for 1B tokens | 1,000M | `qat-int3-1b-001` |
 | INT3 QAT 100M, rerun | As above, with the fixed INT3 quantizer | 100M | `qat-int3-100m-002` (completed 2026-10-26) |
-| ~~INT3 QAT 1B, rerun~~ | Not run (decision log, 2026-10-26) | — | — |
+| INT3 QAT 1B, rerun | As above, with the fixed INT3 quantizer | 1,000M | `qat-int3-1b-002` (reopened 2026-11-03) |
 
 The two `-001` QAT runs are invalid and kept as evidence
 ([INT3 QAT incident](#int3-qat-incident-2026-10-25)). The INT4 counterparts are Quantization-1's `int4`, `qat-int4-100m`, and
 `qat-int4-1b` runs. The 1B run was planned to give Stacking-1's 1B stacked
 models an INT3 competitor with equal training tokens (decision log,
-2026-10-20); after the fixed 100M run it is no longer run
-([No INT3 QAT 1B rerun](#no-int3-qat-1b-rerun-2026-10-26)).
+2026-10-20). It was dropped after the fixed 100M run
+([No INT3 QAT 1B rerun](#no-int3-qat-1b-rerun-2026-10-26)) and reopened after
+Stacking-1's order B at 1B (decision log, 2026-11-03).
 
 ## Method
 
@@ -244,7 +252,7 @@ submitted together with Stacking-1's three order-B INT3 reruns
 | Run | Stage | Expected | Time limit | Ceiling GPU-h | Basis | Confidence |
 | --- | --- | --- | --- | ---: | --- | --- |
 | INT3 QAT 100M `-002` | 1 | 1.7-2.2 h | 4 h | 4 | `qat-int3-100m-001` 1.78 h of workflow time | Medium |
-| INT3 QAT 1B `-002` | 2: **not run** (decision log, 2026-10-26) | 14-17 h | 24 h | 24 | `qat-int3-1b-001` 14.25 h | Medium |
+| INT3 QAT 1B `-002` | 2: reopened (decision log, 2026-11-03) | 14-17 h | 24 h | 24 | `qat-int3-1b-001` 14.25 h | Medium |
 
 - **Per run:** one H200, 8 CPUs, 128 GB RAM, `gpu_short`, one process.
   Expected CPU use 14-18 core-hours (100M) and 112-136 (1B); ceilings 32 and
@@ -257,6 +265,31 @@ submitted together with Stacking-1's three order-B INT3 reruns
 - **Stage 1 in total** (with Stacking-1): 4 single-GPU jobs, expected
   5.3-7.0 GPU-hours, ceiling 13. Headroom against the 8,424-GPU-hour
   allocation is ample.
+
+### INT3 QAT 1B rerun (recorded 2026-11-03)
+
+Plan for `qat-int3-1b-002` under the
+[PERUN resource contract](../../../infrastructure/perun/perun-resources.md).
+Estimates, not measurements.
+
+| Field | Plan |
+| --- | --- |
+| Work | One job, no array or dependency: stream, start check, training, conversion, export, evaluation |
+| Request | One H200, 8 CPUs, 128 GB RAM, `gpu_short`, one process, 24 h limit |
+| Expected elapsed | 14-17 h, central estimate about 14.5 h |
+| GPU cost | 14-17 GPU-hours, ceiling 24 |
+| CPU cost | 112-136 core-hours, ceiling 192 |
+| Memory | About 50 GiB peak allocated VRAM and 15 GiB peak RSS |
+| Storage | PROJECT about 2.3 GB; SCRATCH about 30 GB (4 GB stream, up to two checkpoint generations of about 13 GB) |
+| Confidence | Medium; the main uncertainty is node speed |
+
+- **Basis:** `qat-int3-1b-001` took 14.25 h of workflow time. At 100M the
+  fixed quantizer took 1.80 h against 1.78 h (+1.4%), which gives about 14.5 h.
+  The upper end is kept for node speed; `qat-int4-1b-002` took 16.50 h. Memory
+  comes from `qat-int3-100m-002` (49.6 GiB, 14.9 GiB).
+- **Queue time** is not estimated and is not included.
+- **Headroom:** logged workflow timing is about 394 H200-hours, a proxy that
+  includes job 132434's 1.80 h, against the 8,424-GPU-hour allocation.
 
 ## Results (2026-10-25)
 
@@ -417,6 +450,9 @@ asymmetric INT3 (the assert in `_infer_fake_quantize_configs`; test
   (`-002`) are documented here when they finish.
 
 ## No INT3 QAT 1B rerun (2026-10-26)
+
+*Superseded on 2026-11-03: the run is reopened as `qat-int3-1b-002` (decision
+log, 2026-11-03). This section is kept as the record of the earlier decision.*
 
 **Decision:** the INT3 QAT 1B run is not rerun with the fixed quantizer
 (decision log, 2026-10-26). The valid INT3 QAT point is

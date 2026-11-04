@@ -2,7 +2,7 @@
 title: Experiment Dependencies and Status
 status: active
 created: 2026-11-01
-modified: 2026-11-02
+modified: 2026-11-03
 ---
 
 # Experiment dependencies and status
@@ -106,7 +106,7 @@ Grey: historical or notebook-only.
 | [SwiGLU-8](model/swiglu/swiglu-8.md) | Done; token-0 starts and 100M models are reused | SwiGLU-7 |
 | [SwiGLU-9](model/swiglu/swiglu-9.md) | Done; local fitting closed at 1B | SwiGLU-7 (1B stream, 20/50% models), SwiGLU-8 (starts) |
 | [Quantization-1](model/baseline/quantization-1.md) | Done; INT4 QAT 100M rerun as `-002` after the INT4 fix | SwiGLU-7/8 streams and 8K KL (shared) |
-| [Quantization-2](model/baseline/quantization-2.md) | Done; INT3 QAT valid from `-002` | Quantization-1 runner and preparation |
+| [Quantization-2](model/baseline/quantization-2.md) | INT3 QAT valid from `-002`; INT3 QAT 1B reopened as `qat-int3-1b-002` (2026-11-03) | Quantization-1 runner and preparation |
 | [Speed-1](model/baseline/speed-1.md) | Done | Quantization-1, SwiGLU-8 models |
 | [Compression baseline](model/baseline/compression-baseline.md) | Notebook artifacts only | - |
 | [Stacking-1](model/stacking/stacking-1.md) | Ran 48/48; order-B INT3 and INT4 rerun as `-002` (INT4 completed 2026-11-01) | SwiGLU-7/8/9 models, Quantization-1 backend, Quantization-2 INT3 fix |
@@ -138,5 +138,6 @@ with the real ones.
 | `b-fitted-{0.2,0.5,0.8}-100m-int4-002` | Stacking-1 | INT4 fix, commit `b59da5c` | INT4-audit session | 140575 (array 0, 2, 4) | Completed; KL 0.102 / 0.249 / 0.564 (`-001`: 0.102 / 0.255 / 0.579) |
 | `qat-int4-1b-002` | Quantization-1 | `qat-int4-100m-002` result (gap removed) | INT4-audit session | 140605 | Completed; KL 0.0297 (100M: 0.0291), macro 67.06% (100M: 65.87%) |
 | `b-fitted-{0.2,0.5,0.8}-1b-int{3,4}` | Stacking-1 order B 1B | Order-B INT3 `-002` (in-run twins), order-B INT4 `-002` (compared afterwards) | Order-B-1B session | 140758 (array 0-5) | Completed 2026-11-02; 8K KL INT4 0.077 / 0.173 / 0.395, INT3 0.128 / 0.215 / 0.435 |
+| `qat-int3-1b-002` | Quantization-2 | SwiGLU-7 1B stream, Quantization-1 `prepare-001`, `qat-int3-100m-002` (twin rows) | INT3-1B session | 142928 | Submitted 2026-11-03 from `20f0889` (decision log, 2026-11-03) |
 | TorchAO INT3 upstream check | Quantization-2 | - | TorchAO session | - | Investigation, no GPU |
 | Results-2 snapshot | Results | The runs above; heterogeneous | Results session | - | WIP |
