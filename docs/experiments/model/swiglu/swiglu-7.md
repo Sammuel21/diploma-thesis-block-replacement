@@ -2,7 +2,7 @@
 title: SwiGLU-7 - Retraining-Scope Analysis
 status: active
 created: 2026-09-24
-modified: 2026-09-29
+modified: 2026-11-04
 sources:
   notebooks:
     - notebooks/model/swiglu/swiglu-7.ipynb
@@ -131,6 +131,27 @@ The production decision is to retain replacement-only recovery as the default
 for homogeneous SwiGLU compression. The experiment does not prove that broader
 adaptation can never help; it shows that these two broader scopes do not justify
 their extra cost under the tested one-billion-token protocol.
+
+### Scope ranking against recovery budget (read-only check, 2026-11-04)
+
+S7-0 against the better of S7-1 and S7-2, read from each run's
+`recovery_validation_kl` history:
+
+| Target | At 100M | At 1B |
+| ---: | --- | --- |
+| 20% | 0.4% worse | 11.1% better |
+| 30% | 1.4% worse | 4.1% better |
+| 40% | 0.6% worse | 6.8% better |
+| 50% | 2.9% worse | 0.6% worse |
+
+Every 100M difference is below the run-to-run noise later measured in
+[SwiGLU-8](swiglu-8.md#implementation) (up to about 3.5% at a single checkpoint),
+so the three scopes cannot be told apart at 100M. They separate only between 100M
+and 1B, and the 4.1% at 30% is close to that noise. Early rankings of recovery
+settings can therefore flip, which is why
+[Heterogeneous-2](../heterogenous/heterogeneous-2.md) compares scopes at 1B. There
+was no fixed winning rule here: S7-0 was kept on the overall picture of KL,
+perplexity, and cost.
 
 ## Outputs and evaluation
 

@@ -2,7 +2,7 @@
 title: Experiment Dependencies and Status
 status: active
 created: 2026-11-01
-modified: 2026-11-03
+modified: 2026-11-04
 ---
 
 # Experiment dependencies and status
@@ -60,7 +60,7 @@ flowchart LR
     BI[Block interaction<br/>notebook only]
   end
   subgraph hetero[model/heterogenous]
-    HB[Operator recipe study<br/>block level, to be defined] --> H[Heterogeneous-1<br/>to be defined]
+    H1[Heterogeneous-1<br/>block level, designed] --> H2[Heterogeneous-2<br/>model level, after H1]
   end
   subgraph reports[results snapshots]
     R1[Results 2026-10-15]
@@ -78,21 +78,24 @@ flowchart LR
   Q1 -. INT4 fix .-> ST1B
   Q1 --> SP1
   S8 --> SP1
-  BO --> HB
-  BB -.-> HB
-  BI -.-> H
-  S9 -. 1B homogeneous reference .-> H
+  BO -.-> H1
+  BB -.-> H1
+  S8 --> H1
+  S8 --> H2
+  S7 -. scope and 1B reference .-> H2
+  BI -.-> H2
+  S9 -. 1B homogeneous reference .-> H2
   S8 --> R1
   Q1 --> R1
   SP1 --> R1
   S9 --> R2
   ST1 --> R2
   Q2 --> R2
-  H -. planned section .-> R2
+  H1 -. planned section .-> R2
 
   class S7,S8,S9,Q2,SP1,R1,ST1,ST1B done
   class Q1 running
-  class HB,H,R2 planned
+  class H1,H2,R2 planned
   class S26,BB,BO,CB,BI historical
 ```
 
@@ -112,23 +115,21 @@ Grey: historical or notebook-only.
 | [Stacking-1](model/stacking/stacking-1.md) | Ran 48/48; order-B INT3 and INT4 rerun as `-002` (INT4 completed 2026-11-01) | SwiGLU-7/8/9 models, Quantization-1 backend, Quantization-2 INT3 fix |
 | [Stacking-1 order B 1B](model/stacking/stacking-1.md#order-b-at-1b-results-2026-11-02) | Done 2026-11-02: 6/6 completed; order B beats order A at 1B by 24-52% in 8K KL | Order-B `-002` runs at 100M (INT3, INT4), SwiGLU-7 1B stream, SwiGLU-8 starts |
 | [Block interaction](model/interaction/block-interaction.md) | Notebook artifact only | - |
-| Operator recipe study (block level) | To be defined; one per operator family (decision log, 2026-10-11) | Block operator studies, SwiGLU-8 Part A recipe |
-| [Heterogeneous-1](model/heterogenous/README.md) | To be defined | Operator recipe study, SwiGLU-9 1B homogeneous reference |
+| [Heterogeneous-1](model/heterogenous/heterogeneous-1.md) | Design settled 2026-11-04; not implemented | SwiGLU-8 (Part A protocol, streams, cost tables); block operator studies as background |
+| [Heterogeneous-2](model/heterogenous/heterogeneous-2.md) | Outline; designed after Heterogeneous-1 reports | Heterogeneous-1, SwiGLU-8 (100M pairs), SwiGLU-7 and SwiGLU-9 (1B references) |
 | [Results 2026-11-01](../results/2026-11-01-results.md) | WIP for the 2026-11-06 meeting | SwiGLU-9, Stacking-1, Quantization-2; heterogeneous later |
 
 Invalid and excluded runs (decision log, 2026-10-25): Quantization-2
 `qat-int3-{100m,1b}-001` and Stacking-1 `b-fitted-*-100m-int3-001`.
 
-## Heterogeneous experiments (to fill)
+## Heterogeneous experiments
 
-Placeholder until the first heterogeneous experiment is designed. Add one row
-per experiment, and replace the two placeholder nodes in the experiment graph
-with the real ones.
+The order of work inside each experiment is on its page.
 
 | Experiment | Question | Operators | Status | Depends on | Reused by |
 | --- | --- | --- | --- | --- | --- |
-| Operator recipe study | | | To be defined | Block operator studies | Heterogeneous-1 |
-| Heterogeneous-1 | | | To be defined | Operator recipe study, SwiGLU-9 | Results snapshot |
+| Heterogeneous-1 | How should each operator be fitted, which get picked, can pre-recovery prices be trusted? | Zero, mean, linear, plain MLP, linear + SwiGLU, linear + plain MLP | Designed 2026-11-04 | SwiGLU-8 | Heterogeneous-2, results snapshot |
+| Heterogeneous-2 | How do hybrids compare after recovery, with which scope, and does local fitting matter? | Those Heterogeneous-1 picks | Outline | Heterogeneous-1, SwiGLU-7/8/9 | Results snapshot |
 
 ## Active and planned runs
 

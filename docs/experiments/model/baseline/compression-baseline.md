@@ -2,7 +2,7 @@
 title: Compression Baseline Workflow
 status: active
 created: 2026-09-10
-modified: 2026-09-19
+modified: 2026-11-04
 sources:
   notebooks:
     - notebooks/model/baseline/compression-baseline.ipynb
@@ -175,6 +175,46 @@ This pipeline is a baseline, not an allocation search. It cannot establish
 which layers deserve more capacity, and its short recovery run does not settle
 the final model-retraining budget. It establishes whether the local fitting
 improvements survive model integration under an intentionally simple control.
+
+## Use as a baseline (open question, 2026-11-04)
+
+No decision is made here; the question has its own later session. These are the
+facts found when it was raised.
+
+| Method | Pairs | Start | Layers halved | KL before, after recovery | PPL after |
+| --- | ---: | --- | --- | --- | ---: |
+| `historical_random` | 12,288 | Random | 0, 2, ..., 22 | 14.63, 13.32 | 2,750,678 |
+| `historical_random` | 12,288 | Random | 1, 3, ..., 21 | 2.97, 1.67 | 182.0 |
+| `new_data_random` | 98,304 | Random | 0, 2, ..., 22 | 0.960, 0.916 | 57.5 |
+| `new_data_random` | 98,304 | Random | 1, 3, ..., 21 | 0.960, 0.739 | 51.3 |
+| `complete_method` | 98,304 | Teacher neurons | 0, 2, ..., 22 | 0.289, 0.289 | 24.7 |
+| `complete_method` | 98,304 | Teacher neurons | 1, 3, ..., 21 | 0.216, 0.215 | 21.3 |
+
+Dense perplexity is 14.44 on the same 6,096 WikiText-2 tokens.
+
+- **Not comparable with current runs.** Recovery is about 16K tokens (64 batches of
+  2 × 128), roughly 6,000 times less than 100M. Calibration has 4 times fewer pairs
+  than 393,216, and context is 128 tokens against 8,192.
+- **Not structured pruning.** Every arm locally fits the narrow SwiGLU before
+  recovery, so this is a replacement workflow with a fixed pattern. Recalibrated, it
+  would answer whether teacher initialization still matters after long recovery.
+- **The Grafting link is partial.** Grafting replaces 50% of MLPs in an interleaved
+  pattern but narrows the expansion ratio from 4 to 3 (-12.5% parameters), not to
+  half, and it trains each new operator locally first [src-grafting-2025, Section
+  4.1; Tables 3-4].
+- **The structured-pruning workflow already exists on the current recipe:** the
+  slice-only arm of [SwiGLU-8](../swiglu/swiglu-8.md) and
+  [SwiGLU-9](../swiglu/swiglu-9.md), at 20-80% to 100M and 20/50/80% to 1B. So far
+  it is only used for the local-fitting gap, not as a baseline beside quantization.
+  Its widths come from the allocator run on fitted costs, so it is an ablation of
+  this pipeline, not an independent pruning method.
+- **A possible control.** A uniform-width slice-only arm would remove that
+  dependence and match Minitron's structure, one MLP size for every layer
+  [src-minitron-2024, Section 2.3, Figure 3]. It would be a restricted Minitron-style
+  baseline: Minitron's neuron score differs (Section 2.2), it also prunes heads,
+  embeddings, and depth, and it retrains the full model. The allocator's predicted
+  advantage over uniform width 4096 at 50% is 14.5% in summed single-block KL before
+  recovery (offline calculation); no comparison exists on the current recipe.
 
 ## Configuration appendix
 

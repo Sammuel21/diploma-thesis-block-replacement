@@ -2,7 +2,7 @@
 title: Operator Study Workflow
 status: active
 created: 2026-09-11
-modified: 2026-10-15
+modified: 2026-11-04
 sources:
   notebooks:
     - notebooks/block/operator/operator.ipynb
@@ -153,6 +153,40 @@ layers 1-22.
 Interpretation must separate architecture from footprint, local fit from model
 effect, singleton sensitivity from intrinsic layer importance, and
 pre-recovery ranking from repairability.
+
+### Reading the means (read-only check, 2026-11-04)
+
+The 22-layer means above are dominated by a few layers and should not be used to
+rank operators. Pre-recovery KL recalculated from the same artifact, without
+layers 1, 7, and 22:
+
+| Operator | Mean, 19 layers | Median, 19 layers |
+| --- | ---: | ---: |
+| zero | 0.1577 | 0.1192 |
+| mean | 0.1593 | 0.1168 |
+| linear | 0.1273 | 0.1260 |
+| affine | 0.1272 | 0.1259 |
+| rank-$0.5d$ factorized linear | 0.1257 | 0.1233 |
+| width-$0.5d$ compact MLP | 0.1059 | 0.0996 |
+| rank/width-$0.25d$ hybrid | 0.1069 | 0.1021 |
+| 0.25-width SwiGLU | 0.0959 | 0.0884 |
+| 0.50-width SwiGLU | 0.0927 | 0.0862 |
+
+- **The hybrid and compact MLP tie.** The hybrid is 1.5% higher on average, between
+  -6.3% and +10.1% per layer. Layers 1 and 7 supply all of the 22-layer gap
+  (0.4956 against 0.3466). Most of these fits were still improving at the 64-epoch
+  limit.
+- **Mean is not simply equal to zero.** It beats zero at 14 of 22 layers and is
+  worse at layers 1, 6, and 16-21.
+- **Linear is weak here, but probably data-starved.** It beats zero at 14 of 22
+  layers and mean at only 9. Its fit had 12,288 pairs for 2,048 input dimensions,
+  about 6 per dimension. The truncated version of the same fit has a slightly lower
+  median, which is consistent with overfitting; that was not tested.
+- **The hybrid here is not the Heterogeneous-1 hybrid.** It joins a rank-512 linear
+  path (4.17%) to a width-512 plain MLP (4.17%), all from random weights.
+
+These values use WikiText-2. The allocator's width curves use C4 allocation
+selection, so absolute KL values do not compare across the two.
 
 The checked local, ignored schema-1 artifact (created and checked 2026-08-20)
 contains 220 unique fitting rows and 220 matching sensitivity rows with

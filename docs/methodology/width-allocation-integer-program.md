@@ -2,7 +2,7 @@
 title: Width Allocation as an Integer Program
 status: draft
 created: 2026-10-17
-modified: 2026-10-17
+modified: 2026-11-04
 sources:
   code:
     - src/mlp_replacement/compression/allocation.py
@@ -407,9 +407,10 @@ registered, and no claim in this note rests on them beyond pointing to them.
 
 ## 9. Extension: operator family × width × bit-width per layer
 
-**Status: project proposal, not decided.** The heterogeneous chapter is
-agreed (decision log, 2026-10-16), but it is undesigned beyond the per-family
-recipe study (2026-10-11). Stacking-1 decided uniform bit-widths only.
+**Status: partly decided.** Family × size at BF16 under a parameter budget is
+now [Heterogeneous-1](../experiments/model/heterogenous/heterogeneous-1.md)
+(decision log, 2026-11-04). Per-layer bit-width stays a project proposal;
+Stacking-1 decided uniform bit-widths only.
 
 ### 9.1 Formulation
 
