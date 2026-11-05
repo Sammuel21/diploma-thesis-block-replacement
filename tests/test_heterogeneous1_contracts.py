@@ -399,8 +399,9 @@ class SelectionContracts(unittest.TestCase):
         self.assertFalse(h.overfitting_indicator(one_layer, "x")["overfitting_remains"])
 
     def test_later_stages_refuse_unreviewed_recipes(self):
+        unreviewed = {**self.settings, "recipes": {"select_sha256": None, "settings": {"linear": None}}}
         with self.assertRaises(ValueError):
-            h.load_selection(ROOT, self.settings)
+            h.load_selection(ROOT, unreviewed)
 
     def test_swiglu_keeps_the_decided_recipe_and_closed_forms_have_no_seed(self):
         settings = {**self.settings, "recipes": {"settings": {"linear": "ridge-8k"}}}
@@ -502,7 +503,6 @@ class RecoveryContracts(unittest.TestCase):
 class ConfigurationContracts(unittest.TestCase):
     def test_every_recovery_group_holds_equal_sizes_and_its_extra_swiglu_widths(self):
         settings, unused_path = h.load_settings(CONFIG)
-        self.assertIsNone(settings["recipes"]["select_sha256"])
         groups = settings["single_block_recovery"]["size_groups"]
         members = [tuple(member) for values in groups.values() for member in values]
         tested = {(operator, width) for operator, widths in settings["recipe_selection"]["sizes"].items()

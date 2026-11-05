@@ -8,9 +8,11 @@ modified: 2026-11-04
 # Heterogeneous-1 - Operator Recipes, Cost Tables, and Hybrid Allocation
 
 **Status:** design settled on 2026-11-04 in a grilling session and implemented
-the same day (see [Implementation](#implementation)); nothing has run yet.
-**Next step:** the first submission, recipe selection and the baseline table
-([runbook](../../../infrastructure/perun/perun-runbook.md#12-heterogeneous-1)).
+the same day (see [Implementation](#implementation)). Recipe selection and the
+baseline table have run ([Stage 1 results](#stage-1-results-2026-11-05)), and the
+recipes are pinned.
+**Next step:** sitting 2, the cost tables and single-block recovery
+([runbook](../../../infrastructure/perun/perun-runbook.md#125-sitting-2-cost-tables-and-recovery)).
 The binding decisions are in the
 [shared decision log](../../../agents/decisions.md) (2026-11-04 entries); this
 page explains them. If the two disagree, the log wins until the conflict is
@@ -158,6 +160,57 @@ plateau. A better recipe is reported as a limit, and hybrid SwiGLU layers keep
 tuned" as an explanation. A partly null result is likely: for SwiGLU nothing beat
 the reference by more than 4.4%. A null result still shows that SwiGLU's recipe
 transfers.
+
+### Stage 1 results (2026-11-05)
+
+Source: `heterogeneous-1/select-001/result.json` (sha256
+`92e11c47128996b6afa952c79ac8b47844e0a3ff2e2742cec0b97e57be429520`), from array 143434
+and job 143435 at commit `fbc9142`.
+
+**Checks.** All 24 tasks completed. Data identity and checks 2, 3, 5, and 6 passed; the
+relative differences in checks 2, 3, and 5 are exactly 0, and the self-KL is -2.8e-9 to
+-1.2e-9. The manual sanity gate passed: `kl128` 0.0618 at layer 3 and 0.0318 at layer 11.
+
+**Adopted recipes.** Reductions are against `c1e-3-128`; positive is better.
+
+| Operator | Adopted | Strongest other setting | Why it was not adopted |
+| --- | --- | --- | --- |
+| SwiGLU, width 1024 | `c1e-3-128` | `c1e-4-8k`: 8K +3.96%, 128 -6.91% | Below 5%; a combination more than 5% worse |
+| Linear | `c1e-3-128` | `c3e-4-8k`: 8K +6.13%, worst -14.49% | A combination more than 5% worse |
+| Plain MLP | `c1e-3-128-b256`: 8K +8.08%, 128 +10.01%, noise 1.39%, worst +4.15% | - | - |
+| Linear + SwiGLU | `c1e-3-128` | `c3e-4-8k`: 8K +7.74%, worst -9.99% | A combination more than 5% worse |
+| Linear + plain MLP | `c1e-3-128`, see below | `c1e-3-8k`: 8K +13.01%, worst -7.90% | A combination more than 5% worse; the table is not reliable |
+
+SwiGLU's recipe holds at width 1024, so no limit is reported. As in SwiGLU-8, 8K
+settings trade 128-token KL for 8K KL. Every plain MLP fit reached the 64-epoch cap; with
+the adopted recipe, validation MSE still fell 1.1-2.3% over the last 16 epochs, so plain
+MLP prices are for this budget, not a converged fit.
+
+**Linear + plain MLP mostly failed to train at layers 3 and 11.** The overfitting
+indicator fired there, but it is a false alarm: 88 of this operator's 252 gradient fits
+returned their starting weights (best epoch 0), against 0 of 723 for the other operators.
+With the reference recipe every seed at both sizes stopped after 3 epochs, so widths 512
+and 2048 score the same. The ridge start is already good and validation MSE rises
+slightly at first. Patience 3 ended those runs while it was recovering (layer 3:
+0.21990 at the start, then 0.22009, 0.22007, 0.22006). That is the immediate cause, not
+a full explanation: at layer 3 a 32-epoch cosine run at `1e-3`, which cannot stop early,
+also never beat its start. Layer 19 trained normally. The adoption table for this
+operator compares mostly stalled fits, and more calibration data would treat a problem
+that is not present.
+
+**No follow-up was run** (researcher decision, 2026-11-05). Where this hybrid trained, it
+still lost clearly at 25% of an MLP: 8K KL 0.0355 at layer 11 (`linear-first`) and 0.0784
+at layer 19, against SwiGLU's 0.0236 and 0.0555, linear + SwiGLU's 0.0284 and 0.0628, and
+plain MLP's 0.0303 and 0.0659. A fix is therefore unlikely to change which items are
+picked, although wide sizes were not tested. `c1e-3-128` is pinned as the rule's outcome.
+Its cost-table rows at stalled layers are not a fair price for the operator, so read
+`best_epoch` before quoting them; zero means the row is the start. The linear part's
+question is answered with linear + SwiGLU, which trained normally.
+
+**Measured use.** Workflow timing, not scheduler allocation; the scheduler records had
+expired. `select` took 45.9 GPU-hours against 30-50 planned, 0.81-2.53 h per task, and
+the baseline table 1.44 h. Fits ran at 3.1-5.1 s per epoch, and batch 256 was no slower.
+PERUN held the array at 15 running tasks (`%15`, not requested), so it ran in two waves.
 
 ## Stage 2 - single-block recovery
 

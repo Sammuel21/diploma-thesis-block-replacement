@@ -330,12 +330,12 @@
     ]
   },
   "recipes": {
-    "select_sha256": null,
+    "select_sha256": "92e11c47128996b6afa952c79ac8b47844e0a3ff2e2742cec0b97e57be429520",
     "settings": {
-      "linear": null,
-      "plain_mlp": null,
-      "linear_swiglu": null,
-      "linear_plain_mlp": null
+      "linear": "c1e-3-128",
+      "plain_mlp": "c1e-3-128-b256",
+      "linear_swiglu": "c1e-3-128",
+      "linear_plain_mlp": "c1e-3-128"
     }
   },
   "sources": {
