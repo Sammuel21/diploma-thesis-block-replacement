@@ -2,7 +2,7 @@
 title: Stacking Experiments
 status: active
 created: 2026-10-17
-modified: 2026-10-20
+modified: 2026-11-06
 ---
 
 # Stacking Experiments
@@ -19,7 +19,7 @@ baseline, not stacking: INT8 and INT4 are in
 
 | Experiment | Main question | Status |
 | --- | --- | --- |
-| [Stacking-1](stacking-1.md) | Does SwiGLU replacement plus INT8/INT4/INT3 quantization reach better quality-per-byte points than either method alone, and does the order of operations matter? | Ran 2026-10-20/21, 48 runs completed; analysis pending; the 3 order-B INT3 runs are invalid (2026-10-25) |
+| [Stacking-1](stacking-1.md) | Does SwiGLU replacement plus INT8/INT4/INT3 quantization reach better quality-per-byte points than either method alone, and does the order of operations matter? | Completed: 60 outputs, including order B at 1B (2026-11-02), analysed in the [Results-2 snapshot](../../../results/2026-11-01-results.md); the 3 order-B INT3 `-001` runs are invalid, replaced by `-002` reruns; order C deferred |
 
 Runners, configurations, and launchers use matching `stacking/` directories
 under `workflows/runs/model/` and `workflows/configs/model/`, and

@@ -2,7 +2,7 @@
 title: Stacking-1 - SwiGLU Replacement Plus Weight Quantization
 status: active
 created: 2026-10-17
-modified: 2026-11-03
+modified: 2026-11-06
 ---
 
 # Stacking-1 - SwiGLU Replacement Plus Weight Quantization
@@ -105,6 +105,41 @@ stage (structural, numerical, and algebraic redundancy as three stage kinds).
 | Order A: quantize after recovery | replace → fit → recover (BF16) → PTQ → evaluate |
 | Order B: train while quantized | replace → fit → recover with simulated quantization (QAT) → convert to real integers → evaluate |
 | Order C (deferred) | replace → fit → recover (BF16) → QAT → convert → evaluate |
+
+```mermaid
+flowchart LR
+  classDef rounding fill:#14202b,stroke:#14202b,color:#ffffff
+
+  start[Fitted SwiGLU model]
+
+  subgraph orderA[Order A: BF16 recovery]
+    direction LR
+    weightsA[BF16 weights] -->|used as they are| forwardA[Forward + loss]
+    forwardA -->|gradient updates| weightsA
+  end
+
+  subgraph orderB[Order B: QAT recovery]
+    direction LR
+    master[FP32 master] -->|reads| roundB[Round to levels]:::rounding
+    roundB -->|rounded| forwardB[Forward + loss]
+    forwardB -.->|gradient skips the rounding| master
+  end
+
+  roundA[Round once, PTQ]:::rounding
+  convert[Convert, same rounding]
+  modelA[INT8, INT4, or INT3 model]
+  modelB[INT4 or INT3 model]
+
+  start --> orderA --> roundA --> modelA
+  start --> orderB --> convert --> modelB
+```
+
+The orders differ in where the rounding happens (dark boxes). Order A rounds
+once, after training, so nothing corrects the rounding error. Order B rounds
+the weights in every forward pass, so the loss includes that error. The
+gradient passes through the rounding by a straight-through estimator and
+updates an FP32 master copy (`src-qat-jacob-2018`, Section 3;
+`src-ste-bengio-2013`, Section 4). Conversion then applies the same rounding.
 
 In the configuration, the stages that already ran in SwiGLU-7, -8, or -9
 (replace, fit, recover) are recorded as upstream provenance; the runner
