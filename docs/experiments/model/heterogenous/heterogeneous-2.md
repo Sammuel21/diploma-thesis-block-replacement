@@ -2,7 +2,7 @@
 title: Heterogeneous-2 - Hybrid Models After Recovery
 status: draft
 created: 2026-11-04
-modified: 2026-11-04
+modified: 2026-11-06
 ---
 
 # Heterogeneous-2 - Hybrid Models After Recovery
@@ -12,6 +12,11 @@ modified: 2026-11-04
 come from those results. The plan below is the 2026-11-04 entry in the
 [shared decision log](../../../agents/decisions.md), which wins if the two
 disagree. Nothing here is implemented.
+
+**Update (2026-11-06):** Heterogeneous-1 has reported. It picked no new operator at any
+target and no ranking swapped, so there are no hybrid targets and the forced runs are
+required. The rest of this plan assumed hybrids exist, and its scope is settled in the
+redesign. See the [results summary](heterogeneous-1.md#results-summary).
 
 ## Questions
 

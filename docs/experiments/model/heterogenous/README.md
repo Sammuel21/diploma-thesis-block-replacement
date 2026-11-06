@@ -2,7 +2,7 @@
 title: Heterogeneous Operator Experiments
 status: active
 created: 2026-10-01
-modified: 2026-11-04
+modified: 2026-11-06
 ---
 
 # Heterogeneous Operator Experiments
@@ -19,10 +19,10 @@ tuned (decision log, 2026-10-11).
 
 | Experiment | Main question | Status |
 | --- | --- | --- |
-| [Heterogeneous-1](heterogeneous-1.md) | How should each operator be fitted, which operators get picked, and can their pre-recovery prices be trusted? | Implemented 2026-11-04; not yet run |
-| [Heterogeneous-2](heterogeneous-2.md) | How do hybrids compare with SwiGLU after recovery, with which retraining scope, and does local fitting matter? | Outline; designed after Heterogeneous-1 reports |
+| [Heterogeneous-1](heterogeneous-1.md) | How should each operator be fitted, which operators get picked, and can their pre-recovery prices be trusted? | Done 2026-11-06: no new operator picked at any target |
+| [Heterogeneous-2](heterogeneous-2.md) | How do hybrids compare with SwiGLU after recovery, with which retraining scope, and does local fitting matter? | Outline; redesign pending |
 
-No execution result exists yet.
+Heterogeneous-1's results are on its page. No model-level result exists yet.
 
 | Area | Location |
 | --- | --- |

@@ -2,17 +2,16 @@
 title: Heterogeneous-1 - Operator Recipes, Cost Tables, and Hybrid Allocation
 status: draft
 created: 2026-11-04
-modified: 2026-11-04
+modified: 2026-11-06
 ---
 
 # Heterogeneous-1 - Operator Recipes, Cost Tables, and Hybrid Allocation
 
-**Status:** design settled on 2026-11-04 in a grilling session and implemented
-the same day (see [Implementation](#implementation)). Recipe selection and the
-baseline table have run ([Stage 1 results](#stage-1-results-2026-11-05)), and the
-recipes are pinned.
-**Next step:** sitting 2, the cost tables and single-block recovery
-([runbook](../../../infrastructure/perun/perun-runbook.md#125-sitting-2-cost-tables-and-recovery)).
+**Status:** all 59 tasks ran from 2026-11-04 to 2026-11-06 with no reruns, and every
+acceptance check passed. **No new operator was picked at any target**
+([results summary](#results-summary)).
+**Next step:** the load-only analysis notebook and the redesign of
+[Heterogeneous-2](heterogeneous-2.md).
 The binding decisions are in the
 [shared decision log](../../../agents/decisions.md) (2026-11-04 entries); this
 page explains them. If the two disagree, the log wins until the conflict is
@@ -29,6 +28,26 @@ raised with the researcher. Model-level recovery belongs to
 5. Does summed single-block damage still predict real damage when operators are
    mixed?
 6. How much does damage grow as more layers are forced to non-SwiGLU operators?
+
+## Results summary
+
+**SwiGLU won at block level.** At every target from 20% to 90%, each layer stays the
+dense MLP or a narrower SwiGLU, so the list of hybrid targets is empty. No ranking
+swapped after single-block recovery. Under the 2026-11-04 rule, picking no new operator
+makes Heterogeneous-2's forced runs required.
+
+| Question | Answer |
+| --- | --- |
+| 1. How should each operator be fitted? | `c1e-3-128` holds for every operator except plain MLP, which adopts batch 256. Linear + plain MLP often stalled, so its prices are not fair ([Stage 1](#stage-1-results-2026-11-05), [Stage 3](#stage-3-results-2026-11-06)) |
+| 2. Do pre-recovery prices rank operators correctly? | Over 10M tokens of single-block recovery the leader never changed, but plain MLP's and the hybrids' gaps did shrink ([Stage 2](#stage-2-results-2026-11-06)) |
+| 3. Which layers and targets use simpler operators? | None ([Stage 4](#stage-4-results-2026-11-06)) |
+| 4. At what width does the linear part stop paying? | It does not pay at any tested size. Linear + SwiGLU's median damage is 1.14-1.52 times SwiGLU's at equal price ([Stage 3](#stage-3-results-2026-11-06)) |
+| 5. Does summed damage still predict real damage? | It underestimates more as operators are mixed: real over predicted rises from 1.23-1.55 for SwiGLU to 1.27-1.64 with eight forced layers ([Stage 5](#stage-5-results-2026-11-06)) |
+| 6. How does damage grow with forced layers? | Eight forced layers add 20.5%, 8.9%, and 7.6% at 20%, 50%, and 80%, against a predicted 16.7%, 6.1%, and 1.8% ([Stage 5](#stage-5-results-2026-11-06)) |
+
+**Scope.** These results are at token 0 or after 10M tokens of recovery on one block at
+a time, at three layers and narrow sizes. They do not show what joint model recovery
+does, which is the question left for Heterogeneous-2.
 
 ## Why this experiment
 
@@ -245,6 +264,47 @@ in Heterogeneous-2 required.
 This is single-block recovery, so it does not show joint recovery, and early
 rankings can flip later ([SwiGLU-7](../swiglu/swiglu-7.md#scope-ranking-against-recovery-budget-read-only-check-2026-11-04)).
 
+### Stage 2 results (2026-11-06)
+
+Source: `heterogeneous-1/recovery-001-layer-{03,11,19}/result.json` and
+`summary-001/result.json` (sha256
+`863c8e2cd14cc10ce6b44da1bbee0f6cc4b3192abe59e8f4c2aed63515f519e6`), from array 144575 at
+commit `cff64fd`.
+
+**Checks.** All 30 recoveries completed. All 60 check 8 comparisons with the `select` rows
+differ by exactly 0.
+
+**No swap.** SwiGLU leads all nine layer and size groups before and after recovery, on
+both scores. The table gives damage as a multiple of SwiGLU's at the same size and
+checkpoint, averaged over layers and sizes (offline calculation, 2026-11-06). A value of
+1.00 would equal SwiGLU.
+
+| Operator | Pairs | Start | 1M | 5M | 10M | 128-token KL, start to 10M |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Plain MLP | 6 | 1.23 | 1.14 | 1.14 | 1.14 | 1.20 to 1.17 |
+| Linear + SwiGLU | 6 | 1.24 | 1.21 | 1.18 | 1.17 | 1.18 to 1.18 |
+| Linear | 3 | 1.28 | 1.33 | 1.30 | 1.29 | 1.28 to 1.32 |
+| Linear + plain MLP | 6 | 1.70 | 1.63 | 1.53 | 1.52 | 1.64 to 1.61 |
+
+- **Plain MLP** closes about 40% of its 8K gap in the first 1M tokens, then the gap stops
+  shrinking while both operators keep improving. The closest pair of the study is plain
+  MLP at layer 3 and 12.5%: 1.01 at 1M and 1.05 at 10M. The 128-token gap barely moves.
+- **Linear's gap is not a starting-point effect.** Recovery cut its own damage by 17%,
+  against 18% for SwiGLU. The gap narrowed at layer 11 (1.31 to 1.24) and widened at
+  layer 19 (1.23 to 1.35).
+- **The other three gaps still narrow slowly at 10M,** by about 0.01 from 5M to 10M,
+  while plain MLP's has stopped. Linear + SwiGLU's fell furthest after 1M (1.21 to 1.17)
+  among the two closest operators.
+- **Layer 19** shows almost no closure for any operator (at most 3% of the gap); the
+  shrinking comes from layers 3 and 11.
+- **Linear + plain MLP** trains here, because recovery has no early stop. It still ends
+  1.37-1.89 times SwiGLU at layers 3 and 11, where its local fits stalled. That agrees with
+  the decision not to follow up.
+
+**Reading (interpretation).** SwiGLU's better start explains part of plain MLP's
+pre-recovery gap, but not the rest, and not linear's. The test is short: one block trains
+alone, for 10M tokens, at a rate tuned on SwiGLU, and only narrow sizes are covered.
+
 ## Stage 3 - 22-layer cost tables
 
 Measures each item's price at every eligible layer with the winning recipes.
@@ -274,6 +334,53 @@ SwiGLU's menu ending at 512. Width 256 changes the control, so SwiGLU-only is
 re-solved with it first and any change at 20-80% is reported, keeping its gain
 separate from the new operators' gain.
 
+### Stage 3 results (2026-11-06)
+
+Source: `heterogeneous-1/cost-table-001-layer-NN/result.json` from array 144574, and
+`baseline-table-001/result.json` from job 143435. All 22 tasks completed; the tables hold
+572 rows.
+
+**SwiGLU has the lowest damage at almost every price.** The table gives each operator's
+median damage across the 22 layers, as a multiple of SwiGLU's smoothed curve at the item's
+exact price. This is a project-defined diagnostic (offline calculation, 2026-11-06).
+
+| Size | Plain MLP | Linear + SwiGLU | Linear + plain MLP |
+| ---: | ---: | ---: | ---: |
+| 6.25% | 1.05 | - | - |
+| 12.5% | 1.12 | 1.17 | 1.46 |
+| 25% | 1.22 | 1.14 | 1.99 |
+| 37.5% | 1.49 | 1.17 | 2.75 |
+| 50% | 1.89 | 1.20 | 3.59 |
+| 62.5% | 2.45 | 1.24 | 4.75 |
+| 75% | 3.73 | 1.30 | 7.24 |
+| 87.5% | 6.67 | 1.52 | 13.05 |
+
+Linear's median is 1.28, and its best row is 1.15 at layer 13. Zero and mean cost less than
+any SwiGLU item, so they have no equal-price partner; against SwiGLU 256, their median
+damage is 1.61 and 1.54 times higher.
+
+SwiGLU wins 505 of 506 comparisons. The exception is plain MLP 768 at layer 18, 1.1% below
+SwiGLU 512 (0.0814 against 0.0823). It does not matter, because the solver never takes that
+layer below width 2048. Plain MLP's advantage over the hybrid at the narrow end reverses
+from 25% upward. Layers 1, 7, and 22 are no exception: their best new item is linear +
+SwiGLU at 1.09-1.16.
+
+**The linear part does not pay at any size.** Linear + SwiGLU's best single row is 1.09, at
+layer 1, width 341, and its gap is smallest at 25%. So there is no width at which it stops
+paying, because it never starts.
+
+**Which rows to read with care:**
+
+- **Plain MLP:** 154 of 176 rows reached the 64-epoch cap, so these prices are for this
+  budget. Its near-ties at width 768 (median 1.05) could move with more epochs.
+- **Linear + plain MLP:** 93 of 154 rows have best epoch 0, so they are the starting
+  weights. This is wider than Stage 1 showed: layers 2-6 and 8-16 stall in most or all rows,
+  while layers 1, 7, and 17-22 train. Its best row is 1.16, at layer 17, a layer that
+  trained, and its gap grows with size there, so the no-follow-up decision stands.
+- **Linear:** 15 of 22 rows reached the epoch cap. Layers 1, 7, and 22 are under-trained
+  upper bounds, at KL 6.54, 16.99, and 0.338. Ridge's offline values at layers 1 and 7 (2.7
+  and 1.5) are still 23 and 37 times SwiGLU 256's damage, so no pick changes.
+
 ## Stage 4 - knapsack solves
 
 Each layer has a menu; every item has a price (parameters) and a damage
@@ -290,6 +397,46 @@ operator family, and leftover budget becomes extra neurons in a SwiGLU layer onl
 Solves run at 20, 30, 40, 50, 60, 70, 75, and 80%, and at 90% as an option. They
 give which operators, layers, and targets are picked, and the size at which the
 linear part stops paying.
+
+### Stage 4 results (2026-11-06)
+
+Source: `heterogeneous-1/solve-001/result.json` (sha256
+`a16f26cc38c9d2b7f31078f5dc538b62948ddff623c6ddcf1006748201be24be`), from job 144734 at
+commit `cff64fd`. Check 1 reproduced all eight recorded solves exactly, and check 4 passed
+for all 770 menu items.
+
+**No new operator is picked at any target.** The full-menu solve equals the SwiGLU-only
+solve with width 256 at all nine targets. "Extra damage" is the increase in predicted KL if
+at least one new item must be used.
+
+| Target | 20% | 30% | 40% | 50% | 60% | 70% | 75% | 80% | 90% |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Predicted KL | 0.0901 | 0.1481 | 0.2144 | 0.2946 | 0.3903 | 0.5128 | 0.5896 | 0.6770 | 0.9309 |
+| Extra damage | 1.83% | 1.21% | 0.85% | 0.57% | 0.42% | 0.31% | 0.10% | 0.08% | 0.01% |
+
+The margin narrows as removal rises, so at 75-90% the win is small before recovery. The 90%
+margin was not tested on a built model.
+
+**Checked as a possible bug.** A menu that lost the new items would give the same output,
+so this was checked before spending GPU time on assembly (offline calculation, 2026-11-06):
+
+- Rebuilding the menu from the tables gives 35 items at every layer, and the allocator
+  reproduces the recorded rows at all nine targets.
+- A separately written exact solve, required to use at least one new item, is worse at
+  every target; that is the extra damage above. It leaves out the boundary step.
+- The forced plans contain new operators, so the items were on the menu.
+
+**Width 256.** It changes the SwiGLU-only solve only at 70% and 90%. At 90%, six layers
+drop to 256 and predicted KL falls from 0.9373 to 0.9309. At 70%, the boundary step moves
+to layer 13 (width 1024 to 307, layer 18 from 3379 to 4096). Because that step sits outside
+the knapsack, predicted KL rises from 0.5125 to 0.5128, and real token-0 KL is 0.6% worse
+(0.7691 against 0.7646). At 50% the solver still differs from SwiGLU-8's model at layers 7
+and 11, as expected.
+
+**Entry bars.** The pre-run expectation held at layers 11-13: zero costs 0.044-0.049
+against a bar of 0.031-0.032, and linear 0.029-0.032 against 0.025-0.026. Linear improved a
+lot on the old screen's 0.050-0.055, which fits that fit having been data-starved. The bars
+were calculated before width 256 joined the menu.
 
 ## Stage 5 - assembled hybrids and the degradation curve
 
@@ -316,6 +463,45 @@ SwiGLU-8's model, which decides the size of Heterogeneous-2. A target counts onl
 if its solve has at least one non-SwiGLU layer. SwiGLU-only width changes are
 reported separately: at 50% the solver already differs from SwiGLU-8's model at
 layers 7 and 11, because that model kept SwiGLU-7's widths.
+
+### Stage 5 results (2026-11-06)
+
+Source: `heterogeneous-1/assemble-001-target-T/result.json` and `summary-001/result.json`,
+from array 145235 at commit `cff64fd`.
+
+**Checks.** All eight tasks completed. Check 7 rebuilt SwiGLU-8's model and matched its
+recorded token-0 KL exactly at all eight targets, and all 177 refits under check 8 differ by
+exactly 0.
+
+**No hybrid exists to assemble,** so the measured points are SwiGLU-8's own models, the
+forced models at 20%, 50%, and 80%, and the width-256 control at 70%. SwiGLU-8's real over
+predicted damage is 1.23, 1.24, 1.31, 1.35, 1.40, 1.49, 1.53, and 1.55 from 20% to 80%,
+which reproduces the recorded 1.23-1.55.
+
+**Degradation curve.** Each cell is the increase in KL over SwiGLU-8's model at the same
+target, real then predicted. Real is token-0 monitoring KL.
+
+| Forced layers | 20% | 50% | 80% |
+| ---: | ---: | ---: | ---: |
+| 1 | +3.2% / +1.8% | +0.9% / +0.5% | +1.5% / +0.1% |
+| 2 | +5.9% / +3.7% | +1.9% / +1.2% | +1.2% / +0.2% |
+| 4 | +10.0% / +8.2% | +4.3% / +2.7% | +3.7% / +0.6% |
+| 8 | +20.5% / +16.7% | +8.9% / +6.1% | +7.6% / +1.8% |
+| Operators at 8 layers | 8 linear + SwiGLU | 7 linear + SwiGLU, 1 plain MLP | 8 plain MLP |
+| Real over predicted at 8 layers | 1.27 | 1.38 | 1.64 |
+
+- **Real damage exceeds the prediction at every point.** With eight forced layers, the
+  extra damage is 1.5, 2.0, and 6.5 times the predicted extra, more than the 1.23-1.55 of
+  the whole model. So the near-ties at high removal are less close than the predicted
+  margins suggest.
+- **The curve is not perfectly smooth:** at 80%, two forced layers score slightly better
+  than one (1.0645 against 1.0669), so differences that small should not be over-read.
+- At 50%, the baseline is SwiGLU-8's model, which differs from the solver's at layers 7
+  and 11.
+
+**Output of the experiment:** no target has a hybrid, no ranking swapped, and
+`forced_runs_required` is true through the no-pick branch of the rule. The rest of
+Heterogeneous-2's plan assumed hybrids exist, so it needs a redesign.
 
 ## Order of work
 
@@ -383,7 +569,7 @@ C4, and both are before recovery.
 
 ## Limits and risks
 
-- **The result may be near-homogeneous.** That is a valid finding. The equal-size
+- **The result was homogeneous.** That is a valid finding. The equal-size
   comparison, the entry bars, the degradation curve, and the forced runs are what
   support it.
 - **Summed damage is an approximation.** It underestimates real damage by 23-55%
@@ -401,7 +587,8 @@ C4, and both are before recovery.
   layers 1, 7, and 22. Hybrids start from ridge and are not affected. Plain MLP at
   width 768 also reaches the cap at layer 7, at 1.8 times its bar, so read
   `epochs_completed` there. Offline calculation with a separate training loop on
-  about 8% of the pairs, 2026-11-04; layer 22's trained fits were not measured.
+  about 8% of the pairs, 2026-11-04; layer 22's trained fits were not measured. The
+  measured rows are in the [Stage 3 results](#stage-3-results-2026-11-06).
 - **The 64-epoch cap may bind.** In SwiGLU-8, 9 of 18 `c1e-4-128` fits used all 64
   epochs even from a teacher start, and random starts will do so more often. The
   merge reports the share per setting, so a low-rate setting that was cut off can
@@ -505,12 +692,11 @@ factor of 2 away stops the work for investigation. The factor allows for the sma
 sample behind those values. The commands are in the
 [runbook](../../../infrastructure/perun/perun-runbook.md#123-watch-sitting-1).
 
-**Not yet verified.** `tests/test_heterogeneous1_contracts.py` covers the allocator
+**Verification.** `tests/test_heterogeneous1_contracts.py` covers the allocator
 rules, check 1 on SwiGLU-8's recorded curves, prices, the residual start, linear
 first, the forcing and swap rules, the merge, the job mapping, and stage D's real
-recovery loop on a tiny random model on the CPU. GPU execution, real data, memory
-use, fit lengths, and checks 2, 3, and 5-8 have not run; the first real stages are
-also the first execution test.
+recovery loop on a tiny random model on the CPU. The real runs then executed checks
+1-8 on PERUN, and all passed. Peak memory was not recorded.
 
 ## Pre-run resource plan
 
@@ -555,6 +741,29 @@ tasks or two arrays.
 
 **Confidence:** medium for teacher-start fits. Low for random-start epoch counts,
 which are the main uncertainty; peak RAM is arithmetic, not measured.
+
+### Measured use
+
+Workflow timing from the result records, not scheduler allocation, except where stated.
+The scheduler records of every job except 145235 had expired when requested. The job log
+holds the details.
+
+| Stage | Tasks | Hours per task (plan) | GPU-hours (plan) |
+| --- | ---: | --- | --- |
+| R `select` | 24 | 0.81-2.53 (1.2-2.4) | 45.9 (30-50) |
+| Z, S `baseline-table` | 1 | 1.44 (1.2-1.7) | 1.4 (1.2-1.7) |
+| C `cost-table` | 22 | 0.77-1.63 (0.7-1.4) | 23.2 (15-30) |
+| D `recover` | 3 | 1.46-1.47 (1-1.8) | 4.4 (3-5.5) |
+| K `solve` | 1 | 0.31 (0.3-0.7) | 0, CPU only |
+| T `assemble` | 8 | 0.14-1.40 (0.2-1.5) | 4.9 (4-8) |
+| **Total** | **59** | | **79.8 (55-95)** |
+
+The total is within plan and 36% of the 222 ceiling. `assemble` was 4.89 GPU-hours by
+scheduler allocation. `select` and `cost-table` ran above their per-task estimates, by 0.13 h
+and 0.23 h, and well inside their limits. About 640 CPU core-hours (8 CPUs times workflow time, derived).
+PROJECT holds 231 MB of outputs and the local export is 54 MB. Peak RAM and VRAM are
+Unknown. PERUN held arrays at 15 running tasks, which affected only the 22- and 24-task
+arrays.
 
 ## Sources and attribution
 

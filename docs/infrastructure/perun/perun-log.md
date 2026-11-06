@@ -2,7 +2,7 @@
 title: TUKE Perun Experiment Log
 status: active
 created: 2026-09-25
-modified: 2026-11-02
+modified: 2026-11-06
 ---
 
 # TUKE Perun Experiment Log
@@ -472,3 +472,79 @@ Entries are appended below in submission order.
 - Notes:
   - The `scontrol` records had expired when requested on 2026-11-02, so the times come from the result records and job-log write times.
   - The submission time is from the researcher's session (about 21:00 local time).
+
+## [2026-11-04, started 16:36 UTC; submission time unrecorded] 143434, 143435 | Heterogeneous-1 sitting 1, recipe selection and baseline table
+
+- Plan: 24 tasks of 1.2-2.4 h (4-hour limit) and one of 1.2-1.7 h (3-hour limit), 31-52 GPU-hours expected, ceiling 99 ([resource plan](../../experiments/model/heterogenous/heterogeneous-1.md#pre-run-resource-plan)); medium confidence for teacher-start fits, low for random-start epoch counts.
+- Outcome: all 25 tasks completed with structured status `completed`; no retries. Data identity and checks 2, 3, 5, and 6 passed; the manual sanity gate passed.
+- Submission: `heterogeneous_1.sbatch select --array=0-23 --time=04:00:00 --mem=64G` and `heterogeneous_1.sbatch baseline-table --time=03:00:00 --mem=64G` (runbook 12.2).
+- Provenance: commit `fbc9142`; configuration sha256 `7d20b93e…`; torch 2.11.0+cu128, transformers 5.14.1.
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, and 64 GB requested memory per task; nodes gpu01, gpu13, gpu20, gpu23 (from the job logs).
+- Consumption (workflow timing):
+  - `select`: 0.81-2.53 h per task, 45.9 h in total.
+  - `baseline-table`: 1.44 h.
+  - Allocation GPU-hours Unknown; about 379 CPU core-hours (8 CPUs × workflow time, derived).
+- Efficiency: peak RAM, peak VRAM, CPU, and GPU utilization Unknown.
+- Outputs: PROJECT `perun-results/heterogeneous-1/select-001-task-NN/`, `baseline-table-001/`, and `select-001/` from the login-node merge. Analysis copy on the PC.
+- Continuation: completed; JSON outputs only, no resume.
+- Verification: "Verified persistent output" logged for all 25; no tracebacks or acceptance failures in the job logs.
+- Variance: within plan (47.3 against 31-52 GPU-hours). The longest task ran 0.13 h above its estimate.
+- Experiment document: [Heterogeneous-1](../../experiments/model/heterogenous/heterogeneous-1.md#stage-1-results-2026-11-05).
+- Notes:
+  - The `scontrol` records had expired when requested, so times come from the result records.
+  - PERUN held the array at 15 running tasks (`%15`, not requested), so it ran in two waves.
+
+## [2026-11-05, about 22:21 UTC] 144574, 144575 | Heterogeneous-1 sitting 2, cost tables and single-block recovery
+
+- Plan: 22 tasks of 0.7-1.4 h and 3 of 1-1.8 h (3-hour limit), 18-35.5 GPU-hours expected, ceiling 75 ([resource plan](../../experiments/model/heterogenous/heterogeneous-1.md#pre-run-resource-plan)).
+- Outcome: all 25 tasks completed with structured status `completed`; no retries. Data identity, check 6, and check 8 passed; all 60 check 8 comparisons differ by exactly 0.
+- Submission: `heterogeneous_1.sbatch cost-table --array=0-21` and `heterogeneous_1.sbatch recover --array=0-2`, both `--time=03:00:00 --mem=64G` (runbook 12.5).
+- Provenance: commit `cff64fd`, which pins the reviewed recipes; configuration sha256 `671e58a9…`.
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, and 64 GB requested memory per task; nodes gpu04, gpu09, gpu15, gpu19, gpu26 (from the job logs).
+- Consumption (workflow timing):
+  - `cost-table`: 0.77-1.63 h per task, 23.2 h in total.
+  - `recover`: 1.46-1.47 h per task, 4.4 h in total.
+  - Allocation GPU-hours Unknown; about 220 CPU core-hours (8 CPUs × workflow time, derived).
+- Efficiency: peak RAM, peak VRAM, CPU, and GPU utilization Unknown.
+- Outputs: PROJECT `perun-results/heterogeneous-1/cost-table-001-layer-NN/` and `recovery-001-layer-{03,11,19}/`. Analysis copy on the PC.
+- Continuation: completed; JSON outputs only, no resume.
+- Verification: "Verified persistent output" logged for all 25; no tracebacks or acceptance failures in the job logs.
+- Variance: within plan (27.6 against 18-35.5 GPU-hours). The longest `cost-table` task ran 0.23 h above its estimate, inside its limit.
+- Experiment document: [Heterogeneous-1](../../experiments/model/heterogenous/heterogeneous-1.md#stage-2-results-2026-11-06).
+- Notes:
+  - The `scontrol` records had expired when requested on 2026-11-06, so times come from the result records.
+  - The submission time is inferred from the first result record.
+
+## [2026-11-06, about 07:13 UTC] 144734 | Heterogeneous-1 sitting 3, knapsack solve
+
+- Plan: one task of 0.3-0.7 h (2-hour limit), no GPU ([resource plan](../../experiments/model/heterogenous/heterogeneous-1.md#pre-run-resource-plan)).
+- Outcome: completed with structured status `completed`; no retries. Checks 1 and 4 passed.
+- Submission: `heterogeneous_1.sbatch solve --partition=cpu_short --gres=none --cpus-per-task=4 --mem=16G --time=02:00:00` (runbook 12.6).
+- Provenance: commit `cff64fd`; configuration sha256 `671e58a9…`.
+- Allocation: `cpu_short`; 1 node (cn11); 4 CPUs; 16 GB requested memory; no GPU.
+- Consumption (workflow timing): 0.31 h; about 1.2 CPU core-hours (derived); allocation Unknown.
+- Efficiency: peak RAM and CPU utilization Unknown.
+- Outputs: PROJECT `perun-results/heterogeneous-1/solve-001/`. Analysis copy on the PC.
+- Continuation: completed.
+- Verification: "Verified persistent output" logged; the job's error log is empty of failures.
+- Variance: within plan.
+- Experiment document: [Heterogeneous-1](../../experiments/model/heterogenous/heterogeneous-1.md#stage-4-results-2026-11-06).
+- Notes: the `scontrol` record had expired when requested on the same day, so times come from the result record.
+
+## [2026-11-06 17:29 UTC] 145235 | Heterogeneous-1 sitting 4, token-0 assembly
+
+- Plan: 8 tasks of 0.2-1.5 h (6-hour limit), 4-8 GPU-hours expected, ceiling 48 ([resource plan](../../experiments/model/heterogenous/heterogeneous-1.md#pre-run-resource-plan)); least certain stage.
+- Outcome: all 8 tasks COMPLETED, ExitCode 0:0, structured status `completed`; no retries. Checks 7 and 8 passed; all 8 check 7 and 177 check 8 comparisons differ by exactly 0.
+- Submission: `heterogeneous_1.sbatch assemble --array=0-7 --time=06:00:00 --mem=128G` (runbook 12.7).
+- Provenance: commit `cff64fd`; configuration sha256 `671e58a9…`.
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, and 128 GB requested memory per task; nodes gpu05 (6 tasks) and gpu11 (2 tasks).
+- Consumption:
+  - Scheduler: 0.14-1.40 h per task, 4.89 GPU-hours and about 39 CPU core-hours allocated.
+  - Workflow timing: 4.86 h in total.
+- Efficiency: peak RAM, peak VRAM, CPU, and GPU utilization Unknown.
+- Outputs: PROJECT `perun-results/heterogeneous-1/assemble-001-target-T/`, then `summary-001/` from the login-node summary. The whole experiment holds 231 MB; PROJECT held 281 of 1,000 GB afterwards. Analysis copy on the PC.
+- Continuation: completed; JSON outputs only, no resume.
+- Verification: "Verified persistent output" logged for all 8; no tracebacks or acceptance failures in the job logs.
+- Variance: within plan (4.89 against 4-8 GPU-hours). The shortest task ran below the per-task estimate.
+- Experiment document: [Heterogeneous-1](../../experiments/model/heterogenous/heterogeneous-1.md#stage-5-results-2026-11-06).
+- Notes: all tasks started within a second of submission. Scheduler times are cluster local time, UTC+1.
