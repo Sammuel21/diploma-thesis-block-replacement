@@ -12,6 +12,10 @@ quantization entry points to their configurations and experiment guides.
 experiment class, currently the Heterogeneous-1 runner. Its configurations
 belong under `workflows/configs/model/heterogenous/`.
 
+[`recovery/`](recovery/README.md) holds the recovery-recipe class, currently the
+Recovery-1 schedule screen. Its configurations belong under
+`workflows/configs/model/recovery/`.
+
 ## Implementation ownership
 
 The `swiglu/swiglu5/` package separates experiment context and source validation

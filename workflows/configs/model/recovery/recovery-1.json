@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "workflow": "recovery-1",
+  "seed": 21,
+  "configs": {
+    "dense": "workflows/configs/model/baseline/quantization-2.json",
+    "stacking": "workflows/configs/model/stacking/stacking-1.json"
+  },
+  "budget_tokens": 100000000,
+  "schedule": {
+    "scheduler": "wsd_one_minus_sqrt",
+    "learning_rate": 3e-05,
+    "warmup_fraction": 0.0,
+    "final_lr_ratio": 0.0,
+    "decay_percent": [10, 20, 50]
+  },
+  "rows": {
+    "trunk_requests": [10000000, 25000000, 50000000, 75000000, 80000000, 90000000, 100000000]
+  },
+  "rule": {
+    "bar": 0.035,
+    "reference_requests": [75000000, 80000000, 90000000, 100000000]
+  },
+  "acceptance": {
+    "exact_relative": 0.0001,
+    "review_relative": 0.01,
+    "teacher_self_kl_absolute": 1e-06
+  },
+  "streams": {
+    "recovery_sha256": "570409c133a6e14975485b516a12b774d0f2916345455b652d2bf09f95d3f2d7",
+    "selection_sha256": "85165ff8d0eb9711c1dc75de9a1b9f11f44f6d635abed340e5f81af342047d97",
+    "final_kl_sha256": "ee134d3d230050bbf84794e9fdc5f968cb06d0048490751a4de4a6e8e1bccdb5",
+    "monitoring_sha256": "058fd14eaf4b63050d29b7a323743881d992dc8e37ac32af257a90c5c9fccfa4"
+  },
+  "sources": {
+    "swiglu8_prepare_sha256": "e91c9d313e02d08d62d2e73c35366f6ff78a2d882100f408b258f49f8fa9ce39",
+    "swiglu8_block_check_sha256": "a268f1b0537579580eac5fe908ac6fccb06cf6912688a57a4db972fa28c32724"
+  },
+  "families": [
+    {
+      "name": "dense-int3",
+      "kind": "dense-qat",
+      "bits": 3,
+      "start": null,
+      "recorded_100m": {"workflow": "quantization-2", "run": "qat-int3-100m-002",
+                        "result_sha256": "f3f1eda52623679e3bf7f0a7caf14b4771dcb4d901a5dc42e0cb78662cde2b69"},
+      "constant_1b": {"workflow": "quantization-2", "run": "qat-int3-1b-002",
+                      "result_sha256": "5cd653700393c74d0fa36412224ba8d315c3e409b919adc23fdfcf3bb1e079d8"},
+      "selection_token_zero": null
+    },
+    {
+      "name": "b-0.2-int4",
+      "kind": "order-b",
+      "bits": 4,
+      "start": "fitted-0.2",
+      "recorded_100m": {"workflow": "stacking-1", "run": "b-fitted-0.2-100m-int4-002",
+                        "result_sha256": "84af710075a6851d472904170138e3165be327e3ca5229822f16fc8a6586f918"},
+      "constant_1b": {"workflow": "stacking-1", "run": "b-fitted-0.2-1b-int4-001",
+                      "result_sha256": "ecaa1a56158220a25ba101011a9154d62a7d8003b474eaeec94cda24ad1d86c8"},
+      "selection_token_zero": null
+    },
+    {
+      "name": "swiglu-0.2",
+      "kind": "swiglu-bf16",
+      "bits": null,
+      "start": "fitted-0.2",
+      "recorded_100m": {"workflow": "swiglu-8", "run": "fitted-target-0.2-run-001",
+                        "result_sha256": "7ffa2a9c8282ce5460999d90a611d4243d1e514545ba7f8b9d5da41308e029a8"},
+      "constant_1b": {"workflow": "swiglu-7", "run": "S7-0-target-0.2-run-001",
+                      "result_sha256": "f9a33858445d78e2aae7fe9d4444e18e742787dff5c026fb7c4525b87baa3c93"},
+      "selection_token_zero": {"workflow": "heterogeneous-1", "run": "assemble-001-target-0.2", "point": "swiglu-8",
+                               "result_sha256": "c12fb9205517c1455f58d4d940a393fa84a373b433e64ca8feefd046a17b11ec"}
+    }
+  ]
+}

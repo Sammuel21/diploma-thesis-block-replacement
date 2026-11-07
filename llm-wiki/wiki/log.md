@@ -1041,3 +1041,23 @@ This file is append-only. Entries use the format:
   [`width-allocation-integer-program.md`](../../docs/methodology/width-allocation-integer-program.md),
   which owns the offline additivity calculations, and its link in
   `docs/README.md`.
+
+## [2026-11-07] register | Warmup-stable-decay and QAT oscillation sources for Recovery-1
+
+- `raw/sources.yml`: registered `src-minicpm-2024` (names WSD),
+  `src-hagele-2024` (cooldown length and the 1-sqrt shape), and
+  `src-wen-2024` (river-valley explanation of the decay) in
+  `recovery-references`, and `src-nagel-2022` (weight oscillation in QAT) in
+  `quantization-method-references`.
+- Purpose: attribution for Recovery-1, the recovery schedule screen. All four
+  train from scratch with large batches, so transfer to repairing a pretrained
+  model with small batches is a project hypothesis.
+- Evidence: the arXiv IDs given from an earlier session's memory were
+  verified against the abstract pages (title, authors, version, comments);
+  locators came from automated fetches of the arXiv HTML renderings, not yet
+  confirmed in the PDFs. Unchecked parts are named in each note. All four
+  stay `registered`; there is no ingestion, source-summary page, or method
+  page.
+- Outside the wiki: the sources section of
+  [`recovery-1.md`](../../docs/experiments/model/recovery/recovery-1.md)
+  cites them.

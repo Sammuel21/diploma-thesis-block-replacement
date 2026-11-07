@@ -7,8 +7,9 @@ owns the broader access, storage, environment, scratch, artifact, and
 validation assumptions. This README explains only the tracked job files.
 
 Experiment launchers are grouped by class, like `workflows/configs/model/` and
-`workflows/runs/model/`: `swiglu/`, `baseline/`, `stacking/`, and
-[`heterogenous/`](heterogenous/README.md). The two files at this level are not
+`workflows/runs/model/`: `swiglu/`, `baseline/`, `stacking/`,
+[`heterogenous/`](heterogenous/README.md), and [`recovery/`](recovery/README.md). The two
+files at this level are not
 tied to one experiment class.
 
 ## Files
@@ -25,6 +26,7 @@ tied to one experiment class.
 | `stacking/stacking_1.sbatch` | Runs one Stacking-1 variant, or one variant per array task of a group (`a100m`, `a1b`, `b`, `b1b`). |
 | `heterogenous/heterogeneous_1.sbatch` | Runs every Heterogeneous-1 stage: recipe selection, the cost tables, single-block recovery, the knapsack solve, and token-0 assembly. |
 | `heterogenous/heterogeneous_2.sbatch` | Runs Heterogeneous-2's Step 1: task `0` is the control, and tasks `1-5` wait for it. |
+| `recovery/recovery_1.sbatch` | Runs Recovery-1's schedule screen: tasks `0-2`, one family each (dense INT3, B 20% INT4, SwiGLU 20%). |
 
 `run_model.sbatch` defaults to the documented four-day `gpu_long` ceiling
 because the migrated studies contain long local-fitting loops. These are
@@ -318,6 +320,21 @@ The copy-paste commands are in the
 | `1-5` | `forced-0.2`, `forced-0.5`, `forced-0.8`, `forced-0.8-lr1e-4`, `swiglu-0.8-lr1e-4` | With `--dependency=afterok` on task 0 |
 
 `summarize` runs on the login node once all six runs are on PROJECT.
+
+## Recovery-1 workflow
+
+`recovery/recovery_1.sbatch` uses the Heterogeneous-2 lock, scratch, explicit code staging, and
+verified stage-out contract, without a resume path. Its one mode, `train`, maps array tasks
+`0-2` onto the configuration's families (`dense-int3`, `b-0.2-int4`, `swiglu-0.2`); the three
+tasks are independent. Outputs go to `PROJECT/perun-results/recovery-1/<family>-run-001`. The
+pinned SwiGLU-8, Quantization-2, Stacking-1, SwiGLU-7, and Heterogeneous-1 inputs are read in
+place from PROJECT. The 8K selection stream is read from the path in
+`RECOVERY1_SELECTION_STREAM`, which must lie inside PROJECT; the runner checks its sha256. Each
+submission needs the researcher's go. Pass the planned `--time` and `--mem` from the
+[resource plan](../../../docs/experiments/model/recovery/recovery-1.md#pre-run-resource-plan).
+The copy-paste commands are in the
+[PERUN runbook](../../../docs/infrastructure/perun/perun-runbook.md#14-recovery-1).
+`summarize` runs on the login node once all three families are on PROJECT.
 
 ## Results and logs
 

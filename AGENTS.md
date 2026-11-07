@@ -74,7 +74,8 @@
   homogeneous SwiGLU progression, `model/baseline/` owns
   model baselines, `model/stacking/` owns chained-method studies such as
   replacement plus quantization, `model/interaction/` owns block-interaction
-  studies, and
+  studies, `model/recovery/` owns recovery-recipe studies such as the
+  schedule screen, and
   `block/{baseline,operator,analysis}/` own the corresponding block studies.
 
 ## Instruction routing

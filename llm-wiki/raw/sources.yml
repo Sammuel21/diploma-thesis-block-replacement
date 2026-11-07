@@ -537,3 +537,124 @@ sources:
       runtime table, and the structured SPDY search with a relative
       layer-wise error prior; Section 3.3 for distillation. No full paper
       ingestion was performed.
+
+  - id: src-minicpm-2024
+    title: "MiniCPM: Unveiling the Potential of Small Language Models with Scalable Training Strategies"
+    collection_id: recovery-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Shengding Hu, Yuge Tu, Xu Han, Chaoqun He, Ganqu Cui, Xiang Long, Zhi Zheng, Yewei Fang, Yuxiang Huang, Weilin Zhao, Xinrong Zhang, Zheng Leng Thai, Kaihuo Zhang, Chongyi Wang, Yuan Yao, Chenyang Zhao, Jie Zhou, Jie Cai, Zhongwu Zhai, Ning Ding, Chao Jia, Guoyang Zeng, Dahai Li, Zhiyuan Liu, Maosong Sun]
+    year: 2024
+    canonical_url: https://arxiv.org/abs/2404.06395v3
+    sha256: null
+    added: 2026-11-07
+    ingestion_status: registered
+    notes: >-
+      Names the Warmup-Stable-Decay (WSD) learning-rate schedule (arXiv v3,
+      comments "revise according to peer review"; no venue stated).
+      Registered for Recovery-1, which screens stable-decay schedules for
+      recovery and QAT; the paper trains from scratch with large batches, so
+      transfer to repairing a pretrained model is a project hypothesis.
+      Bibliographic identity checked on arXiv on 2026-11-07. Locators found
+      on 2026-11-07 through an automated fetch of the arXiv HTML rendering of
+      v3, not yet confirmed in the PDF: Section 4.2, "WSD LRS", Eq. (1) for
+      the piecewise warmup, stable, and decay schedule; Section 4.3, "10%
+      Steps are Enough", for a decay of about 10% of steps and the loss
+      decreasing dramatically in the decay stage; Section 6.2, "Decay Stage",
+      for exponential annealing f(s - T) = 0.5^((s - S)/T). The fetch flagged
+      that, as printed, the Section 6.2 exponent conflicts with the bound
+      0 < f <= 1 of Eq. (1); not resolved. No full paper ingestion was
+      performed.
+
+  - id: src-hagele-2024
+    title: Scaling Laws and Compute-Optimal Training Beyond Fixed Training Durations
+    collection_id: recovery-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Alexander Hägele, Elie Bakouch, Atli Kosson, Loubna Ben Allal, Leandro Von Werra, Martin Jaggi]
+    year: 2024
+    canonical_url: https://arxiv.org/abs/2405.18392v3
+    sha256: null
+    added: 2026-11-07
+    ingestion_status: registered
+    notes: >-
+      Constant learning rate with a cooldown and the 1-sqrt cooldown shape
+      (NeurIPS 2024 spotlight, per the arXiv v3 comments). Registered for
+      Recovery-1, whose decays use the 1-sqrt shape to zero; the decay
+      fractions, the rounding of the decay start to an update boundary, and
+      the use for recovery and QAT from a pretrained model are project
+      choices. Bibliographic identity checked on arXiv on 2026-11-07.
+      Locators found on 2026-11-07 through an automated fetch of the arXiv
+      HTML rendering of v3, not yet confirmed in the PDF: Section 3, "A
+      Different Route: Constant Learning Rate with Cooldown", Eq. (1), which
+      relates it to WSD (Hu et al. 2024); Section 3.2, "Different cooldown
+      schedules", for the 1-sqrt function
+      f(n, N, N_decay) = 1 - sqrt((n - (N - N_decay)) / N_decay), which
+      "outperforms the linear cooldown" (also Fig. 4); Section 3.2, "How long
+      do you need to cooldown?", for benefits that "plateau at around 20%"
+      and a cooldown under 20% matching cosine (Takeaway 3, Fig. 6); Section
+      4.1 for stochastic weight averaging as an alternative that does not
+      match the cooldown (Takeaway 5). The runs use warmup. Appendix B and
+      Section 5 onward were not checked. No full paper ingestion was
+      performed.
+
+  - id: src-wen-2024
+    title: "Understanding Warmup-Stable-Decay Learning Rates: A River Valley Loss Landscape Perspective"
+    collection_id: recovery-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Kaiyue Wen, Zhiyuan Li, Jason Wang, David Hall, Percy Liang, Tengyu Ma]
+    year: 2024
+    canonical_url: https://arxiv.org/abs/2410.05192v3
+    sha256: null
+    added: 2026-11-07
+    ingestion_status: registered
+    notes: >-
+      Explains why the WSD decay helps with a "river valley" loss landscape
+      (arXiv v3, comments "45 pages,13 figures"; no venue stated). Registered
+      for Recovery-1's learning-rate-noise hypothesis: if the INT3 QAT wobble
+      is a learning-rate noise floor, a decay should lower it. Bibliographic
+      identity checked on arXiv on 2026-11-07. Locators found on 2026-11-07
+      through an automated fetch of the arXiv HTML rendering of v3, not yet
+      confirmed in the PDF: abstract and Section 1 for the stable phase
+      making progress along the river while oscillating in the mountain
+      direction at a high learning rate, and the decay minimizing those
+      oscillations; Section 3, Definition 3.1 (Section 3.1) for the river
+      valley; Theorems 3.2-3.5 (Sections 3.2-3.4.2) by their anchors only,
+      whose statements were not checked. No full paper ingestion was
+      performed.
+
+  - id: src-nagel-2022
+    title: Overcoming Oscillations in Quantization-Aware Training
+    collection_id: quantization-method-references
+    origin: external-other
+    evidence_kind: scholarly-primary
+    priority: supporting
+    authors: [Markus Nagel, Marios Fournarakis, Yelysei Bondarenko, Tijmen Blankevoort]
+    year: 2022
+    canonical_url: https://arxiv.org/abs/2203.11086v2
+    sha256: null
+    added: 2026-11-07
+    ingestion_status: registered
+    notes: >-
+      Weight oscillation in quantization-aware training (ICML 2022 oral, per
+      the arXiv v2 comments). Registered for Recovery-1's competing
+      hypothesis: if the INT3 QAT wobble comes from latent weights oscillating
+      around rounding boundaries, a learning-rate decay may not remove it.
+      Not implemented. Bibliographic identity checked on arXiv on 2026-11-07.
+      Locators found on 2026-11-07 through an automated fetch of the arXiv
+      HTML rendering of v2, not yet confirmed in the PDF: Section 2.1 for the
+      straight-through estimator; Section 2.2, "Oscillations", for latent
+      weights "oscillating around the decision boundary between adjacent
+      quantized states", which "happen irrespective of the learning rate",
+      while decreasing the learning rate reduces their amplitude (citing
+      Appendix A.3, not checked); Section 4.2, oscillation dampening, and
+      Section 4.3, iterative freezing of oscillating weights (Algorithm 1),
+      as remedies; the abstract for 3- and 4-bit experiments on efficient
+      ImageNet networks such as MobileNetV2. The setting is weight and
+      activation quantization of convolutional networks, not weight-only
+      quantization of a language model. Section 5 and the appendices were
+      not checked. No full paper ingestion was performed.

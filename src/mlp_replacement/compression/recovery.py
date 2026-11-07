@@ -366,15 +366,37 @@ def token_learning_rate_multiplier(
     scheduler,
     warmup_fraction=0.0,
     final_lr_ratio=1.0,
+    decay_start_tokens=None,
 ):
-    """Return a deterministic token-position learning-rate multiplier."""
+    """Return a deterministic token-position learning-rate multiplier.
+
+    ``wsd_one_minus_sqrt`` is a stable-decay schedule without warmup: the
+    multiplier is 1 through ``decay_start_tokens`` and then follows the 1-sqrt
+    cooldown of Hägele et al. (``src-hagele-2024``, Section 3.2) to
+    ``final_lr_ratio`` at the end of the schedule.
+    """
 
     tokens_after_step = int(tokens_after_step)
     schedule_tokens = int(schedule_tokens)
     if schedule_tokens < 1 or not 0 < tokens_after_step <= schedule_tokens:
         raise ValueError("Learning-rate position lies outside the schedule")
+    if decay_start_tokens is not None and scheduler != "wsd_one_minus_sqrt":
+        raise ValueError("Only the stable-decay schedule takes a decay start")
     if scheduler == "constant":
         return 1.0
+    if scheduler == "wsd_one_minus_sqrt":
+        if float(warmup_fraction):
+            raise ValueError("The 1-sqrt stable-decay schedule has no warmup")
+        if decay_start_tokens is None or not 0 <= int(decay_start_tokens) < schedule_tokens:
+            raise ValueError("Decay start must lie within [0, schedule)")
+        final_lr_ratio = float(final_lr_ratio)
+        if not 0.0 <= final_lr_ratio <= 1.0:
+            raise ValueError("Final LR ratio must lie within [0, 1]")
+        start = int(decay_start_tokens)
+        if tokens_after_step <= start:
+            return 1.0
+        progress = (tokens_after_step - start) / (schedule_tokens - start)
+        return final_lr_ratio + (1.0 - final_lr_ratio) * (1.0 - math.sqrt(progress))
     if scheduler != "warmup_cosine":
         raise ValueError(f"Unsupported recovery scheduler: {scheduler}")
     warmup_fraction = float(warmup_fraction)
@@ -417,8 +439,13 @@ def recover_trainable_by_tokens(
     teacher_hidden_at=None,
     teacher_head=None,
     optimizer_backend="single_tensor",
+    decay_start_tokens=None,
 ):
-    """Recover an explicit set of parameter groups under a token budget."""
+    """Recover an explicit set of parameter groups under a token budget.
+
+    The learning rate is set from the token count after each update, counted
+    from this call's origin, so a stable-decay schedule needs the origin at 0.
+    """
 
     target_tokens = int(target_tokens)
     schedule_tokens = int(schedule_tokens)
@@ -516,6 +543,7 @@ def recover_trainable_by_tokens(
                 scheduler,
                 warmup_fraction,
                 final_lr_ratio,
+                decay_start_tokens,
             )
             for group in optimizer.param_groups:
                 group["lr"] = float(group["initial_lr"]) * multiplier
