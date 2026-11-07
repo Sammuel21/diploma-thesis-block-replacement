@@ -117,8 +117,8 @@ read it.
 
 ## MVP boundary
 
-The completed MVP remains executable at `notebooks/mvp/`, `scripts/intro/`,
-and `configs/intro_config.py`. Its evidence is preserved under
+The completed MVP remains executable at `notebooks/mvp/`, which also holds its
+helper modules (`scripts/`) and configuration (`configs/intro_config.py`). Its evidence is preserved under
 `data/mvp/results/logs/`, with a manifest in `docs/prototype/mvp/`.
 
 Maintained reusable implementation belongs under `src/`, while top-level

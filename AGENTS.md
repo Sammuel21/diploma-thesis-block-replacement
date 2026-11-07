@@ -66,8 +66,8 @@
 - `llm-wiki/` is the incremental, source-linked research knowledge base.
 - `docs/` contains distilled human documentation.
 - `docs/prototype/mvp/` documents the frozen prototype and its limitations.
-- `notebooks/mvp/`, `scripts/intro/`, and the associated configs are historical
-  MVP implementation paths, not the target production architecture.
+- `notebooks/mvp/`, with its bundled `scripts/` and `configs/` packages, holds
+  the historical MVP implementation, not the target production architecture.
 - `src/` contains maintained reusable implementation; `workflows/` contains
   maintained process entry points and executor-specific job definitions.
 - Maintained experiments are grouped by class: `model/swiglu/` owns the

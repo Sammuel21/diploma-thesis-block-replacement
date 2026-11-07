@@ -28,22 +28,26 @@ scope:
   recovery: teacher-logit knowledge distillation
 
 implementation:
+  relocated:
+    date: 2026-11-07
+    note: scripts/ and configs/ moved from the repository root into notebooks/mvp/; the checkpoint commit keeps the root layout.
   configs:
-    - configs/intro_config.py
+    - notebooks/mvp/configs/intro_config.py
   notebooks:
     - notebooks/mvp/introduction.ipynb
     - notebooks/mvp/methods.ipynb
     - notebooks/mvp/multi-block-replacement.ipynb
     - notebooks/mvp/analysis.ipynb
   modules:
-    - scripts/intro/activation.py
-    - scripts/intro/block.py
-    - scripts/intro/eval.py
-    - scripts/intro/loader.py
-    - scripts/intro/metrics.py
-    - scripts/intro/model.py
-    - scripts/intro/replacement.py
-    - scripts/utils.py
+    - notebooks/mvp/scripts/data/datautils.py
+    - notebooks/mvp/scripts/intro/activation.py
+    - notebooks/mvp/scripts/intro/block.py
+    - notebooks/mvp/scripts/intro/eval.py
+    - notebooks/mvp/scripts/intro/loader.py
+    - notebooks/mvp/scripts/intro/metrics.py
+    - notebooks/mvp/scripts/intro/model.py
+    - notebooks/mvp/scripts/intro/replacement.py
+    - notebooks/mvp/scripts/utils.py
 
 evidence:
   logs:

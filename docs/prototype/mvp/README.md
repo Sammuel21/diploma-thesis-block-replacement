@@ -2,7 +2,7 @@
 title: Block Replacement MVP Archive
 status: archived
 created: 2026-07-17
-modified: 2026-09-11
+modified: 2026-11-07
 ---
 
 # Block Replacement MVP Archive
@@ -13,9 +13,14 @@ This directory documents the completed MVP prototype. It is a historical
 record, not the canonical specification for future methodology or production
 code.
 
-The executable files remain at their original repository paths because the
-notebooks import `scripts.intro` and `configs.intro_config` directly. Moving
-those files would damage the very state this archive is intended to preserve.
+On 2026-11-07 the helper and configuration packages moved from the repository
+root to `notebooks/mvp/scripts/` and `notebooks/mvp/configs/`, beside the
+notebooks that import them. No notebook was edited: `scripts.intro` and
+`configs.intro_config` now resolve from the notebook folder, the kernel's
+default working directory. Before the move they resolved only when a kernel
+started at the repository root. The notebooks' path cell appends a
+`pathlib.Path` object to `sys.path`, and Python's import system ignores it. The
+frozen checkpoint below keeps the original root layout.
 
 ## Frozen checkpoint
 
@@ -36,8 +41,8 @@ excluded by `.gitignore`.
 | Main workflow notebook | `notebooks/mvp/multi-block-replacement.ipynb` |
 | Analysis notebook | `notebooks/mvp/analysis.ipynb` |
 | Introductory notebooks | `notebooks/mvp/introduction.ipynb`, `notebooks/mvp/methods.ipynb` |
-| Prototype helpers | `scripts/intro/` and `scripts/utils.py` |
-| Experiment configuration | `configs/intro_config.py` |
+| Prototype helpers | `notebooks/mvp/scripts/intro/`, `notebooks/mvp/scripts/utils.py`, and `notebooks/mvp/scripts/data/datautils.py` |
+| Experiment configuration | `notebooks/mvp/configs/intro_config.py` |
 | Experiment logs | `data/mvp/results/logs/` |
 | Long historical result summary | [result-overview.md](result-overview.md) |
 | Experiment index | [experiments.md](experiments.md) |

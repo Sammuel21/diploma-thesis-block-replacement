@@ -1,8 +1,8 @@
 # Maintained Source Package
 
 `mlp_replacement/` is the maintained implementation of the thesis workflow.
-The historical MVP remains under `scripts/intro/` and `notebooks/mvp/` and is
-not imported by this package.
+The historical MVP, including its helper modules, remains under
+`notebooks/mvp/` and is not imported by this package.
 
 The package follows a functional-core design. Configuration and result objects
 are immutable dataclasses, model mutation is isolated in `compression/surgery.py`,

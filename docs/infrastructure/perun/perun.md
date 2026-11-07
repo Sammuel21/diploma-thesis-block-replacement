@@ -230,8 +230,8 @@ Perun-targeted migrations follow these project boundaries:
 - `workflows/runs/model/` is intended for executable model-wide workflows;
 - `workflows/jobs/perun/` owns Slurm resource requests and process launch only;
 - `workflows/configs/` owns explicit migrated-workflow choices and budgets;
-- the root `configs/` directory remains the configuration source for the
-  existing generic experiment runner; and
+- the historical MVP configuration lives with its notebooks in
+  `notebooks/mvp/configs/` and is not used by these workflows; and
 - notebooks remain the explanatory and artifact-analysis frontend.
 
 A Python workflow should be runnable without notebook state, use one explicit

@@ -14,15 +14,13 @@ defined in [docs/annotation.md](docs/annotation.md).
 | `llm-wiki/` | LLM-maintained, source-linked research knowledge base |
 | `docs/` | Distilled, human-oriented documentation and historical records |
 | `docs/prototype/mvp/` | Frozen documentation and manifest for the completed MVP |
-| `notebooks/mvp/` | Historical MVP execution and analysis notebooks |
-| `scripts/intro/` | Historical MVP helper implementation |
-| `configs/` | Historical MVP configuration |
+| `notebooks/mvp/` | Historical MVP notebooks with their helper (`scripts/`) and configuration (`configs/`) packages |
 | `data/mvp/results/logs/` | Versioned MVP experiment evidence |
 | `src/mlp_replacement/` | Maintained replacement, recovery, and evaluation implementation |
 | `workflows/` | Maintained experiment runners and executor-specific job definitions |
 
-The executable MVP paths remain unchanged to avoid breaking notebook imports.
-New work belongs to the maintained package and workflow layer; historical
+The MVP helper and configuration packages sit beside the notebooks that import
+them, so those imports resolve from the notebook folder. New work belongs to the maintained package and workflow layer; historical
 modules are evidence of the prototype rather than dependencies of the
 production architecture.
 

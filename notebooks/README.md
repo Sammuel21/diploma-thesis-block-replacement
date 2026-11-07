@@ -117,7 +117,9 @@ experiments and BI-related observations under the earlier compute budget.
 
 Documents the early data-loading and conversion path from the provided sampling
 utilities into calibration and validation batches expected by the model
-pipeline. Confirm that its data assumptions still match the active experiment
+pipeline. Its `scripts` and `configs` imports refer to the MVP helpers, which
+moved to `notebooks/mvp/` on 2026-11-07, so it no longer imports them without
+adding that folder to `sys.path`. Confirm that its data assumptions still match the active experiment
 before reuse.
 
 ### [`block-replacement.ipynb`](old/block-replacement.ipynb)
