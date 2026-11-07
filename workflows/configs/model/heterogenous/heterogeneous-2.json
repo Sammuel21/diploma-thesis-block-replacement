@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "workflow": "heterogeneous-2",
+  "heterogeneous1_config": "workflows/configs/model/heterogenous/heterogeneous-1.json",
+  "runs": [
+    {"name": "swiglu-0.8-control", "target": 0.8, "model": "swiglu-8", "learning_rate": 3e-05},
+    {"name": "forced-0.2", "target": 0.2, "model": "forced-8", "learning_rate": 3e-05},
+    {"name": "forced-0.5", "target": 0.5, "model": "forced-8", "learning_rate": 3e-05},
+    {"name": "forced-0.8", "target": 0.8, "model": "forced-8", "learning_rate": 3e-05},
+    {"name": "forced-0.8-lr1e-4", "target": 0.8, "model": "forced-8", "learning_rate": 0.0001},
+    {"name": "swiglu-0.8-lr1e-4", "target": 0.8, "model": "swiglu-8", "learning_rate": 0.0001}
+  ],
+  "reading": {
+    "bar": 0.035,
+    "decision_tokens": 100000000,
+    "shrink_from_tokens": 50000000,
+    "high_learning_rate": 0.0001
+  },
+  "sources": {
+    "heterogeneous1_assemble_sha256": {
+      "0.2": "c12fb9205517c1455f58d4d940a393fa84a373b433e64ca8feefd046a17b11ec",
+      "0.5": "0fe760d83d7206f29e71a5e9b26ac1f391802807889db7bc4c4a6e88c57c3e96",
+      "0.8": "0ae1246c9615db4b0b1ea3de094502bd05d4bd208fa92c24db4cd9c8113bb230"
+    }
+  }
+}

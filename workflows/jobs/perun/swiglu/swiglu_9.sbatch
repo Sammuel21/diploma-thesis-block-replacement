@@ -43,7 +43,7 @@ PYTHON_BIN="$(realpath "$PYTHON_BIN")"
 PYTHON_ENV_PREFIX="$(dirname "$(dirname "$PYTHON_BIN")")"
 export LD_LIBRARY_PATH="$PYTHON_ENV_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 SUBMIT_DIR="$(realpath "${SLURM_SUBMIT_DIR:?Submit from the repository root}")"
-test -f "$SUBMIT_DIR/workflows/jobs/perun/swiglu_9.sbatch"
+test -f "$SUBMIT_DIR/workflows/jobs/perun/swiglu/swiglu_9.sbatch"
 PROJECT_ROOT="$(dirname "$SUBMIT_DIR")"
 [[ "$(dirname "$PROJECT_ROOT")" == "/mnt/project" ]] || { echo "Repository must be a direct child of a PERUN PROJECT directory." >&2; exit 2; }
 test -w "$PROJECT_ROOT"

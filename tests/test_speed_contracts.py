@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from mlp_replacement.artifacts import file_digest
 from workflows.runs.model.baseline import speed as runner
 
-JOB = ROOT / "workflows/jobs/perun/speed_1.sbatch"
+JOB = ROOT / "workflows/jobs/perun/baseline/speed_1.sbatch"
 
 
 def write_config(directory, settings):

@@ -2,7 +2,7 @@
 title: Quantization-2 Dense INT3 Baseline
 status: active
 created: 2026-10-20
-modified: 2026-11-03
+modified: 2026-11-07
 ---
 
 # Quantization-2
@@ -36,8 +36,13 @@ binding decisions are the 2026-10-20, 2026-10-25, and 2026-10-26 rows in the
 (decision log, 2026-11-03), with the quantizer of `qat-int3-100m-002` and no
 code change. Its plan is in
 [INT3 QAT 1B rerun](#int3-qat-1b-rerun-recorded-2026-11-03). Submitted on
-2026-11-03 as job 142928 from commit `20f0889`. **Next step:** the start check
-(runbook 11.6), then the results.
+2026-11-03 as job 142928 from commit `20f0889`.
+
+**Update (2026-11-07):** `qat-int3-1b-002` completed on 2026-11-04 with both
+weight checks passing. At 8K KL 0.0709 it is on all three frontiers near 51%
+saving, and B 20% INT4 1B drops off the KL frontier, though the margin depends
+on the final row
+([Results of the fixed reruns](#results-of-the-fixed-reruns-2026-11-07)).
 
 ## Runs
 
@@ -47,7 +52,7 @@ code change. Its plan is in
 | INT3 QAT 100M | Train the 66 projections for 100M tokens with INT3 simulated, convert to real INT3, evaluate | 100M | `qat-int3-100m-001` |
 | INT3 QAT 1B | The same for 1B tokens | 1,000M | `qat-int3-1b-001` |
 | INT3 QAT 100M, rerun | As above, with the fixed INT3 quantizer | 100M | `qat-int3-100m-002` (completed 2026-10-26) |
-| INT3 QAT 1B, rerun | As above, with the fixed INT3 quantizer | 1,000M | `qat-int3-1b-002` (reopened 2026-11-03) |
+| INT3 QAT 1B, rerun | As above, with the fixed INT3 quantizer | 1,000M | `qat-int3-1b-002` (completed 2026-11-04) |
 
 The two `-001` QAT runs are invalid and kept as evidence
 ([INT3 QAT incident](#int3-qat-incident-2026-10-25)). The INT4 counterparts are Quantization-1's `int4`, `qat-int4-100m`, and
@@ -79,8 +84,9 @@ Quantization-2's `seed`, `model`, `backend`, `scope`, `data`, `qat`, and
   use the project's `DeployedInt3FakeQuantizer`: its scale and zero point are
   the deployed recipe's (the deployed equations in [Cause](#cause),
   source-derived from `src-torchao-0-17-0`), computed on the BF16-cast weight,
-  so the simulated weights equal the deployed weights bit for bit
-  ([INT3 QAT fix](#int3-qat-fix-2026-10-25)). Gradients pass through rounding
+  so the simulated weights equal the deployed weights bit for bit outside
+  CUDA autocast ([INT3 QAT fix](#int3-qat-fix-2026-10-25); inside it, see
+  [Limits](#limits)). Gradients pass through rounding
   by a straight-through estimator (`src-qat-jacob-2018`, Section 3;
   `src-ste-bengio-2013`, Section 4), implemented by TorchAO's `_Round`. INT4
   QAT uses TorchAO's dedicated INT4 fake quantizer, so the two QAT points do
@@ -138,6 +144,9 @@ Each check stops the run.
 | INT3 start (`-002` on) | After QAT preparation, before the first update: every projection's simulated INT3 weight is bitwise equal to the deployed recipe applied to the same weight (`results.int3_fake_quantization_check`) |
 | INT3 conversion (`-002` on) | At conversion: every projection's deployed INT3 weight is bitwise equal to the simulated weight of the trained master just before conversion (`results.conversion.int3_fake_equals_deployed`) |
 
+Both INT3 checks run outside CUDA autocast, while training runs inside it, so
+they do not see the small autocast difference described in [Limits](#limits).
+
 Recorded, not enforced: the token-0 8K KL of the simulated model (expected
 near INT3 PTQ's 0.2226; the `-001` runs started at 6.229) and the first-step
 gradient norm (`-001`: 308; INT4 QAT: 0.571). The 24-batch monitoring
@@ -154,7 +163,7 @@ before.
 | --- | --- |
 | [quantization-2.json](../../../../workflows/configs/model/baseline/quantization-2.json) | Quantization-1's blocks, the INT3 variants, the two stream pins, and no speed workloads |
 | [quantization.py](../../../../workflows/runs/model/baseline/quantization.py) | Workflow taken from the configuration; `ptq-int3` and `qat-int3`; QAT for any supported bit width; calculated INT3 bytes; the stream check; resident memory without speed when the configuration has no workloads; the report accepts both workflows |
-| [quantization_1.sbatch](../../../../workflows/jobs/perun/quantization_1.sbatch) | The results folder follows the configuration's workflow; `run-array` stays Quantization-1 only |
+| [quantization_1.sbatch](../../../../workflows/jobs/perun/baseline/quantization_1.sbatch) | The results folder follows the configuration's workflow; `run-array` stays Quantization-1 only |
 | [test_quantization2_contracts.py](../../../../tests/test_quantization2_contracts.py) | Shared blocks, variant scope, stream pins, refused commands, and the report's frontier bytes |
 
 **What was tested.** CPU only, on 2026-10-20, in the project's Python: the 7
@@ -168,7 +177,7 @@ intended runs.
 **Commands** (local form; PERUN commands are in the runbook):
 
 ```bash
-bash workflows/jobs/local/quantization_1.sh run --config workflows/configs/model/baseline/quantization-2.json \
+bash workflows/jobs/local/baseline/quantization_1.sh run --config workflows/configs/model/baseline/quantization-2.json \
   --prepared data/results/workflows/model/quantization-1/prepare-001/result.json \
   --variant qat-int3 --qat-tokens 100000000 \
   --output-dir data/results/workflows/model/quantization-2/qat-int3-100m-001
@@ -326,6 +335,48 @@ above dense. This is one run per variant, without bootstrap intervals yet.
 The GPTQ condition (decision log, 2026-10-17: add GPTQ only if INT3 PTQ is
 much worse than INT3 QAT) cannot be evaluated until a valid INT3 QAT result
 exists.
+
+## Results of the fixed reruns (2026-11-07)
+
+`qat-int3-100m-002` (job 132434, commit `61b2b0d`) and `qat-int3-1b-002` (job
+142928, commit `20f0889`, the same INT3 code) both completed. Values are read
+from the local copies of their `result.json` and task files.
+
+| Model | 8K KL to dense | WikiText-2 test PPL, 128 / 2K / 8K | Task macro | Byte saving | Training tokens |
+| --- | ---: | --- | ---: | ---: | ---: |
+| INT3 PTQ (`int3-001`) | 0.2226 | 15.61 / 9.02 / 8.56 | 0.640 | 51.6% calc. | 0 |
+| INT3 QAT 100M (`qat-int3-100m-002`) | 0.0804 | 13.74 / 8.16 / 7.77 | 0.643 | 51.6% calc. | 100M |
+| INT3 QAT 1B (`qat-int3-1b-002`) | 0.0709 | 13.53 / 8.09 / 7.69 | 0.648 | 51.6% calc. | 1,000M |
+
+Per task, 100M / 1B: PIQA 0.761 / 0.764, ARC-Easy 0.710 / 0.715,
+ARC-Challenge 0.425 / 0.441, WinoGrande 0.639 / 0.632, HellaSwag 0.680 /
+0.686.
+
+- **Checks.** Both runs passed the start and conversion checks (66 of 66
+  projections) and trained on their pinned streams (`570409c1…`,
+  `f78bf805…`). Token-0 KL was 0.22268 in both, and the first-step gradient
+  norm was 0.556.
+- **Frontier.** At 0.0709 the 1B KL is below the unresolved band
+  (0.0747-0.0793), so under the 2026-11-03 decision row it beats B 20% INT4 1B
+  (50.9%, KL 0.0770, PPL 7.78, macro 63.30%) on all three metrics. INT3 QAT
+  100M also drops off, and nothing above 52% saving changes
+  ([Results-2](../../../results/2026-11-01-results.md)).
+- **The margin depends on the final row.** The 1B row is the run's lowest
+  (0.0692). The median of the rows from 125M is 0.0761, inside the band, and
+  scaling the deployed KL by it gives about 0.078. That is an estimate, and B
+  20% INT4 1B's own endpoint is not rescaled. The reported value is the
+  configured endpoint, with no row selection (decision log, 2026-11-03).
+- **Two spikes.** The 100M row is 0.1484, against 0.0795 for its 100M twin
+  (+87%). Validation PPL rises with it (8.316 against 7.988), and the rows are
+  back at 0.0754 by 125M. A second spike is at 825M (0.1005). The 10-75M rows
+  are within 0.6% of the twin. The cause is unknown, and no checkpoint is
+  kept.
+- **Training against deployed.** The deployed KL is 2.5% above the final
+  training row (100M: 1.0%), in line with the autocast difference in
+  [Limits](#limits).
+- **100M against 1B.** The extra 900M tokens lower the KL by 12% and raise the
+  macro by 0.5 points. INT4 QAT gained nothing on KL over the same tokens
+  (0.0291 against 0.0297).
 
 ## INT3 QAT incident (2026-10-25)
 
@@ -535,6 +586,19 @@ ones already have their equal-token competitor.
 - QAT peak VRAM was about 50 GiB; Quantization-1 did not record it.
 - Storage: 2.3 GB per run on PROJECT; the 1B checkpoint was not kept.
 
+### Fixed reruns (recorded 2026-11-07)
+
+| Run | Workflow time | Plan | Training | Peak GPU memory (allocated) | Peak process RSS |
+| --- | ---: | --- | ---: | ---: | ---: |
+| INT3 QAT 100M `-002` (132434) | 1.80 h | 1.7-2.2 h | 1.35 h | 49.6 GiB | 14.9 GiB |
+| INT3 QAT 1B `-002` (142928) | 14.71 h | 14-17 h, central 14.5 h | 13.49 h | 49.6 GiB | 15.0 GiB |
+
+- Workflow timing is a stand-in; both scheduler records had expired, so
+  allocation is Unknown.
+- 1B ran from 22:21 UTC on 2026-11-03 to 13:04 UTC on 2026-11-04, about 20.6k
+  training tokens/s. Its workflow time was 1.4% above the central estimate.
+- Storage: 2.3 GB per run on PROJECT; checkpoints removed at completion.
+
 ## Limits
 
 - One run per variant.
@@ -547,10 +611,25 @@ ones already have their equal-token competitor.
   weights, the INT3 fake quantizer distorts the outliers, and the INT3 QAT
   results are invalid ([INT3 QAT incident](#int3-qat-incident-2026-10-25)).
   From `-002` on, INT3 uses the project's quantizer, which is bitwise equal to
-  the deployed INT3 and checked in every run
-  ([INT3 QAT fix](#int3-qat-fix-2026-10-25)). INT4 still uses TorchAO's INT4
-  quantizer; its conversion adds KL that is not yet explained
-  (0.0286 → 0.0360 at 100M), an open question outside this fix.
+  the deployed INT3 outside CUDA autocast and checked in every run
+  ([INT3 QAT fix](#int3-qat-fix-2026-10-25)). Since 2026-11-01, INT4 also
+  uses a project quantizer (Quantization-1).
+- **INT3 training under autocast differs slightly from deployed INT3**
+  (found 2026-11-03). TorchAO's fake quantization computes
+  `input * (1.0 / scale)`. Under CUDA autocast, `1.0 / scale` runs in FP32;
+  the deployed path, without autocast, computes it in BF16. A probe on the 66
+  real projections (local RTX 3060, TorchAO 0.17.0) found 1,991,647 of
+  1,107,296,256 weights (0.18%) differing under autocast. That is 14% of the
+  INT3 rounding error, and 0 weights differ without autocast. The INT4
+  quantizer is unaffected (0 differ). Both checks run outside autocast, so they pass. In the
+  artifacts, every order-B INT4 run has a conversion PPL change of exactly 0,
+  and every order-B INT3 run a nonzero one (-0.6% to +0.7%). The dense INT3
+  deployed KL is 1.0% (100M) and 2.5% (1B) above the final training row,
+  against at most 0.1% for INT4. That the mismatch causes these gaps is
+  inferred, not tested. Deployed results remain valid measurements. All seven
+  fixed INT3 QAT runs share this arithmetic and were not changed; it is a
+  known limit (decision log, 2026-11-03 and 2026-11-07). A scratch fix (autocast disabled inside the
+  quantizer) removes the difference but is not implemented.
 - No speed is measured.
 
 ## Sources

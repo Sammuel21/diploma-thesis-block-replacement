@@ -2,7 +2,7 @@
 title: TUKE Perun Project Status
 status: active
 created: 2026-09-25
-modified: 2026-11-06
+modified: 2026-11-07
 ---
 
 # TUKE Perun Project Status
@@ -92,6 +92,7 @@ scheduler records.
 | Stacking-1 order-B INT3 reruns (`-002`), workflow timing | about 4.0 H200-hours | Job 132436 (3 tasks, no retries): 1.21-1.43 h per task, from the job log and the Stacking-1 artifacts; workflow-timing proxy, not scheduler allocation |
 | INT4 QAT fix reruns: Quantization-1 INT4 QAT 100M and 1B, Stacking-1 order-B INT4 100M (`-002`), workflow timing | about 21.0 H200-hours | Jobs 140530, 140575 (3 tasks), and 140605, all completed: QAT training 1.55 and 15.40, order B 4.04 in total, from the [Quantization-1 page](../../experiments/model/baseline/quantization-1.md#int4-qat-conversion-gap-2026-11-01) and the artifacts; workflow-timing proxy, not scheduler allocation; Quantization-1 evaluation time not included |
 | Stacking-1 order B at 1B, workflow timing | about 66.9 H200-hours | Job 140758 (6 tasks, no retries): 9.78-12.11 h per task (training 9.52-11.88, evaluation 0.21-0.33), from the job log and the [Stacking-1](../../experiments/model/stacking/stacking-1.md#order-b-at-1b-results-2026-11-02) artifacts; workflow-timing proxy, not scheduler allocation |
+| Quantization-2 INT3 QAT reruns (`-002`), workflow timing | about 16.5 H200-hours | Jobs 132434 (100M, 1.80 h) and 142928 (1B, 14.71 h), both completed, from the [Quantization-2 page](../../experiments/model/baseline/quantization-2.md#fixed-reruns-recorded-2026-11-07) and its artifacts; workflow-timing proxy, not scheduler allocation |
 | Heterogeneous-1, all stages, workflow timing | about 79.8 H200-hours, plus 0.31 h CPU solve | Jobs 143434, 143435, 144574, 144575, 145235 (58 GPU tasks, no retries): select 45.9, baseline table 1.4, cost tables 23.2, recovery 4.4, assembly 4.9, from the job log and the [Heterogeneous-1 page](../../experiments/model/heterogenous/heterogeneous-1.md#measured-use); workflow-timing proxy, not scheduler allocation; assembly alone was 4.89 GPU-hours by scheduler allocation |
 
 ## Open questions

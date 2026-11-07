@@ -2,7 +2,7 @@
 title: Stacking-1 - SwiGLU Replacement Plus Weight Quantization
 status: active
 created: 2026-10-17
-modified: 2026-11-06
+modified: 2026-11-07
 ---
 
 # Stacking-1 - SwiGLU Replacement Plus Weight Quantization
@@ -230,7 +230,8 @@ total tokens (100M + 100M against 200M). Whether any stacking variant goes to
   is_symmetric=False)`, which does not reproduce the deployed INT3; they are
   invalid ([INT3 order-B runs invalid](#int3-order-b-runs-invalid-2026-10-25)).
   From `-002` on, INT3 QAT uses `DeployedInt3FakeQuantizer`, whose simulated
-  weights are bitwise equal to the deployed INT3 weights, and converts with the
+  weights are bitwise equal to the deployed INT3 weights outside CUDA autocast
+  (0.18% differ under it; Quantization-2, Limits), and converts with the
   asymmetric PTQ recipe ([INT3 QAT fix](#int3-qat-fix-2026-10-25)). The method
   is simulated quantization during training (`src-qat-jacob-2018`, Section 3),
   with gradients passed through rounding by a straight-through estimator
@@ -341,7 +342,7 @@ Implemented on 2026-10-17; nothing was run on PERUN.
 | [quantization.py](../../../../src/mlp_replacement/compression/quantization.py) | INT3 recipe and scope check, replacement projection names, QAT for INT4 and INT3 with a trainable subset, padding, gradient mask, calculated bytes |
 | [quantized_bundles.py](../../../../src/mlp_replacement/evaluation/quantized_bundles.py) | Packed bundles may record SwiGLU topology (padded and real widths) and calculated bytes; INT3 accepted |
 | [bundles.py](../../../../src/mlp_replacement/evaluation/bundles.py) | Resident-memory measurement takes a loader, so packed bundles can be measured |
-| [stacking_1.sbatch](../../../../workflows/jobs/perun/stacking_1.sbatch), [stacking_1.sh](../../../../workflows/jobs/local/stacking_1.sh) | PERUN and local launchers |
+| [stacking_1.sbatch](../../../../workflows/jobs/perun/stacking/stacking_1.sbatch), [stacking_1.sh](../../../../workflows/jobs/local/stacking/stacking_1.sh) | PERUN and local launchers |
 | [test_stacking1_contracts.py](../../../../tests/test_stacking1_contracts.py) | Configuration, grid, pins, padding, gradient mask, bytes, recipes, INT3 PTQ and QAT, packed-bundle round trip |
 
 Quantization-1's INT8 and INT4 recipes, recipe records, and QAT behaviour are
@@ -352,7 +353,7 @@ and -9 code is not modified; Stacking-1 imports their helpers.
 
 ```bash
 python -m workflows.runs.model.stacking.stacking_1 list-variants --group a100m   # a100m, a1b, b, b1b
-bash workflows/jobs/local/stacking_1.sh run --variant a-fitted-0.2-100m-int3 \
+bash workflows/jobs/local/stacking/stacking_1.sh run --variant a-fitted-0.2-100m-int3 \
   --prepared data/results/workflows/model/swiglu-8/prepare-001/result.json \
   --source-root data/results/workflows/model \
   --output-dir data/results/workflows/model/stacking-1/a-fitted-0.2-100m-int3-001
@@ -402,7 +403,7 @@ Order A, order-B INT4, and every PTQ path are unchanged.
 | --- | --- |
 | [quantization.py](../../../../src/mlp_replacement/compression/quantization.py) | `DeployedInt3FakeQuantizer`: scale and zero point from the deployed INT3 recipe, so simulated weights equal deployed weights bit for bit; `int3_fake_quantization_check`; `convert_qat` stops if a converted INT3 weight differs from the trained simulated weight |
 | [stacking_1.py](../../../../workflows/runs/model/stacking/stacking_1.py) | Check `K6-start` right after QAT preparation in order B (INT3; INT4 from 2026-11-01), before the first update; the conversion half runs inside `convert_qat` |
-| [stacking_1.sbatch](../../../../workflows/jobs/perun/stacking_1.sbatch) | Optional `--attempt NNN` (default `001`), placed before `--resume`; the output is `VARIANT-NNN`, so a rerun never overwrites the invalid `-001` evidence |
+| [stacking_1.sbatch](../../../../workflows/jobs/perun/stacking/stacking_1.sbatch) | Optional `--attempt NNN` (default `001`), placed before `--resume`; the output is `VARIANT-NNN`, so a rerun never overwrites the invalid `-001` evidence |
 | [test_stacking1_contracts.py](../../../../tests/test_stacking1_contracts.py) | Planted outlier, trained masters off the BF16 grid, the old TorchAO quantizer caught by both checks, and the pinned SmolLM2 weights |
 
 **Effect on runs.** The run fingerprint covers all maintained code, so no
@@ -616,7 +617,7 @@ twin noise for BF16 recovery at 1B.
 | --- | --- |
 | [stacking-1.json](../../../../workflows/configs/model/stacking/stacking-1.json) | `recovery_1b`; group `b1b`; `sources.swiglu7_prepare_sha256`; `sources.b1b_twins`, the three INT3 `-002` results by sha256 |
 | [stacking_1.py](../../../../workflows/runs/model/stacking/stacking_1.py) | Group `b1b`; the recipe per group; SwiGLU-7's stream with `K7-stream`; twin validation (completed, same recipe and stream, K6 passed) and K7; `inputs` stages the 1B stream and the twin instead of the 100M stream |
-| [stacking_1.sbatch](../../../../workflows/jobs/perun/stacking_1.sbatch) | Accepts `group b1b` |
+| [stacking_1.sbatch](../../../../workflows/jobs/perun/stacking/stacking_1.sbatch) | Accepts `group b1b` |
 | [test_stacking1_contracts.py](../../../../tests/test_stacking1_contracts.py) | The recipe equals SwiGLU-7's; the first-100M schedule is identical; the staging list; `K7-stream`; twin validation (a twin without K6, like an invalid `-001` run, is rejected); K7 stops only at token 0; the pins match the downloaded artifacts |
 
 Group `b` keeps its variant ids, identities, and behaviour. Its run

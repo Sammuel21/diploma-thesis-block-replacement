@@ -35,7 +35,7 @@ case "$WORKFLOW_NAME" in
         WORKFLOW_MODULE="workflows.runs.model.swiglu.swiglu_2_allocation"
         ;;
     swiglu-7)
-        echo "Use workflows/jobs/perun/swiglu_7.sbatch for SwiGLU-7." >&2
+        echo "Use workflows/jobs/perun/swiglu/swiglu_7.sbatch for SwiGLU-7." >&2
         exit 2
         ;;
     *)

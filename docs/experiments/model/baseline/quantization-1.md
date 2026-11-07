@@ -2,7 +2,7 @@
 title: Quantization-1 MLP Compression Baseline
 status: active
 created: 2026-10-02
-modified: 2026-11-01
+modified: 2026-11-07
 ---
 
 # Quantization-1
@@ -238,18 +238,18 @@ The local launcher resolves paths from the checkout regardless of the caller's
 working directory. Each example below owns a different output directory.
 
 ```bash
-bash workflows/jobs/local/quantization_1.sh prepare \
+bash workflows/jobs/local/baseline/quantization_1.sh prepare \
   --output-dir data/results/workflows/model/quantization-1/prepare-001
 
-bash workflows/jobs/local/quantization_1.sh run --variant dense-bf16 \
+bash workflows/jobs/local/baseline/quantization_1.sh run --variant dense-bf16 \
   --prepared data/results/workflows/model/quantization-1/prepare-001/result.json \
   --output-dir data/results/workflows/model/quantization-1/dense-001
 
-bash workflows/jobs/local/quantization_1.sh run --variant ptq-int8 \
+bash workflows/jobs/local/baseline/quantization_1.sh run --variant ptq-int8 \
   --prepared data/results/workflows/model/quantization-1/prepare-001/result.json \
   --output-dir data/results/workflows/model/quantization-1/int8-001
 
-bash workflows/jobs/local/quantization_1.sh run --variant ptq-int4 \
+bash workflows/jobs/local/baseline/quantization_1.sh run --variant ptq-int4 \
   --prepared data/results/workflows/model/quantization-1/prepare-001/result.json \
   --output-dir data/results/workflows/model/quantization-1/int4-001
 ```
@@ -281,7 +281,7 @@ add an available 50%, 70%, or 80% model, supply its complete BF16 bundle and
 the original result for revision/scope/budget provenance:
 
 ```bash
-bash workflows/jobs/local/quantization_1.sh evaluate \
+bash workflows/jobs/local/baseline/quantization_1.sh evaluate \
   --bundle "$STRUCTURAL_BUNDLE" --reference-result "$STRUCTURAL_RESULT" \
   --label 'SwiGLU 50%' \
   --prepared data/results/workflows/model/quantization-1/prepare-001/result.json \
@@ -294,7 +294,7 @@ were omitted: obtain the complete bundle from its retained production output.
 Missing reference points remain explicitly pending.
 
 ```bash
-bash workflows/jobs/local/quantization_1.sh report \
+bash workflows/jobs/local/baseline/quantization_1.sh report \
   --results data/results/workflows/model/quantization-1/dense-001/result.json \
             data/results/workflows/model/quantization-1/int8-001/result.json \
             data/results/workflows/model/quantization-1/int4-001/result.json \
@@ -352,7 +352,7 @@ logs, and evaluation files do not contribute to model-bundle size.
 is null. Select it explicitly and supply the intended budget:
 
 ```bash
-bash workflows/jobs/local/quantization_1.sh run --variant qat-int4 \
+bash workflows/jobs/local/baseline/quantization_1.sh run --variant qat-int4 \
   --qat-tokens "$QAT_TOKEN_BUDGET" \
   --prepared data/results/workflows/model/quantization-1/prepare-001/result.json \
   --output-dir data/results/workflows/model/quantization-1/qat-int4-001
@@ -390,7 +390,9 @@ evaluation. No best-test-checkpoint selection or extra LoRA scope is included.
 
 **Observation.** At the end of QAT the simulated INT4 model has 8K KL 0.0286
 (100M); the converted INT4 model has 0.0360. The fixed INT3 QAT, whose training
-and deployed weights are bitwise equal, changes only from 0.0795 to 0.0804.
+and deployed weights are bitwise equal outside CUDA autocast, changes only from
+0.0795 to 0.0804. Most of that small change probably comes from a 0.18% INT3
+mismatch under autocast, found on 2026-11-03 (Quantization-2, Limits).
 
 **Cause** (source reading of TorchAO 0.17.0 and MSLK 1.1.0, then a CPU audit).
 - **Training:** TorchAO's `Int4WeightFakeQuantizer` (`qat/fake_quantizer.py`,
@@ -515,7 +517,7 @@ grows by about 7-9 GB, because the `-001` outputs are kept.
 
 ## Perun resource and deployment contract
 
-Use [quantization_1.sbatch](../../../../workflows/jobs/perun/quantization_1.sbatch),
+Use [quantization_1.sbatch](../../../../workflows/jobs/perun/baseline/quantization_1.sbatch),
 not the historical generic launcher. It stages only code/configs and explicitly
 supplied inputs; it does not depend on `.rsyncignore`. It locks each PROJECT
 output, uses unique manual job scratch, copies durable results on success,
@@ -525,7 +527,7 @@ failure, TERM, or INT, and checksum-verifies the copy before scratch removal.
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
   --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
   --time="$QUANTIZATION_WALLTIME" \
-  workflows/jobs/perun/quantization_1.sbatch run int8-001 \
+  workflows/jobs/perun/baseline/quantization_1.sbatch run int8-001 \
   --variant ptq-int8 --prepared "$QUANTIZATION_PREPARED_RESULT"
 ```
 

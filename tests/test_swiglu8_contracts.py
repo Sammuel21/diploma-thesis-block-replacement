@@ -21,7 +21,7 @@ from mlp_replacement.data_streams import build_finite_stream
 from workflows.runs.model.swiglu import swiglu_7, swiglu_8
 
 CONFIG = ROOT / "workflows/configs/model/swiglu/swiglu-8.json"
-SBATCH = ROOT / "workflows/jobs/perun/swiglu_8.sbatch"
+SBATCH = ROOT / "workflows/jobs/perun/swiglu/swiglu_8.sbatch"
 NOTEBOOK = ROOT / "notebooks/model/swiglu/swiglu-8.ipynb"
 COMBINATIONS = [(layer, width) for layer in (3, 11, 19) for width in (2048, 4096)]
 

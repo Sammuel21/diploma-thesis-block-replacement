@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / "workflows" / "jobs" / "local" / "run_model.sh"
 PERUN = ROOT / "workflows" / "jobs" / "perun" / "run_model.sbatch"
-PERUN_SWIGLU_7 = ROOT / "workflows" / "jobs" / "perun" / "swiglu_7.sbatch"
+PERUN_SWIGLU_7 = ROOT / "workflows" / "jobs" / "perun" / "swiglu" / "swiglu_7.sbatch"
 
 
 def workflow_modules(source):
@@ -59,7 +59,7 @@ class ExecutorContracts(unittest.TestCase):
         self.assertIn('STORAGE_CONTRACT="artifact"', perun_source)
         self.assertNotIn('STORAGE_CONTRACT="directories"', perun_source)
         self.assertIn('"--output"', perun_source)
-        self.assertIn("Use workflows/jobs/perun/swiglu_7.sbatch", perun_source)
+        self.assertIn("Use workflows/jobs/perun/swiglu/swiglu_7.sbatch", perun_source)
 
     def test_perun_swiglu7_uses_manual_bounded_scratch_and_project_stageout(self):
         source = PERUN_SWIGLU_7.read_text(encoding="utf-8")

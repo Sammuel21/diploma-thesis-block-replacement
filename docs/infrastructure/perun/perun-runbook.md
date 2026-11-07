@@ -2,7 +2,7 @@
 title: PERUN Runbook
 status: active
 created: 2026-10-11
-modified: 2026-11-04
+modified: 2026-11-06
 ---
 
 # PERUN Runbook
@@ -41,7 +41,8 @@ training runs, the three-task block check, and the reference KL. Stacking-1
 order A at 100M, and order A at 1B, 48 tasks in total. Quantization-2
 (section 11) adds three single runs on Quantization-1's launcher, after
 Stacking-1 has finished. Heterogeneous-1 (section 12) adds five sittings, each
-after a review of the one before.
+after a review of the one before. Heterogeneous-2 (section 13) adds one sitting of
+six runs: a control, and five that wait for it.
 
 **Official PERUN rules these commands follow**, checked against the
 [PERUN wiki](https://wiki.hpc.tuke.sk/perun/perun/) on 2026-10-11:
@@ -336,9 +337,9 @@ EOF
 
 # Storage, launcher syntax, and whether Slurm would accept the job (nothing is submitted).
 perunfsusage                    # SCRATCH needs about 2 GB per block-check task
-bash -n workflows/jobs/perun/swiglu_8.sbatch && echo "launcher syntax OK"
+bash -n workflows/jobs/perun/swiglu/swiglu_8.sbatch && echo "launcher syntax OK"
 sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=0-14 \
-  workflows/jobs/perun/swiglu_8.sbatch block-check
+  workflows/jobs/perun/swiglu/swiglu_8.sbatch block-check
 ls "$PERUN_RESULTS/swiglu-8" 2>/dev/null || echo "no SwiGLU-8 outputs yet"
 grep -A2 '"part_b"' workflows/configs/model/swiglu/swiglu-8.json   # both null before the block check
 ```
@@ -359,7 +360,7 @@ if [[ -n "$EXISTING" ]] || squeue -u "$USER" -h -n swiglu-8 | grep -q .; then
 else
     JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=0-14 \
         --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-        workflows/jobs/perun/swiglu_8.sbatch block-check)
+        workflows/jobs/perun/swiglu/swiglu_8.sbatch block-check)
     echo "block-check array: ${JOB%%;*}   <- record it in local/perun/runs/swiglu-8.md"
 fi
 ```
@@ -435,7 +436,7 @@ if [[ -e "$OUT" || -e "$OUT.perun-lock" ]] || squeue -u "$USER" -h -n swiglu-8 |
 else
     JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=24:00:00 \
         --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-        workflows/jobs/perun/swiglu_8.sbatch prepare "$BLOCK")
+        workflows/jobs/perun/swiglu/swiglu_8.sbatch prepare "$BLOCK")
     echo "prepare job: ${JOB%%;*}   <- record it in local/perun/runs/swiglu-8.md"
 fi
 ```
@@ -456,7 +457,7 @@ if [[ -n "$EXISTING" ]]; then
 else
     JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=0-15 \
         --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-        workflows/jobs/perun/swiglu_8.sbatch train "$S8_PREPARED")
+        workflows/jobs/perun/swiglu/swiglu_8.sbatch train "$S8_PREPARED")
     echo "training array: ${JOB%%;*}   <- record it in local/perun/runs/swiglu-8.md"
 fi
 ```
@@ -486,17 +487,17 @@ with no lock (see 5.2).
 # One block-check task; replace 7 with the task number (0-14):
 sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=7 \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-  workflows/jobs/perun/swiglu_8.sbatch block-check --resume
+  workflows/jobs/perun/swiglu/swiglu_8.sbatch block-check --resume
 
 # Preparation:
 sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=24:00:00 \
   --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-  workflows/jobs/perun/swiglu_8.sbatch prepare --resume "$PERUN_RESULTS/swiglu-8/block-check-001/result.json"
+  workflows/jobs/perun/swiglu/swiglu_8.sbatch prepare --resume "$PERUN_RESULTS/swiglu-8/block-check-001/result.json"
 
 # One training task; replace 6 with the task number from the map above:
 sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --array=6 \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-  workflows/jobs/perun/swiglu_8.sbatch train --resume "$PERUN_RESULTS/swiglu-8/prepare-001/result.json"
+  workflows/jobs/perun/swiglu/swiglu_8.sbatch train --resume "$PERUN_RESULTS/swiglu-8/prepare-001/result.json"
 ```
 
 ### 3.8 Rerun training tasks from token 0
@@ -531,7 +532,7 @@ else
         JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 \
             --array="$(echo $TASKS | tr ' ' ',')" \
             --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-            workflows/jobs/perun/swiglu_8.sbatch train "$ROOT/prepare-001/result.json")
+            workflows/jobs/perun/swiglu/swiglu_8.sbatch train "$ROOT/prepare-001/result.json")
         echo "rerun array: ${JOB%%;*}"
     fi
 fi
@@ -572,11 +573,11 @@ on different GPUs (decision of 2026-10-11).
 ```bash
 sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
   --partition=cpu_short --gres=none --cpus-per-task=4 --mem=32G --time=01:00:00 \
-  workflows/jobs/perun/quantization_1.sbatch prepare prepare-001
+  workflows/jobs/perun/baseline/quantization_1.sbatch prepare prepare-001
 sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=08:00:00 --array=0-3 \
-  workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+  workflows/jobs/perun/baseline/quantization_1.sbatch run-array --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json"
 sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 --array=4 \
-  workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json"
+  workflows/jobs/perun/baseline/quantization_1.sbatch run-array --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json"
 ```
 
 If the first command is rejected because of `--gres=none` or the QoS, stop
@@ -594,7 +595,7 @@ else
     JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
         --partition=cpu_short --gres=none --cpus-per-task=4 --mem=32G --time=01:00:00 \
         --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-        workflows/jobs/perun/quantization_1.sbatch prepare prepare-001)
+        workflows/jobs/perun/baseline/quantization_1.sbatch prepare prepare-001)
     echo "quantization-1 prepare job: ${JOB%%;*}   <- record it in local/perun/runs/quantization-1.md"
 fi
 ```
@@ -614,11 +615,11 @@ if [[ -n "$EXISTING" ]]; then
 else
     JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=08:00:00 --array=0-3 \
         --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-        workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$Q1_PREPARED")
+        workflows/jobs/perun/baseline/quantization_1.sbatch run-array --prepared "$Q1_PREPARED")
     echo "quantization-1 tasks 0-3: ${JOB%%;*}   <- record it in local/perun/runs/quantization-1.md"
     JOB=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 --array=4 \
         --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-        workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$Q1_PREPARED")
+        workflows/jobs/perun/baseline/quantization_1.sbatch run-array --prepared "$Q1_PREPARED")
     echo "quantization-1 task 4:   ${JOB%%;*}   <- record it in local/perun/runs/quantization-1.md"
 fi
 ```
@@ -650,7 +651,7 @@ TASK=4
 LIMIT=$([[ "$TASK" == 4 ]] && echo 36:00:00 || echo 08:00:00)
 sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time="$LIMIT" --array="$TASK" \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-  workflows/jobs/perun/quantization_1.sbatch run-array --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json" --resume
+  workflows/jobs/perun/baseline/quantization_1.sbatch run-array --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json" --resume
 ```
 
 ### 4.6 Rerun INT4 QAT 100M as `-002`
@@ -668,9 +669,9 @@ must not exist.
 cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
 Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
 git log -1 --oneline
-bash -n workflows/jobs/perun/quantization_1.sbatch && echo "launcher syntax OK"
+bash -n workflows/jobs/perun/baseline/quantization_1.sbatch && echo "launcher syntax OK"
 sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 \
-  workflows/jobs/perun/quantization_1.sbatch run qat-int4-100m-002 --prepared "$Q1_PREPARED" \
+  workflows/jobs/perun/baseline/quantization_1.sbatch run qat-int4-100m-002 --prepared "$Q1_PREPARED" \
   --variant qat-int4 --qat-tokens 100000000
 find "$PERUN_RESULTS/quantization-1" -maxdepth 1 -name 'qat-int4-100m-002*' | grep . || echo "no -002 output yet"
 squeue -u "$USER"
@@ -688,7 +689,7 @@ if [[ -n "$EXISTING" ]]; then
 else
     QINT4=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 \
         --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-        workflows/jobs/perun/quantization_1.sbatch run qat-int4-100m-002 --prepared "$Q1_PREPARED" \
+        workflows/jobs/perun/baseline/quantization_1.sbatch run qat-int4-100m-002 --prepared "$Q1_PREPARED" \
         --variant qat-int4 --qat-tokens 100000000)
     printf 'QINT4=%s\n' "${QINT4%%;*}" | tee "$PERUN_LOG_DIR/quantization-1-int4-rerun_submission.txt"
     echo "<- record this in local/perun/runs/quantization-1.md"
@@ -731,7 +732,7 @@ cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
 Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
 git log -1 --oneline
 sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=24:00:00 \
-  workflows/jobs/perun/quantization_1.sbatch run qat-int4-1b-002 --prepared "$Q1_PREPARED" \
+  workflows/jobs/perun/baseline/quantization_1.sbatch run qat-int4-1b-002 --prepared "$Q1_PREPARED" \
   --variant qat-int4 --qat-tokens 1000000000
 find "$PERUN_RESULTS/quantization-1" -maxdepth 1 -name 'qat-int4-1b-002*' | grep . || echo "no 1B -002 output yet"
 ```
@@ -747,7 +748,7 @@ if [[ -n "$EXISTING" ]]; then
 else
     QINT4B=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=24:00:00 \
         --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-        workflows/jobs/perun/quantization_1.sbatch run qat-int4-1b-002 --prepared "$Q1_PREPARED" \
+        workflows/jobs/perun/baseline/quantization_1.sbatch run qat-int4-1b-002 --prepared "$Q1_PREPARED" \
         --variant qat-int4 --qat-tokens 1000000000)
     printf 'QINT4B=%s\n' "${QINT4B%%;*}" | tee "$PERUN_LOG_DIR/quantization-1-int4-1b-rerun_submission.txt"
 fi
@@ -964,13 +965,13 @@ EOF
 
 # Storage, launcher syntax, and whether Slurm would accept the jobs (nothing is submitted).
 perunfsusage    # PROJECT needs about 12 GB; SCRATCH up to 25 GB per training task
-bash -n workflows/jobs/perun/swiglu_9.sbatch && echo "launcher syntax OK"
+bash -n workflows/jobs/perun/swiglu/swiglu_9.sbatch && echo "launcher syntax OK"
 sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=14:00:00 --mem=64G --array=0-4 \
-  workflows/jobs/perun/swiglu_9.sbatch train
+  workflows/jobs/perun/swiglu/swiglu_9.sbatch train
 sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --mem=128G --array=0-2 \
-  workflows/jobs/perun/swiglu_9.sbatch block-check
+  workflows/jobs/perun/swiglu/swiglu_9.sbatch block-check
 sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=01:00:00 --mem=64G \
-  workflows/jobs/perun/swiglu_9.sbatch reference-kl
+  workflows/jobs/perun/swiglu/swiglu_9.sbatch reference-kl
 ls "$PERUN_RESULTS/swiglu-9" 2>/dev/null || echo "no SwiGLU-9 outputs yet"
 squeue -u "$USER"   # submit 9.2 only while at most one or two of your jobs run
 ```
@@ -990,13 +991,13 @@ if [[ -n "$EXISTING" ]] || squeue -u "$USER" -h -n swiglu-9 | grep -q .; then
 else
     TRAIN=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=14:00:00 --mem=64G \
         --array=0-4 --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-        workflows/jobs/perun/swiglu_9.sbatch train)
+        workflows/jobs/perun/swiglu/swiglu_9.sbatch train)
     BLOCK=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --mem=128G \
         --array=0-2 --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-        workflows/jobs/perun/swiglu_9.sbatch block-check)
+        workflows/jobs/perun/swiglu/swiglu_9.sbatch block-check)
     REFERENCE=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=01:00:00 --mem=64G \
         --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-        workflows/jobs/perun/swiglu_9.sbatch reference-kl)
+        workflows/jobs/perun/swiglu/swiglu_9.sbatch reference-kl)
     printf 'TRAIN=%s\nBLOCK=%s\nREFERENCE=%s\n' "${TRAIN%%;*}" "${BLOCK%%;*}" "${REFERENCE%%;*}" \
         | tee "$PERUN_LOG_DIR/swiglu-9_submission.txt"
     echo "<- record these in local/perun/runs/swiglu-9.md"
@@ -1072,17 +1073,17 @@ with no lock (see 5.2).
 # One training task; replace 3 with the task number (0-4):
 sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=14:00:00 --mem=64G --array=3 \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-  workflows/jobs/perun/swiglu_9.sbatch train --resume
+  workflows/jobs/perun/swiglu/swiglu_9.sbatch train --resume
 
 # One block-check task; replace 1 with the task number (0-2):
 sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 --mem=128G --array=1 \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-  workflows/jobs/perun/swiglu_9.sbatch block-check --resume
+  workflows/jobs/perun/swiglu/swiglu_9.sbatch block-check --resume
 
 # The reference KL:
 sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=01:00:00 --mem=64G \
   --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-  workflows/jobs/perun/swiglu_9.sbatch reference-kl --resume
+  workflows/jobs/perun/swiglu/swiglu_9.sbatch reference-kl --resume
 ```
 
 ## 10. Stacking-1
@@ -1160,13 +1161,13 @@ pip show torch torchao mslk 2>/dev/null | grep -E '^(Name|Version)'
 for GROUP in b a100m a1b; do
     echo "$GROUP: $(PYTHONPATH=src python -m workflows.runs.model.stacking.stacking_1 list-variants --group $GROUP | wc -l)"
 done
-bash -n workflows/jobs/perun/stacking_1.sbatch && echo "launcher syntax OK"
+bash -n workflows/jobs/perun/stacking/stacking_1.sbatch && echo "launcher syntax OK"
 sbatch --test-only --begin=now+10minutes --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=06:00:00 \
-  --array=0-5 workflows/jobs/perun/stacking_1.sbatch group b
+  --array=0-5 workflows/jobs/perun/stacking/stacking_1.sbatch group b
 sbatch --test-only --begin=now+10minutes --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=02:00:00 \
-  --array=0-32 workflows/jobs/perun/stacking_1.sbatch group a100m
+  --array=0-32 workflows/jobs/perun/stacking/stacking_1.sbatch group a100m
 sbatch --test-only --begin=now+10minutes --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=02:00:00 \
-  --array=0-8 workflows/jobs/perun/stacking_1.sbatch group a1b
+  --array=0-8 workflows/jobs/perun/stacking/stacking_1.sbatch group a1b
 perunfsusage    # PROJECT needs about 70-100 GB
 ls "$PERUN_RESULTS/stacking-1" 2>/dev/null || echo "no Stacking-1 outputs yet"
 git log -1 --oneline
@@ -1191,15 +1192,15 @@ else
     B=$(sbatch --parsable --begin=now+10minutes --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
         --time=06:00:00 --array=0-5 \
         --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-        workflows/jobs/perun/stacking_1.sbatch group b)
+        workflows/jobs/perun/stacking/stacking_1.sbatch group b)
     A100M=$(sbatch --parsable --begin=now+10minutes --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
         --time=02:00:00 --array=0-32 \
         --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-        workflows/jobs/perun/stacking_1.sbatch group a100m)
+        workflows/jobs/perun/stacking/stacking_1.sbatch group a100m)
     A1B=$(sbatch --parsable --begin=now+10minutes --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
         --time=02:00:00 --array=0-8 \
         --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-        workflows/jobs/perun/stacking_1.sbatch group a1b)
+        workflows/jobs/perun/stacking/stacking_1.sbatch group a1b)
     printf 'B=%s\nA100M=%s\nA1B=%s\n' "${B%%;*}" "${A100M%%;*}" "${A1B%%;*}" \
         | tee "$PERUN_LOG_DIR/stacking-1_submission.txt"
     echo "<- record these in local/perun/runs/stacking-1.md"
@@ -1247,7 +1248,7 @@ cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
 # One order-B INT3 rerun task; replace the index (1, 3, or 5):
 sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --array=3 \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-  workflows/jobs/perun/stacking_1.sbatch group b --attempt 002 --resume
+  workflows/jobs/perun/stacking/stacking_1.sbatch group b --attempt 002 --resume
 ```
 
 Right after the last task finishes, run section 7 for the job IDs
@@ -1272,10 +1273,10 @@ cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
 git log -1 --oneline
 # Array tasks 1, 3, and 5 of group b are the three INT3 variants:
 PYTHONPATH=src python -m workflows.runs.model.stacking.stacking_1 list-variants --group b | sed -n '2p;4p;6p'
-bash -n workflows/jobs/perun/stacking_1.sbatch && echo "launcher syntax OK"
+bash -n workflows/jobs/perun/stacking/stacking_1.sbatch && echo "launcher syntax OK"
 find "$PERUN_RESULTS/stacking-1" -maxdepth 1 -name 'b-fitted-*-100m-int3-002*' | grep . || echo "no -002 outputs yet"
 sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --array=1,3,5 \
-  workflows/jobs/perun/stacking_1.sbatch group b --attempt 002
+  workflows/jobs/perun/stacking/stacking_1.sbatch group b --attempt 002
 squeue -u "$USER"
 ```
 
@@ -1291,7 +1292,7 @@ if [[ -n "$EXISTING" ]]; then
 else
     BINT3=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --array=1,3,5 \
         --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-        workflows/jobs/perun/stacking_1.sbatch group b --attempt 002)
+        workflows/jobs/perun/stacking/stacking_1.sbatch group b --attempt 002)
     printf 'BINT3=%s\n' "${BINT3%%;*}" | tee "$PERUN_LOG_DIR/stacking-1-int3-rerun_submission.txt"
     echo "<- record this in local/perun/runs/stacking-1.md"
 fi
@@ -1320,7 +1321,7 @@ git log -1 --oneline
 PYTHONPATH=src python -m workflows.runs.model.stacking.stacking_1 list-variants --group b | sed -n '1p;3p;5p'
 find "$PERUN_RESULTS/stacking-1" -maxdepth 1 -name 'b-fitted-*-100m-int4-002*' | grep . || echo "no -002 outputs yet"
 sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --array=0,2,4 \
-  workflows/jobs/perun/stacking_1.sbatch group b --attempt 002
+  workflows/jobs/perun/stacking/stacking_1.sbatch group b --attempt 002
 ```
 
 **Submits jobs. Run once,** after the checks are clean. It writes the job ID
@@ -1334,7 +1335,7 @@ if [[ -n "$EXISTING" ]]; then
 else
     BINT4=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=03:00:00 --array=0,2,4 \
         --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-        workflows/jobs/perun/stacking_1.sbatch group b --attempt 002)
+        workflows/jobs/perun/stacking/stacking_1.sbatch group b --attempt 002)
     printf 'BINT4=%s\n' "${BINT4%%;*}" | tee "$PERUN_LOG_DIR/stacking-1-int4-rerun_submission.txt"
     echo "<- record this in local/perun/runs/stacking-1.md"
 fi
@@ -1400,10 +1401,10 @@ stat -c '%s %n' "$PERUN_RESULTS/swiglu-7/prepare-001/prepared/recovery-tokens.in
 ls "$PERUN_RESULTS"/swiglu-8/prepare-001/prepared/starts/fitted-target-0.{2,5,8}.pt
 pip show torch torchao mslk 2>/dev/null | grep -E '^(Name|Version)'
 PYTHONPATH=src python -m workflows.runs.model.stacking.stacking_1 list-variants --group b1b
-bash -n workflows/jobs/perun/stacking_1.sbatch && echo "launcher syntax OK"
+bash -n workflows/jobs/perun/stacking/stacking_1.sbatch && echo "launcher syntax OK"
 find "$PERUN_RESULTS/stacking-1" -maxdepth 1 -name 'b-fitted-*-1b-*' | grep . || echo "no 1B outputs yet"
 sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=18:00:00 --array=0-5 \
-  workflows/jobs/perun/stacking_1.sbatch group b1b
+  workflows/jobs/perun/stacking/stacking_1.sbatch group b1b
 squeue -u "$USER"
 perunfsusage    # PROJECT needs about 10 GB; SCRATCH about 20 GB per task
 ```
@@ -1420,7 +1421,7 @@ if [[ -n "$EXISTING" ]]; then
 else
     B1B=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=18:00:00 --array=0-5 \
         --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-        workflows/jobs/perun/stacking_1.sbatch group b1b)
+        workflows/jobs/perun/stacking/stacking_1.sbatch group b1b)
     printf 'B1B=%s\n' "${B1B%%;*}" | tee "$PERUN_LOG_DIR/stacking-1-b1b_submission.txt"
     echo "<- record this in local/perun/runs/stacking-1.md"
 fi
@@ -1463,7 +1464,7 @@ Replace the index:
 cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
 sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=18:00:00 --array=3 \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-  workflows/jobs/perun/stacking_1.sbatch group b1b --resume
+  workflows/jobs/perun/stacking/stacking_1.sbatch group b1b --resume
 ```
 
 Right after the last task finishes, run section 7 for the job ID (scheduler
@@ -1510,11 +1511,11 @@ CONFIG=workflows/configs/model/baseline/quantization-2.json
 Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
 PYTHONPATH=src python -c "from workflows.runs.model.baseline import quantization as q; s = q.load_settings('$CONFIG'); print(s['workflow'], s['variants'])"
 ls -l "$Q1_PREPARED" "$PERUN_RESULTS"/quantization-1/prepare-001/prepared/
-bash -n workflows/jobs/perun/quantization_1.sbatch && echo "launcher syntax OK"
+bash -n workflows/jobs/perun/baseline/quantization_1.sbatch && echo "launcher syntax OK"
 sbatch --test-only --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=02:00:00 \
-  workflows/jobs/perun/quantization_1.sbatch run int3-001 --config "$CONFIG" --prepared "$Q1_PREPARED" --variant ptq-int3
+  workflows/jobs/perun/baseline/quantization_1.sbatch run int3-001 --config "$CONFIG" --prepared "$Q1_PREPARED" --variant ptq-int3
 sbatch --test-only --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=36:00:00 \
-  workflows/jobs/perun/quantization_1.sbatch run qat-int3-1b-001 --config "$CONFIG" --prepared "$Q1_PREPARED" \
+  workflows/jobs/perun/baseline/quantization_1.sbatch run qat-int3-1b-001 --config "$CONFIG" --prepared "$Q1_PREPARED" \
   --variant qat-int3 --qat-tokens 1000000000
 perunfsusage    # PROJECT needs about 7 GB
 ls "$PERUN_RESULTS/quantization-2" 2>/dev/null || echo "no Quantization-2 outputs yet"
@@ -1540,11 +1541,11 @@ EXISTING=$(find "$PERUN_RESULTS/quantization-2" -mindepth 1 -maxdepth 1 2>/dev/n
 if [[ -n "$EXISTING" ]] || squeue -u "$USER" -h -n quantization-2 | grep -q .; then
     echo "STOP: Quantization-2 outputs exist or a quantization-2 job is queued:"; echo "$EXISTING"
 else
-    PTQ=$(sbatch "${COMMON[@]}" --time=02:00:00 workflows/jobs/perun/quantization_1.sbatch \
+    PTQ=$(sbatch "${COMMON[@]}" --time=02:00:00 workflows/jobs/perun/baseline/quantization_1.sbatch \
         run int3-001 --config "$CONFIG" --prepared "$Q1_PREPARED" --variant ptq-int3)
-    QAT100M=$(sbatch "${COMMON[@]}" --time=06:00:00 workflows/jobs/perun/quantization_1.sbatch \
+    QAT100M=$(sbatch "${COMMON[@]}" --time=06:00:00 workflows/jobs/perun/baseline/quantization_1.sbatch \
         run qat-int3-100m-001 --config "$CONFIG" --prepared "$Q1_PREPARED" --variant qat-int3 --qat-tokens 100000000)
-    QAT1B=$(sbatch "${COMMON[@]}" --time=36:00:00 workflows/jobs/perun/quantization_1.sbatch \
+    QAT1B=$(sbatch "${COMMON[@]}" --time=36:00:00 workflows/jobs/perun/baseline/quantization_1.sbatch \
         run qat-int3-1b-001 --config "$CONFIG" --prepared "$Q1_PREPARED" --variant qat-int3 --qat-tokens 1000000000)
     printf 'PTQ=%s\nQAT100M=%s\nQAT1B=%s\n' "${PTQ%%;*}" "${QAT100M%%;*}" "${QAT1B%%;*}" \
         | tee "$PERUN_LOG_DIR/quantization-2_submission.txt"
@@ -1585,7 +1586,7 @@ output name, token budget, and limit for the rerun being resumed (100M: 4 h;
 cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
 sbatch --parsable --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 \
   --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-  workflows/jobs/perun/quantization_1.sbatch run qat-int3-100m-002 \
+  workflows/jobs/perun/baseline/quantization_1.sbatch run qat-int3-100m-002 \
   --config workflows/configs/model/baseline/quantization-2.json \
   --prepared "$PERUN_RESULTS/quantization-1/prepare-001/result.json" \
   --variant qat-int3 --qat-tokens 100000000 --resume
@@ -1612,9 +1613,9 @@ CONFIG=workflows/configs/model/baseline/quantization-2.json
 Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
 git log -1 --oneline
 PYTHONPATH=src python -c "from workflows.runs.model.baseline import quantization as q; s = q.load_settings('$CONFIG'); print(s['workflow'], s['variants'])"
-bash -n workflows/jobs/perun/quantization_1.sbatch && echo "launcher syntax OK"
+bash -n workflows/jobs/perun/baseline/quantization_1.sbatch && echo "launcher syntax OK"
 sbatch --test-only --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 \
-  workflows/jobs/perun/quantization_1.sbatch run qat-int3-100m-002 --config "$CONFIG" --prepared "$Q1_PREPARED" \
+  workflows/jobs/perun/baseline/quantization_1.sbatch run qat-int3-100m-002 --config "$CONFIG" --prepared "$Q1_PREPARED" \
   --variant qat-int3 --qat-tokens 100000000
 find "$PERUN_RESULTS/quantization-2" -maxdepth 1 -name 'qat-int3-100m-002*' | grep . || echo "no 100M -002 output yet"
 squeue -u "$USER"
@@ -1633,7 +1634,7 @@ if [[ -n "$EXISTING" ]]; then
 else
     QAT100M=$(sbatch --parsable --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
         --time=04:00:00 --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-        workflows/jobs/perun/quantization_1.sbatch run qat-int3-100m-002 --config "$CONFIG" \
+        workflows/jobs/perun/baseline/quantization_1.sbatch run qat-int3-100m-002 --config "$CONFIG" \
         --prepared "$Q1_PREPARED" --variant qat-int3 --qat-tokens 100000000)
     printf 'QAT100M=%s\n' "${QAT100M%%;*}" | tee "$PERUN_LOG_DIR/quantization-2-int3-rerun_submission.txt"
     echo "<- record this in local/perun/runs/quantization-2.md"
@@ -1664,9 +1665,9 @@ Q1_PREPARED="$PERUN_RESULTS/quantization-1/prepare-001/result.json"
 git log -1 --oneline
 git merge-base --is-ancestor b59da5c HEAD && echo "checkout contains b59da5c"
 PYTHONPATH=src python -c "from workflows.runs.model.baseline import quantization as q; s = q.load_settings('$CONFIG'); print(s['workflow'], s['variants'])"
-bash -n workflows/jobs/perun/quantization_1.sbatch && echo "launcher syntax OK"
+bash -n workflows/jobs/perun/baseline/quantization_1.sbatch && echo "launcher syntax OK"
 sbatch --test-only --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=24:00:00 \
-  workflows/jobs/perun/quantization_1.sbatch run qat-int3-1b-002 --config "$CONFIG" --prepared "$Q1_PREPARED" \
+  workflows/jobs/perun/baseline/quantization_1.sbatch run qat-int3-1b-002 --config "$CONFIG" --prepared "$Q1_PREPARED" \
   --variant qat-int3 --qat-tokens 1000000000
 find "$PERUN_RESULTS/quantization-2" -maxdepth 1 -name 'qat-int3-1b-002*' | grep . || echo "no 1B -002 output yet"
 perunfsusage
@@ -1686,7 +1687,7 @@ if [[ -n "$EXISTING" ]]; then
 else
     QAT1B=$(sbatch --parsable --job-name=quantization-2 --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
         --time=24:00:00 --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-        workflows/jobs/perun/quantization_1.sbatch run qat-int3-1b-002 --config "$CONFIG" \
+        workflows/jobs/perun/baseline/quantization_1.sbatch run qat-int3-1b-002 --config "$CONFIG" \
         --prepared "$Q1_PREPARED" --variant qat-int3 --qat-tokens 1000000000)
     printf 'QAT1B=%s\n' "${QAT1B%%;*}" | tee -a "$PERUN_LOG_DIR/quantization-2-int3-rerun_submission.txt"
     echo "<- record this in local/perun/runs/quantization-2.md"
@@ -1979,3 +1980,182 @@ PYTHONPATH=src python -m workflows.runs.model.heterogenous.heterogeneous_1 summa
 It prints the hybrid targets, the ranking swaps, and whether Heterogeneous-2's forced
 runs are required. Right after each sitting, run section 7 for its job IDs (scheduler
 records expire), and copy the results home (section 6, `EXPERIMENT=heterogeneous-1`).
+
+## 13. Heterogeneous-2
+
+Design, checks, and resource plan:
+[heterogeneous-2.md](../../experiments/model/heterogenous/heterogeneous-2.md).
+Every submission needs the researcher's go. Everything goes to
+`perun-results/heterogeneous-2/`. This section covers Step 1 only: six runs that train
+forced models to 100M and score them by KL.
+
+| Step | Block | Requested per task | Expected per task | Before the next step |
+| --- | --- | --- | --- | --- |
+| Update and pre-submission checks | 13.1 | - | minutes | Every line OK |
+| **One sitting:** the control (task 0), then five runs (tasks 1-5) that wait for it | 13.2 | 4 h, 128 GB | 1.2-1.85 h | The control's `token-0` check passes (13.3) |
+| Summary | 13.5 | login node | minutes | - |
+
+The five runs start by themselves when the control ends successfully. Do not update the
+checkout while a job of yours is queued or running: a job copies the code when it starts,
+and the summary refuses runs on different code. There is no resume in this experiment. To
+rerun a failed task, move its output aside first, because the job refuses an existing output.
+
+Run 1.2 and 1.3 first.
+
+### 13.1 Pre-submission checks
+
+**Safe to re-run, except the `git pull`, which needs an empty queue.** Every hash line must
+print OK, the table count must be 22, `squeue` must list no job when you pull, both
+`--test-only` lines must be accepted, and no Heterogeneous-2 output may exist yet.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+squeue -u "$USER"   # must list no job before the pull below
+git status --short
+git pull --ff-only origin "$PERUN_BRANCH"
+git log -1 --oneline
+# Every pinned Heterogeneous-1 and SwiGLU-8 input exists and matches the configurations.
+python - <<'EOF'
+import hashlib, json, os
+config = json.load(open("workflows/configs/model/heterogenous/heterogeneous-2.json"))
+sources = json.load(open(config["heterogeneous1_config"]))["sources"]
+expected = {
+    "swiglu-8/prepare-001/result.json": sources["swiglu8_prepare_sha256"],
+    "swiglu-8/block-check-001/result.json": sources["swiglu8_block_check_sha256"],
+}
+for target, digest in config["sources"]["heterogeneous1_assemble_sha256"].items():
+    expected[f"heterogeneous-1/assemble-001-target-{target}/result.json"] = digest
+    expected[f"swiglu-8/fitted-target-{target}-run-001/result.json"] = sources["swiglu8_fitted_runs_sha256"][target]
+for relative, digest in expected.items():
+    path = os.path.join(os.environ["PERUN_RESULTS"], relative)
+    if not os.path.isfile(path):
+        print("MISSING ", relative)
+        continue
+    sha = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            sha.update(block)
+    print("OK      " if sha.hexdigest() == digest else "MISMATCH", relative)
+EOF
+ls "$PERUN_RESULTS/swiglu-8/prepare-001/prepared/recovery-tokens.int32" \
+   "$PERUN_RESULTS/swiglu-8/prepare-001/prepared/kl-tokens.int32" \
+   "$PERUN_RESULTS/swiglu-8/prepare-001/prepared/local-evaluation-batches.pt" \
+   "$PERUN_RESULTS/heterogeneous-1/baseline-table-001/result.json"
+ls -d "$PERUN_RESULTS"/heterogeneous-1/cost-table-001-layer-* | wc -l   # must print 22
+
+# The environment matches the one SwiGLU-8's 80% run recorded (the control compares across it).
+PYTHONPATH=src python - <<'EOF'
+import json, os
+from mlp_replacement.runlog import environment_record
+recorded = json.load(open(os.path.join(os.environ["PERUN_RESULTS"], "swiglu-8/fitted-target-0.8-run-001/result.json")))["environment"]
+current = environment_record()
+print("python  ", "OK" if recorded["python"] == current["python"] else f"DIFFERS {recorded['python']} -> {current['python']}")
+for name, version in sorted(recorded["packages"].items()):
+    now = current["packages"].get(name)
+    print(f"{name:12}", "OK" if now == version else f"DIFFERS {version} -> {now}")
+EOF
+
+# Configuration, launcher syntax, and whether Slurm would accept the jobs (nothing is submitted).
+PYTHONPATH=src python -c "from workflows.runs.model.heterogenous import heterogeneous_2 as h; s, r, p = h.load_settings(h.DEFAULT_CONFIG); print(s['workflow'], [run['name'] for run in s['runs']])"
+JOB=workflows/jobs/perun/heterogenous/heterogeneous_2.sbatch
+bash -n "$JOB" && echo "launcher syntax OK"
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 --mem=128G --array=0 "$JOB" train
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 --mem=128G --array=1-5 "$JOB" train
+perunfsusage    # PROJECT needs under 50 MB; SCRATCH at most 5 GB per task
+ls "$PERUN_RESULTS/heterogeneous-2" 2>/dev/null || echo "no Heterogeneous-2 outputs yet"
+```
+
+### 13.2 Submit the six runs
+
+**Submits jobs. Run once,** after 13.1 is clean. The first `sbatch` is the control. The second
+holds tasks 1-5 until the control ends successfully. It writes the job IDs to
+`$PERUN_LOG_DIR/heterogeneous-2_submission.txt`. If an ID prints empty, that `sbatch` was
+refused: tell the assistant before submitting it again.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+JOB=workflows/jobs/perun/heterogenous/heterogeneous_2.sbatch
+EXISTING=$(find "$PERUN_RESULTS/heterogeneous-2" -mindepth 1 -maxdepth 1 2>/dev/null)
+if [[ -n "$EXISTING" ]] || squeue -u "$USER" -h -n heterogeneous-2 | grep -q .; then
+    echo "STOP: Heterogeneous-2 outputs exist or a heterogeneous-2 job is queued:"; echo "$EXISTING"
+else
+    CONTROL=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 --mem=128G \
+        --array=0 --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        "$JOB" train)
+    RUNS=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=04:00:00 --mem=128G \
+        --array=1-5 --dependency=afterok:"${CONTROL%%;*}" \
+        --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        "$JOB" train)
+    printf 'CONTROL=%s\nRUNS=%s\n' "${CONTROL%%;*}" "${RUNS%%;*}" \
+        | tee "$PERUN_LOG_DIR/heterogeneous-2_submission.txt"
+    echo "<- record these in local/perun/runs/heterogeneous-2.md"
+fi
+```
+
+Task map: 0 `swiglu-0.8-control`, 1 `forced-0.2`, 2 `forced-0.5`, 3 `forced-0.8`,
+4 `forced-0.8-lr1e-4`, 5 `swiglu-0.8-lr1e-4`.
+
+### 13.3 Watch the control
+
+**Safe to re-run.** The control refits its blocks for about 45 minutes, then checks token 0. A
+mismatch stops it with `AcceptanceFailure` in its `.err` file. Stop and tell the assistant
+before trusting any result. After that it prints one `run=` line per checkpoint, and `gap`
+should stay within about 0.1% and must stay within 1%.
+
+```bash
+source "$PERUN_LOG_DIR/heterogeneous-2_submission.txt"
+squeue -u "$USER" -n heterogeneous-2 -o "%.18i %.10T %.10M %.11l %R"
+grep -h '^run=' "$PERUN_LOG_DIR/heterogeneous-2_${CONTROL}_0.out" 2>/dev/null
+grep -l -E 'AcceptanceFailure|Traceback' "$PERUN_LOG_DIR"/heterogeneous-2_*.err 2>/dev/null
+python - <<'EOF'
+import json, os
+from pathlib import Path
+for result in sorted(Path(os.environ["PERUN_SCRATCH"]).glob("job_*/results/*-run-001/result.json")):
+    data = json.loads(result.read_text())
+    if data.get("workflow") != "heterogeneous-2":
+        continue
+    acceptance = data.get("results", {}).get("acceptance", {})
+    print(result.parent.name, data.get("status"), {group: row["passed"] for group, row in acceptance.items()},
+          (data.get("error") or "")[:120])
+EOF
+gpu-status
+```
+
+**If the control ends with a failure,** the five runs stay pending with the reason
+`DependencyNeverSatisfied` and never start. Cancel them with `scancel "$RUNS"`, then tell the
+assistant. A curve outside 1% still leaves a complete `result.json`, and the flag is read under
+the 2026-11-01 rule: a gap that changes sign or falls back is noise, and a gap that grows
+steadily needs a cause. If it is ruled noise, or if `--dependency` misbehaves, submit tasks 1-5
+by repeating the second `sbatch` of 13.2 without its `--dependency` line.
+
+### 13.4 Watch the five runs
+
+**Safe to re-run.** Each run stops within its first hour if it misses its recorded token-0 KL.
+`gap` on the `run=` lines is against SwiGLU-8's 3e-5 curve at the same tokens, so it is only a
+comparison for tasks 1-3.
+
+```bash
+source "$PERUN_LOG_DIR/heterogeneous-2_submission.txt"
+squeue -u "$USER" -n heterogeneous-2 -o "%.18i %.10T %.10M %.11l %R"
+for TASK in 1 2 3 4 5; do
+    LOG="$PERUN_LOG_DIR/heterogeneous-2_${RUNS}_${TASK}"
+    grep -h '^run=' "$LOG.out" 2>/dev/null | tail -1
+    grep -q 'Verified persistent output' "$LOG.out" 2>/dev/null && echo "task $TASK: done"
+done
+grep -l -E 'AcceptanceFailure|Traceback' "$PERUN_LOG_DIR"/heterogeneous-2_*.err 2>/dev/null
+```
+
+### 13.5 Summary
+
+**Safe to re-run.** When all six runs have finished, on the login node:
+
+```bash
+PYTHONPATH=src python -m workflows.runs.model.heterogenous.heterogeneous_2 summarize \
+  --results-root "$PERUN_RESULTS/heterogeneous-2" --swiglu8-root "$PERUN_RESULTS/swiglu-8"
+```
+
+It prints the control's result, then each target's gap, band, 8K gap, and outcome, the
+learning-rate check, and any flag. The outcomes are read as on the
+[experiment page](../../experiments/model/heterogenous/heterogeneous-2.md#reading-the-main-comparison).
+Right after the sitting, run section 7 for its job IDs (scheduler records expire), and copy the
+results home (section 6, `EXPERIMENT=heterogeneous-2`).

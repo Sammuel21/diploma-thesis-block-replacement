@@ -2,7 +2,7 @@
 title: TUKE Perun Experiment Log
 status: active
 created: 2026-09-25
-modified: 2026-11-06
+modified: 2026-11-07
 ---
 
 # TUKE Perun Experiment Log
@@ -548,3 +548,36 @@ Entries are appended below in submission order.
 - Variance: within plan (4.89 against 4-8 GPU-hours). The shortest task ran below the per-task estimate.
 - Experiment document: [Heterogeneous-1](../../experiments/model/heterogenous/heterogeneous-1.md#stage-5-results-2026-11-06).
 - Notes: all tasks started within a second of submission. Scheduler times are cluster local time, UTC+1.
+
+## [2026-10-25, started 20:45 UTC; submission time unrecorded] 132434 | Quantization-2 INT3 QAT 100M rerun `qat-int3-100m-002`
+
+*Recorded late, on 2026-11-07, from the job logs and the artifacts.*
+
+- Plan: 1.7-2.2 h (4-hour limit), ceiling 4 GPU-hours ([resource plan](../../experiments/model/baseline/quantization-2.md#reruns-with-the-fixed-quantizer-recorded-2026-10-25)); medium confidence.
+- Outcome: COMPLETED with structured status `completed`; no retries. The start and conversion INT3 checks passed (66 of 66 projections).
+- Submission: `quantization_1.sbatch run qat-int3-100m-002 --config workflows/configs/model/baseline/quantization-2.json --variant qat-int3 --qat-tokens 100000000` (runbook 11.5), in the same sitting as Stacking-1's job 132436.
+- Provenance: commit `61b2b0d`; configuration sha256 `650e8ca1…`; stream sha256 `570409c1…`, equal to the pin.
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, 128 GB requested memory, 4-hour limit; node Unknown.
+- Consumption (workflow timing): 1.80 h (training 1.35 h, evaluation 0.34 h); allocation GPU-hours Unknown (scheduler record expired); about 14.4 CPU core-hours (8 CPUs × workflow time, derived); peak VRAM 49.6 GiB allocated; peak RSS 14.9 GiB.
+- Efficiency: CPU Unknown; GPU utilization Unknown.
+- Outputs: PROJECT `perun-results/quantization-2/qat-int3-100m-002/`, 2.3 GB; `result.json` sha256 `f3f1eda5…`, `run.json` `cbb19a7a…`; analysis copy on the PC.
+- Continuation: completed; checkpoints removed at completion.
+- Verification: "Verified persistent output" logged; no traceback in the `.err` file, which holds library warnings only.
+- Variance: within plan (1.80 against 1.7-2.2 h).
+- Experiment document: [Quantization-2](../../experiments/model/baseline/quantization-2.md#results-of-the-fixed-reruns-2026-11-07).
+
+## [2026-11-03, started 22:21 UTC] 142928 | Quantization-2 INT3 QAT 1B rerun `qat-int3-1b-002`
+
+- Plan: 14-17 h, central estimate 14.5 h (24-hour limit), ceiling 24 GPU-hours ([resource plan](../../experiments/model/baseline/quantization-2.md#int3-qat-1b-rerun-recorded-2026-11-03)); medium confidence.
+- Outcome: COMPLETED with structured status `completed`; no retries. The start and conversion INT3 checks passed (66 of 66 projections); token-0 KL 0.22268 and first-step gradient norm 0.556, as in the 100M twin.
+- Submission: `quantization_1.sbatch run qat-int3-1b-002 --config workflows/configs/model/baseline/quantization-2.json --variant qat-int3 --qat-tokens 1000000000 --time=24:00:00` (runbook 11.6), after the pre-submission checks were clean (the `--test-only` estimate projected gpu02). The checkout was not pulled.
+- Provenance: commit `20f0889`, whose INT3 code equals `61b2b0d`'s; configuration sha256 `650e8ca1…`; stream sha256 `f78bf805…`, equal to the pin.
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, 128 GB requested memory, 24-hour limit; node Unknown.
+- Consumption (workflow timing): 14.71 h (training 13.49 h, evaluation 0.35 h), ending 13:04 UTC on 2026-11-04; allocation GPU-hours Unknown (scheduler record expired before it was read); about 118 CPU core-hours (derived); peak VRAM 49.6 GiB allocated; peak RSS 15.0 GiB.
+- Efficiency: CPU Unknown; GPU utilization Unknown.
+- Outputs: PROJECT `perun-results/quantization-2/qat-int3-1b-002/`, 2.3 GB; `result.json` sha256 `5cd65370…`, `run.json` `b6aaa819…`; analysis copy on the PC. PROJECT held 279 of 1,000 GB before submission.
+- Continuation: completed; checkpoints removed at completion.
+- Verification: "Verified persistent output" logged; no traceback; no leftover lock.
+- Variance: 1.4% above the central estimate, within the range.
+- Experiment document: [Quantization-2](../../experiments/model/baseline/quantization-2.md#results-of-the-fixed-reruns-2026-11-07).
+- Notes: `perunfsusage` on 2026-11-03 listed the user limits as 20 running jobs, 50 queued, and 32 GPUs at once.

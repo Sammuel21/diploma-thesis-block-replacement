@@ -180,7 +180,7 @@ only for labeled historical comparisons.
 - Configuration: `workflows/configs/model/swiglu/swiglu-7.json`
 - Runner: `workflows/runs/model/swiglu/swiglu_7.py`
 - Local launcher: `workflows/jobs/local/run_model.sh`
-- Dedicated PERUN job: `workflows/jobs/perun/swiglu_7.sbatch`
+- Dedicated PERUN job: `workflows/jobs/perun/swiglu/swiglu_7.sbatch`
 - Report notebook: `notebooks/model/swiglu/swiglu-7.ipynb`
 
 ## PERUN prerequisites
@@ -241,7 +241,7 @@ Submit one preparation job:
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
   --output="$PERUN_LOG_DIR/%x_%j.out" \
   --error="$PERUN_LOG_DIR/%x_%j.err" \
-  workflows/jobs/perun/swiglu_7.sbatch prepare
+  workflows/jobs/perun/swiglu/swiglu_7.sbatch prepare
 ```
 
 The job uses one H200, eight CPUs, 128 GB RAM, and the documented 48-hour
@@ -269,7 +269,7 @@ export S7_PREPARED="$PERUN_PROJECT/perun-results/swiglu-7/prepare-001/result.jso
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=0-11%12 \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" \
   --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-  workflows/jobs/perun/swiglu_7.sbatch train "$S7_PREPARED"
+  workflows/jobs/perun/swiglu/swiglu_7.sbatch train "$S7_PREPARED"
 ```
 
 Array mapping is deterministic:
@@ -295,7 +295,7 @@ Resume preparation with:
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
   --output="$PERUN_LOG_DIR/%x_%j.out" \
   --error="$PERUN_LOG_DIR/%x_%j.err" \
-  workflows/jobs/perun/swiglu_7.sbatch prepare --resume
+  workflows/jobs/perun/swiglu/swiglu_7.sbatch prepare --resume
 ```
 
 Preparation reuses completed durable stages, although work inside the active
@@ -306,7 +306,7 @@ original array index, for example task 6 (S7-1 at target 0.4):
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=6 \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" \
   --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-  workflows/jobs/perun/swiglu_7.sbatch train --resume "$S7_PREPARED"
+  workflows/jobs/perun/swiglu/swiglu_7.sbatch train --resume "$S7_PREPARED"
 ```
 
 Training restores model, optimizer, RNG, and progress from the latest verified

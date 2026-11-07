@@ -20,7 +20,7 @@ from mlp_replacement.operators import GatedMLPReplacement
 from workflows.runs.model.swiglu import swiglu_8, swiglu_9
 
 CONFIG = ROOT / "workflows/configs/model/swiglu/swiglu-9.json"
-SBATCH = ROOT / "workflows/jobs/perun/swiglu_9.sbatch"
+SBATCH = ROOT / "workflows/jobs/perun/swiglu/swiglu_9.sbatch"
 WIDTHS = (2048, 4096)
 COMBINATIONS = [(layer, width) for layer in swiglu_9.LAYERS for width in WIDTHS]
 CHECKPOINTS = [0, 10_000_000, *range(25_000_000, 1_000_000_001, 25_000_000)]

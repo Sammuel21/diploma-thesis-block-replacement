@@ -20,7 +20,7 @@ tuned (decision log, 2026-10-11).
 | Experiment | Main question | Status |
 | --- | --- | --- |
 | [Heterogeneous-1](heterogeneous-1.md) | How should each operator be fitted, which operators get picked, and can their pre-recovery prices be trusted? | Done 2026-11-06: no new operator picked at any target |
-| [Heterogeneous-2](heterogeneous-2.md) | How do hybrids compare with SwiGLU after recovery, with which retraining scope, and does local fitting matter? | Outline; redesign pending |
+| [Heterogeneous-2](heterogeneous-2.md) | Do new blocks catch up after real training, when forced into the model? | Step 1 implemented 2026-11-06, not yet run; Steps 2 and 3 conditional |
 
 Heterogeneous-1's results are on its page. No model-level result exists yet.
 
@@ -33,8 +33,8 @@ Heterogeneous-1's results are on its page. No model-level result exists yet.
 | Local launchers | [workflows/jobs/local/heterogenous/](../../../../workflows/jobs/local/heterogenous/README.md) |
 | Perun launchers | [workflows/jobs/perun/heterogenous/](../../../../workflows/jobs/perun/heterogenous/README.md) |
 
-Heterogeneous-1's local results go to
-`data/results/workflows/model/heterogeneous-1/`, ignored by Git under the existing
+Local results go to `data/results/workflows/model/heterogeneous-1/` and
+`data/results/workflows/model/heterogeneous-2/`, ignored by Git under the existing
 data policy.
 
 The [homogeneous SwiGLU family](../swiglu/README.md) remains the reference

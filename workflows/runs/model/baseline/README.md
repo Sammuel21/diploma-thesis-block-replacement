@@ -19,8 +19,8 @@ the same runner with its own configuration: INT3 PTQ by default, optional
 INT3 QAT, Quantization-1's `prepare-001`, and resident memory without speed;
 it refuses `prepare` and `evaluate`.
 
-Quantization-1 has dedicated [local](../../../jobs/local/quantization_1.sh) and
-[Perun](../../../jobs/perun/quantization_1.sbatch) launchers. It runs in the
+Quantization-1 has dedicated [local](../../../jobs/local/baseline/quantization_1.sh) and
+[Perun](../../../jobs/perun/baseline/quantization_1.sbatch) launchers. It runs in the
 shared `mlp-replacement` environment with TorchAO and MSLK added; the
 [environment pins](../../../environments/quantization-1-requirements.txt)
 record the expected stack.
@@ -29,7 +29,7 @@ Use its experiment guide for commands and artifact conventions.
 Speed-1 times saved dense, quantized, and SwiGLU bundles in one process per
 measurement, all in one job on one GPU. It reuses Quantization-1's
 `measure-runtime` command unchanged and has a dedicated
-[Perun launcher](../../../jobs/perun/speed_1.sbatch).
+[Perun launcher](../../../jobs/perun/baseline/speed_1.sbatch).
 
 See the [baseline experiment index](../../../../docs/experiments/model/baseline/README.md),
 [configuration index](../../../configs/model/baseline/README.md), and

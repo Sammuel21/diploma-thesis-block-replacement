@@ -116,7 +116,7 @@ else
 fi
 SCRATCH_DIR="$SCRATCH_ROOT/job_${JOB_KEY}"
 
-test -f "$SUBMIT_DIR/workflows/jobs/perun/swiglu_7.sbatch"
+test -f "$SUBMIT_DIR/workflows/jobs/perun/swiglu/swiglu_7.sbatch"
 test -d "$SCRATCH_ROOT"
 test -w "$SCRATCH_ROOT"
 if [[ "$(dirname "$PROJECT_ROOT")" != "/mnt/project" ]]; then

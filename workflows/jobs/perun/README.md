@@ -6,8 +6,10 @@ environment. Before changing or using them, read the canonical
 owns the broader access, storage, environment, scratch, artifact, and
 validation assumptions. This README explains only the tracked job files.
 
-[`heterogenous/`](heterogenous/README.md) holds the launchers of the
-heterogeneous operator class.
+Experiment launchers are grouped by class, like `workflows/configs/model/` and
+`workflows/runs/model/`: `swiglu/`, `baseline/`, `stacking/`, and
+[`heterogenous/`](heterogenous/README.md). The two files at this level are not
+tied to one experiment class.
 
 ## Files
 
@@ -15,18 +17,21 @@ heterogeneous operator class.
 | --- | --- |
 | `scratch_probe.sbatch` | Performs a five-minute CPU-only check of manual PROJECT-to-SCRATCH staging and PROJECT stage-out without loading Python or requesting a GPU. |
 | `run_model.sbatch` | Runs the historical allow-listed model-wide workflows that still depend on the unavailable automatic-scratch helper. It is not the SwiGLU-7 launcher. |
-| `swiglu_7.sbatch` | Runs the independent SwiGLU-7 preparation or maps array tasks `0-11` onto its fixed three-scope/four-target grid. |
-| `swiglu_8.sbatch` | Runs the SwiGLU-8 block check or preparation, or maps array tasks `0-15` onto its two arms at eight targets. |
-| `swiglu_9.sbatch` | Runs the SwiGLU-9 block check (tasks `0-2`, one per layer), the five 1B training runs (tasks `0-4`), or the 8K KL of SwiGLU-7's reused 1B bundles. |
-| `speed_1.sbatch` | Times the saved dense, quantized, and SwiGLU-8 bundles in one job on one GPU, so their speeds are comparable. |
+| `swiglu/swiglu_7.sbatch` | Runs the independent SwiGLU-7 preparation or maps array tasks `0-11` onto its fixed three-scope/four-target grid. |
+| `swiglu/swiglu_8.sbatch` | Runs the SwiGLU-8 block check or preparation, or maps array tasks `0-15` onto its two arms at eight targets. |
+| `swiglu/swiglu_9.sbatch` | Runs the SwiGLU-9 block check (tasks `0-2`, one per layer), the five 1B training runs (tasks `0-4`), or the 8K KL of SwiGLU-7's reused 1B bundles. |
+| `baseline/quantization_1.sbatch` | Runs one Quantization-1 or Quantization-2 prepare, run, or evaluate job, or Quantization-1's five models as `run-array` tasks `0-4`. |
+| `baseline/speed_1.sbatch` | Times the saved dense, quantized, and SwiGLU-8 bundles in one job on one GPU, so their speeds are comparable. |
+| `stacking/stacking_1.sbatch` | Runs one Stacking-1 variant, or one variant per array task of a group (`a100m`, `a1b`, `b`, `b1b`). |
 | `heterogenous/heterogeneous_1.sbatch` | Runs every Heterogeneous-1 stage: recipe selection, the cost tables, single-block recovery, the knapsack solve, and token-0 assembly. |
+| `heterogenous/heterogeneous_2.sbatch` | Runs Heterogeneous-2's Step 1: task `0` is the control, and tasks `1-5` wait for it. |
 
 `run_model.sbatch` defaults to the documented four-day `gpu_long` ceiling
 because the migrated studies contain long local-fitting loops. These are
 starting values, not measured requirements. Options passed to `sbatch` may
 override them.
 
-`swiglu_7.sbatch` requests one GPU, eight CPUs, 128 GB RAM, and 48 hours on
+`swiglu/swiglu_7.sbatch` requests one GPU, eight CPUs, 128 GB RAM, and 48 hours on
 `gpu_short`. It is the only supported PERUN launcher for SwiGLU-7 new runs and
 resumes.
 
@@ -160,7 +165,7 @@ Prepare once with the dedicated job:
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
   --output="$PERUN_LOG_DIR/%x_%j.out" \
   --error="$PERUN_LOG_DIR/%x_%j.err" \
-  workflows/jobs/perun/swiglu_7.sbatch prepare
+  workflows/jobs/perun/swiglu/swiglu_7.sbatch prepare
 ```
 
 After a verified stage-out, preparation is already stored at
@@ -175,7 +180,7 @@ sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
   --array=0-11%12 \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" \
   --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-  workflows/jobs/perun/swiglu_7.sbatch train "$S7_PREPARED"
+  workflows/jobs/perun/swiglu/swiglu_7.sbatch train "$S7_PREPARED"
 ```
 
 Tasks `0-3`, `4-7`, and `8-11` map respectively to S7-0, S7-1, and S7-2;
@@ -190,12 +195,12 @@ output:
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
   --output="$PERUN_LOG_DIR/%x_%j.out" \
   --error="$PERUN_LOG_DIR/%x_%j.err" \
-  workflows/jobs/perun/swiglu_7.sbatch prepare --resume
+  workflows/jobs/perun/swiglu/swiglu_7.sbatch prepare --resume
 
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --array=5 \
   --output="$PERUN_LOG_DIR/%x_%A_%a.out" \
   --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
-  workflows/jobs/perun/swiglu_7.sbatch train --resume "$S7_PREPARED"
+  workflows/jobs/perun/swiglu/swiglu_7.sbatch train --resume "$S7_PREPARED"
 ```
 
 Task 5 is S7-1 at target 0.3. Replace it with the failed task index. Never run
@@ -211,7 +216,7 @@ result handling.
 
 ## SwiGLU-8 workflow
 
-`swiglu_8.sbatch` uses the SwiGLU-7 lock, scratch, and verified stage-out
+`swiglu/swiglu_8.sbatch` uses the SwiGLU-7 lock, scratch, and verified stage-out
 contract with Quantization-1's explicit code staging. Outputs go to `PROJECT/perun-results/swiglu-8/<run-id>`. Every
 stage reads its pinned SwiGLU-7 sources read-only from
 `PROJECT/perun-results/swiglu-7/`. Each submission needs the researcher's go;
@@ -239,7 +244,7 @@ same `--array` index.
 
 ## SwiGLU-9 workflow
 
-`swiglu_9.sbatch` uses the SwiGLU-8 lock, scratch, explicit code staging, and
+`swiglu/swiglu_9.sbatch` uses the SwiGLU-8 lock, scratch, explicit code staging, and
 verified stage-out contract. Outputs go to `PROJECT/perun-results/swiglu-9/<run-id>`.
 Every mode reads its pinned SwiGLU-7 and SwiGLU-8 sources from
 `PROJECT/perun-results/swiglu-7/` and `swiglu-8/`; nothing there is written.
@@ -295,9 +300,28 @@ The copy-paste commands are in the
 without a GPU, so its launcher skips the GPU checks. To rerun a failed task, move
 its output aside first; the launcher refuses an existing output.
 
+## Heterogeneous-2 workflow
+
+`heterogenous/heterogeneous_2.sbatch` uses the Heterogeneous-1 lock, scratch, explicit code
+staging, and verified stage-out contract, without a resume path. Its one mode, `train`, maps
+array tasks onto the configuration's run table. Outputs go to
+`PROJECT/perun-results/heterogeneous-2/<name>-run-001`. Heterogeneous-1's and SwiGLU-8's pinned
+inputs are read in place from PROJECT; nothing there is written. Each submission needs the
+researcher's go. Pass the planned `--time` and `--mem` from the
+[resource plan](../../../docs/experiments/model/heterogenous/heterogeneous-2.md#pre-run-resource-plan).
+The copy-paste commands are in the
+[PERUN runbook](../../../docs/infrastructure/perun/perun-runbook.md#13-heterogeneous-2).
+
+| Array | Runs | Submission |
+| --- | --- | --- |
+| `0` | `swiglu-0.8-control` | First |
+| `1-5` | `forced-0.2`, `forced-0.5`, `forced-0.8`, `forced-0.8-lr1e-4`, `swiglu-0.8-lr1e-4` | With `--dependency=afterok` on task 0 |
+
+`summarize` runs on the login node once all six runs are on PROJECT.
+
 ## Results and logs
 
-[quantization_1.sbatch](quantization_1.sbatch) submits one explicitly selected
+[baseline/quantization_1.sbatch](baseline/quantization_1.sbatch) submits one explicitly selected
 Quantization-1 prepare/run/evaluate job. Alternatively, `run-array` starts the
 five decided models as array tasks 0-4. The runbook submits `--array=0-3` with
 an 8-hour limit and `--array=4` with 36 hours, because one array has a single
@@ -313,7 +337,7 @@ Conda environment with TorchAO and MSLK added. See the
 [Quantization-1 guide](../../../docs/experiments/model/baseline/quantization-1.md)
 for submission, resource-planning, and resume requirements.
 
-[speed_1.sbatch](speed_1.sbatch) runs Speed-1 as one job, never an array,
+[baseline/speed_1.sbatch](baseline/speed_1.sbatch) runs Speed-1 as one job, never an array,
 because comparable speeds need one GPU. It reads the bundles in place from
 `PROJECT/perun-results/quantization-1/` and `swiglu-8/` and stages out to
 `PROJECT/perun-results/speed-1/<output>`, with the same lock and verified

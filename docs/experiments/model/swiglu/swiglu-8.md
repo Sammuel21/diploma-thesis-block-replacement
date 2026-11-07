@@ -613,7 +613,7 @@ Implemented on 2026-10-11 without any run. Runner:
 [`swiglu_8.py`](../../../../workflows/runs/model/swiglu/swiglu_8.py).
 Configuration:
 [`swiglu-8.json`](../../../../workflows/configs/model/swiglu/swiglu-8.json).
-PERUN job: [`swiglu_8.sbatch`](../../../../workflows/jobs/perun/swiglu_8.sbatch),
+PERUN job: [`swiglu_8.sbatch`](../../../../workflows/jobs/perun/swiglu/swiglu_8.sbatch),
 described in the [PERUN job README](../../../../workflows/jobs/perun/README.md#swiglu-8-workflow).
 The copy-paste commands for every stage are in the
 [PERUN runbook](../../../infrastructure/perun/perun-runbook.md#3-swiglu-8).

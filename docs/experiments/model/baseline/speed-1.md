@@ -70,7 +70,7 @@ From the repository root on a PERUN login node, with the environment from the
 ```bash
 sbatch --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" \
   --output="$PERUN_LOG_DIR/%x_%j.out" --error="$PERUN_LOG_DIR/%x_%j.err" \
-  workflows/jobs/perun/speed_1.sbatch speed-001
+  workflows/jobs/perun/baseline/speed_1.sbatch speed-001
 ```
 
 The job reads the bundles in place from `PROJECT/perun-results/quantization-1/`

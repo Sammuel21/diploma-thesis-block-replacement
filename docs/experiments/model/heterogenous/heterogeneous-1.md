@@ -10,8 +10,8 @@ modified: 2026-11-06
 **Status:** all 59 tasks ran from 2026-11-04 to 2026-11-06 with no reruns, and every
 acceptance check passed. **No new operator was picked at any target**
 ([results summary](#results-summary)).
-**Next step:** the load-only analysis notebook and the redesign of
-[Heterogeneous-2](heterogeneous-2.md).
+**Next step:** the load-only analysis notebook. [Heterogeneous-2](heterogeneous-2.md) has been
+redesigned around the forced models.
 The binding decisions are in the
 [shared decision log](../../../agents/decisions.md) (2026-11-04 entries); this
 page explains them. If the two disagree, the log wins until the conflict is
