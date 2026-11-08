@@ -2,7 +2,7 @@
 title: TUKE Perun Experiment Log
 status: active
 created: 2026-09-25
-modified: 2026-11-07
+modified: 2026-11-08
 ---
 
 # TUKE Perun Experiment Log
@@ -581,3 +581,21 @@ Entries are appended below in submission order.
 - Variance: 1.4% above the central estimate, within the range.
 - Experiment document: [Quantization-2](../../experiments/model/baseline/quantization-2.md#results-of-the-fixed-reruns-2026-11-07).
 - Notes: `perunfsusage` on 2026-11-03 listed the user limits as 20 running jobs, 50 queued, and 32 GPUs at once.
+
+## [2026-11-07 21:52 UTC] 145625 | Recovery-1 schedule screen, 3 tasks
+
+- Plan: 1.9-2.8 h per task (4-hour limit), 6.6-7.5 GPU-hours expected, ceiling 12 ([resource plan](../../experiments/model/recovery/recovery-1.md#pre-run-resource-plan)); medium confidence.
+- Outcome: all 3 tasks completed with structured status `completed`; no retries. Every stopping gate passed: each token-0 row equalled its recorded run's (relative difference 0.0), no fake-quantized projection differed from its deployed weight (dense and B), and the selection-stream teacher self-KL was −1.2e-9. The recorded `trunk-curve` check flagged all three families (largest gaps 4.12%, 1.04%, 1.85%); the review classed them as noise ([results](../../experiments/model/recovery/recovery-1.md#results-2026-11-08)).
+- Submission: `recovery_1.sbatch train --array=0-2 --time=04:00:00 --mem=128G` (runbook 14.3), after 14.2 was clean (13 of 13 hashes OK, `--test-only` accepted). The checkout was pulled from `cff64fd` to `97a97a2` with an empty queue first. Task job IDs: 145626 (task 0, `dense-int3`), 145627 (task 1, `b-0.2-int4`), 145625 (task 2, `swiglu-0.2`).
+- Provenance: commit `97a97a2`; configuration sha256 `d4149df2…`; recovery stream `570409c1…` and selection stream `85165ff8…`, equal to the pins; selection stream read from `swiglu-8/block-check-001-task-00/prepared/`.
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, and 128 GB per task (`AllocTRES` cpu=8, mem=128G, gres/gpu=1, billing=9); all three on gpu01. Submitted and started 2026-11-07 22:52:02-03 local time (UTC+1).
+- Consumption:
+  - Scheduler: Unknown; `scontrol` returned "Invalid job id" on 2026-11-08, about 10 hours after the last task ended.
+  - Workflow timing (result `created` to last update): 2.49 h (dense), 2.13 h (B), 1.87 h (SwiGLU), 6.49 h in total; a lower bound that excludes code staging and stage-out. About 52 CPU core-hours (8 CPUs × workflow time, derived).
+- Efficiency: peak RAM (process high-water mark at the trunk's last row) 39.3, 14.0, and 13.8 GiB; peak VRAM allocated 49.6, 37.1, and 31.2 GiB. The branch phase has no memory record. CPU and GPU utilization Unknown.
+- Outputs: PROJECT `perun-results/recovery-1/{dense-int3,b-0.2-int4,swiglu-0.2}-run-001/`, 160 KB in total (JSON only); `summary-001/` follows the researcher's flag acceptance. PROJECT held 281 of 1,000 GB. Analysis copy on the PC (archive 28 KB).
+- Continuation: completed; no resume by design; trained models are not kept.
+- Verification: "Verified persistent output" logged for all 3; no `AcceptanceFailure` or traceback; no leftover lock.
+- Variance: 6.49 h against 6.6-7.5 h expected, 2-13% below; each task at or just under the low end of its range. Peak RAM was below the estimate (39 against about 55 GB for dense; 14 against about 40 GB for B and SwiGLU, whose replacement-only snapshots are small).
+- Experiment document: [Recovery-1](../../experiments/model/recovery/recovery-1.md#results-2026-11-08).
+- Notes: the three tasks shared node gpu01, one GPU each, without a visible slowdown.
