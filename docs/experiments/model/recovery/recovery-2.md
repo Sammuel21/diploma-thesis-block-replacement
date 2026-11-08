@@ -126,6 +126,30 @@ both the constant reference and a 1B noise sample. The decay lengths are those
 of Recovery-1 (20%, 50%), so the ordering can be compared across budgets; 10%
 was the weakest at 100M and is dropped.
 
+Every compared model sees exactly 1B tokens: a decay model is the trunk up to its
+decay start, then its own decay to 1B. The 1.7B is the GPU work shared among the
+three models, not any model's budget.
+
+**Decay rate.** After the start $D$ the rate follows Recovery-1's formula,
+$\eta(t) = \eta_{\text{peak}} \cdot (1 - \sqrt{(t - D)/(T - D)})$ with $T$ = 1B. It is
+source-derived from Hägele et al. [`src-hagele-2024`, Section 3.2]; the source,
+notation, and length rationale are in
+[Recovery-1, Candidates](recovery-1.md#design). Both decays use the same curve, stretched
+over 500M or 200M tokens, so the 20% decay falls 2.5 times as fast per token. The rate
+drops fastest at the start (22% in the first 5% of a decay), then flattens, and reaches 0
+only at 1B. Share of the 3e-5 peak (computed from the formula):
+
+| Token | 50% decay | 20% decay |
+| --- | ---: | ---: |
+| 500M | 100% | 100% |
+| 600M | 55% | 100% |
+| 700M | 37% | 100% |
+| 800M | 23% | 100% |
+| 850M | 16% | 50% |
+| 900M | 11% | 29% |
+| 950M | 5% | 13% |
+| 1B | 0% | 0% |
+
 **Score.** The 8K KL on SwiGLU-8's selection stream (`85165ff8…`), as in
 Recovery-1. Each family's old history metric (dense: the final 8K stream; B and
 SwiGLU: the 128-token monitoring KL, with WikiText perplexity at 10, 25, 50, 100, 250,
