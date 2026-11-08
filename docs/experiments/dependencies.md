@@ -2,7 +2,7 @@
 title: Experiment Dependencies and Status
 status: active
 created: 2026-11-01
-modified: 2026-11-07
+modified: 2026-11-08
 ---
 
 # Experiment dependencies and status
@@ -102,8 +102,8 @@ flowchart LR
   Q2 --> R2
   H1 -. planned section .-> R2
 
-  class S7,S8,S9,Q2,SP1,R1,ST1,ST1B done
-  class Q1 running
+  class S7,S8,S9,Q2,SP1,R1,ST1,ST1B,RC1 done
+  class Q1,RC2 running
   class H1,H2,R2 planned
   class S26,BB,BO,CB,BI historical
 ```
@@ -126,8 +126,8 @@ Grey: historical or notebook-only.
 | [Block interaction](model/interaction/block-interaction.md) | Notebook artifact only | - |
 | [Heterogeneous-1](model/heterogenous/heterogeneous-1.md) | Done 2026-11-06: 59/59 completed; no new operator picked, no ranking swap | SwiGLU-8 (Part A protocol, streams, cost tables); block operator studies as background |
 | [Heterogeneous-2](model/heterogenous/heterogeneous-2.md) | Step 1 implemented 2026-11-06, not yet run; Steps 2 and 3 conditional | Heterogeneous-1, SwiGLU-8 (100M pairs), SwiGLU-7 and SwiGLU-9 (1B references) |
-| [Recovery-1](model/recovery/recovery-1.md) | Run 2026-11-07 (array 145625, 3/3 completed): dense INT3 adopts the 20% decay; B 20% INT4 and SwiGLU 20% keep constant; `summary-001` after flag acceptance | Quantization-2, Stacking-1, and SwiGLU-8 recorded runs and starts; SwiGLU-8 selection stream; 1B constant runs for the token-equivalent |
-| [Recovery-2](model/recovery/recovery-2.md) | Implemented 2026-11-08, not run; sets each family's 3B schedule | Recovery-1; the recorded 1B constant runs (Quantization-2, Stacking-1, SwiGLU-7); SwiGLU-8 selection stream |
+| [Recovery-1](model/recovery/recovery-1.md) | Run 2026-11-07 (array 145625, 3/3 completed): dense INT3 adopts the 20% decay; B 20% INT4 and SwiGLU 20% keep constant; flags accepted, `summary-001` written 2026-11-08 | Quantization-2, Stacking-1, and SwiGLU-8 recorded runs and starts; SwiGLU-8 selection stream; 1B constant runs for the token-equivalent |
+| [Recovery-2](model/recovery/recovery-2.md) | Running since 2026-11-08 (array 146204); sets each family's 3B schedule | Recovery-1; the recorded 1B constant runs (Quantization-2, Stacking-1, SwiGLU-7); SwiGLU-8 selection stream |
 | [Results 2026-11-01](../results/2026-11-01-results.md) | WIP for the 2026-11-06 meeting | SwiGLU-9, Stacking-1, Quantization-2; heterogeneous later |
 
 Invalid and excluded runs (decision log, 2026-10-25): Quantization-2
@@ -154,6 +154,7 @@ The order of work inside each experiment is on its page.
 | `select-001`, `baseline-table-001` | Heterogeneous-1 | SwiGLU-8 `prepare-001` and `block-check-001` | Heterogeneous-1 session | 143434, 143435 | Completed 2026-11-04; recipes pinned in `cff64fd` |
 | `cost-table-001`, `recovery-001`, `solve-001`, `assemble-001`, `summary-001` | Heterogeneous-1 | Pinned recipes, `select-001`, `baseline-table-001` | Heterogeneous-1 session | 144574, 144575, 144734, 145235 | Completed 2026-11-06; no hybrid target, no swap, forced runs required |
 | `swiglu-0.8-control`, then `forced-{0.2,0.5,0.8}`, `forced-0.8-lr1e-4`, `swiglu-0.8-lr1e-4` | Heterogeneous-2 Step 1 | Heterogeneous-1 `assemble-001`, cost tables; SwiGLU-8 `prepare-001`, fitted runs | Heterogeneous-2 session | - | Implemented, not submitted |
-| `dense-int3`, `b-0.2-int4`, `swiglu-0.2` (`-run-001`) | Recovery-1 | Recorded constant runs (Quantization-2, Stacking-1, SwiGLU-8), SwiGLU-8 `prepare-001` and selection stream | Recovery-1 session 2b | 145625 | Completed 2026-11-08; dense 20% decay, B and SwiGLU constant; flags reviewed |
+| `dense-int3`, `b-0.2-int4`, `swiglu-0.2` (`-run-001`) | Recovery-1 | Recorded constant runs (Quantization-2, Stacking-1, SwiGLU-8), SwiGLU-8 `prepare-001` and selection stream | Recovery-1 session 2b | 145625 | Completed 2026-11-08; dense 20% decay, B and SwiGLU constant; flags accepted, `summary-001` written |
+| `dense-int3`, `b-0.2-int4`, `swiglu-0.2` (`-run-001`) | Recovery-2 | Recovery-1 runs (token-0 check); recorded 1B constant runs (Quantization-2, Stacking-1, SwiGLU-7); SwiGLU-7 1B stream; SwiGLU-8 `prepare-001` and selection stream | Recovery-2 session | 146204 | Running since 2026-11-08 from `bb6c1cb`; expected 17.6-24.0 h per task |
 | TorchAO INT3 upstream check | Quantization-2 | - | TorchAO session | - | Investigation, no GPU |
 | Results-2 snapshot | Results | The runs above; heterogeneous | Results session | - | WIP |

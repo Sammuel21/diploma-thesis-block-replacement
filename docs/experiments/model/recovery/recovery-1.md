@@ -12,8 +12,8 @@ array 145625 from commit `97a97a2`, all completed, and every stopping gate
 passed ([results](#results-2026-11-08)). Under the fixed rule, **dense INT3
 adopts the 20% decay; B 20% INT4 and SwiGLU 20% keep constant.** All three
 families carry a `trunk-curve` flag. The review classes each as noise and
-recommends accepting it. `summary-001` is written once the researcher runs
-`summarize --accept-flags`. **Next step:** [Recovery-2](recovery-2.md), a
+recommends accepting it. The researcher accepted all three, and `summary-001` was
+written on PERUN on 2026-11-08 with the same decisions. **Next step:** [Recovery-2](recovery-2.md), a
 branched 1B screen of all three families, replaces the single 1B check
 below (decision log, 2026-11-08). The binding
 decisions are the 2026-11-07 and 2026-11-08 rows in the

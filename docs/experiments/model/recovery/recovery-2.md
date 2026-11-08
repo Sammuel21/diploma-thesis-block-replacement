@@ -7,12 +7,14 @@ modified: 2026-11-08
 
 # Recovery-2 - decay length at 1B
 
-**Status (2026-11-08):** designed in Recovery-1 session 2b. The plan session then
-settled the open reference-row point (median of four), the update layout, the rows, and
-the time limit. It implemented the runner, configuration, job, CPU tests, and the runbook
-section. Nothing is committed and nothing has run. **Next step:** the researcher commits
-and pushes, then submits the array from a fresh PERUN login once the queue is empty
-([runbook section 15](../../../infrastructure/perun/perun-runbook.md#15-recovery-2)).
+**Status (2026-11-08):** running. Designed in Recovery-1 session 2b; the plan session
+settled the reference (median of four), the update layout, the rows, and the time limit,
+and implemented the runner, configuration, job, CPU tests, and runbook section. Submitted
+on 2026-11-08 as array 146204 from commit `bb6c1cb` after a clean pre-submission check
+(14 of 14 hashes OK, decay starts as designed); all three tasks started together on
+`gpu23`. Expected 17.6-24.0 h per task. **Next step:** confirm the token-0 gates (first
+`trunk tokens=10,002,432` line per task), then, when all three finish, run the summary
+([runbook 15.4-15.5](../../../infrastructure/perun/perun-runbook.md#15-recovery-2)).
 3B runs (Stacking-2, Quantization-3) wait for this experiment's results. The binding
 decisions are the rows in the [shared decision log](../../../agents/decisions.md); if this
 page and the log disagree, the log wins.

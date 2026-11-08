@@ -28,7 +28,7 @@ what is running now, is in [experiment dependencies](../dependencies.md).
 | [Homogeneous SwiGLU experiments](swiglu/README.md) | What quality did model-wide SwiGLU replacement achieve, and why? See the [results overview](swiglu/swiglu-results.md) or [chronological progression](swiglu/swiglu-progression.md). | Concluded through SwiGLU-7; all 12 native-8K production runs completed. SwiGLU-8 is implemented and not yet run |
 | [Stacking experiments](stacking/README.md) | Does replacement plus INT8/INT4/INT3 quantization beat either method alone at equal bytes, and does the order of operations matter? | Stacking-1 ran 2026-10-20/21; analysis pending; 3 order-B INT3 runs invalid (2026-10-25) |
 | [Heterogeneous operator experiments](heterogenous/README.md) | How should different replacement operator families and capacities be allocated across MLP blocks? | Heterogeneous-1 done 2026-11-06: no new operator picked; Heterogeneous-2 Step 1 implemented, not yet run |
-| [Recovery recipe experiments](recovery/README.md) | Does a learning-rate decay beat the constant recovery recipe, for dense INT3 QAT, stacking, and SwiGLU alone? | Recovery-1 run 2026-11-07: dense INT3 adopts a 20% decay, B and SwiGLU keep constant; Recovery-2 (1B decay lengths) implemented 2026-11-08, not run |
+| [Recovery recipe experiments](recovery/README.md) | Does a learning-rate decay beat the constant recovery recipe, for dense INT3 QAT, stacking, and SwiGLU alone? | Recovery-1 run 2026-11-07: dense INT3 adopts a 20% decay, B and SwiGLU keep constant; Recovery-2 (1B decay lengths) running since 2026-11-08 (array 146204) |
 
 Reusable definitions belong under [methodology](../../methodology/). Results
 and run metadata belong in JSON artifacts. The Python migrations require an

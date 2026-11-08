@@ -2,7 +2,7 @@
 title: Heterogeneous-2 - Forced Models After Recovery
 status: draft
 created: 2026-11-04
-modified: 2026-11-06
+modified: 2026-11-08
 ---
 
 # Heterogeneous-2 - Forced Models After Recovery
@@ -251,6 +251,14 @@ on PERUN by this project; the fallback is to submit tasks 1-5 by hand after the 
   measured noise are reported as unresolved.
 - **The forcing rule picks layers by predicted damage,** so these are the most favourable layers
   by that measure, not the only possible hybrids.
+- **The forced layers are a ranking, not an optimum.** Each layer's extra damage was scored alone,
+  before training, and the eight lowest were forced together (20%: layers 4, 8, 10-15; 50%: 3, 6,
+  11, 13-16; 80%: 6, 10-16; from Heterogeneous-1's `assemble-001` results). A knapsack required to
+  use at least eight non-SwiGLU layers could pick a different set; it was not solved. Eight is the
+  largest point of Heterogeneous-1's 1, 2, 4, 8 curve, and the only one whose token-0 gap is clearly
+  above the 3.5% bar at all three targets (+20.5%, +8.9%, +7.6%; four layers give +3.7% at 80%), so
+  recovery has a measurable gap to close (reason recorded 2026-11-08). The cost is that a loss at
+  eight layers does not show whether two or four would also lose.
 
 ## Steps 2 and 3
 
