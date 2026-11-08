@@ -14,9 +14,9 @@ adopts the 20% decay; B 20% INT4 and SwiGLU 20% keep constant.** All three
 families carry a `trunk-curve` flag. The review classes each as noise and
 recommends accepting it. `summary-001` is written once the researcher runs
 `summarize --accept-flags`. **Next step:** [Recovery-2](recovery-2.md), a
-branched 1B screen of all three families that is to replace the single 1B check
+branched 1B screen of all three families, replaces the single 1B check
 below (decision log, 2026-11-08). The binding
-decisions are the 2026-11-07 rows in the
+decisions are the 2026-11-07 and 2026-11-08 rows in the
 [shared decision log](../../../agents/decisions.md); if this page and the log
 disagree, the log wins.
 

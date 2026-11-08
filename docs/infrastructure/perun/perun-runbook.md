@@ -2,7 +2,7 @@
 title: PERUN Runbook
 status: active
 created: 2026-10-11
-modified: 2026-11-06
+modified: 2026-11-08
 ---
 
 # PERUN Runbook
@@ -42,7 +42,8 @@ order A at 100M, and order A at 1B, 48 tasks in total. Quantization-2
 (section 11) adds three single runs on Quantization-1's launcher, after
 Stacking-1 has finished. Heterogeneous-1 (section 12) adds five sittings, each
 after a review of the one before. Heterogeneous-2 (section 13) adds one sitting of
-six runs: a control, and five that wait for it.
+six runs: a control, and five that wait for it. Recovery-1 (section 14) and
+Recovery-2 (section 15) each add one sitting of three independent tasks.
 
 **Official PERUN rules these commands follow**, checked against the
 [PERUN wiki](https://wiki.hpc.tuke.sk/perun/perun/) on 2026-10-11:
@@ -2302,3 +2303,171 @@ review the flag with the assistant, then rerun with `--accept-flags FAMILY`, whi
 the [experiment page](../../experiments/model/recovery/recovery-1.md#winner-rule). Right after
 the sitting, run section 7 for its job IDs, and copy the results home (section 6,
 `EXPERIMENT=recovery-1`).
+
+## 15. Recovery-2
+
+Design, rule, gates, and resource plan:
+[recovery-2.md](../../experiments/model/recovery/recovery-2.md). Every submission needs the
+researcher's go. Everything goes to `perun-results/recovery-2/`. Three independent tasks, one
+per family; each trains a constant trunk to 1B in its recorded run's update layout and two
+decays branched from it. Each task takes about a day.
+
+| Step | Block | Requested per task | Expected per task | Before the next step |
+| --- | --- | --- | --- | --- |
+| Recovery-1 summary | 15.0 | login node | minutes | `summary-001` exists |
+| Locate the selection stream | 15.1 | - | minutes | One copy with sha256 `85165ff8…` |
+| Update and pre-submission checks | 15.2 | - | minutes | Every line OK |
+| **One sitting:** tasks 0-2 | 15.3 | 30 h, 128 GB | 17.6-24.0 h | Each task prints its first `trunk` line (15.4) |
+| Summary | 15.5 | login node | minutes | - |
+
+Do not update the checkout while a job of yours is queued or running (Heterogeneous-2
+included): a job copies the code when it starts, and the summary refuses families on
+different code. There is no resume: a failed task reruns from token 0. To rerun one, move its
+output aside first.
+
+Run 1.2 and 1.3 first.
+
+### 15.0 Recovery-1 summary
+
+**Safe to re-run.** Recovery-2 does not read it, but Recovery-1's decision record must exist.
+If the first line prints `missing`, run the `summarize` command: it prints the three decisions
+and writes `summary-001` with the three flags accepted (decision log, 2026-11-08). If it prints
+`exists`, skip the command. A repeat with identical results changes nothing.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+test -f "$PERUN_RESULTS/recovery-1/summary-001/result.json" && echo "summary-001 exists" || echo "summary-001 missing"
+# Only if it printed "missing":
+PYTHONPATH=src python -m workflows.runs.model.recovery.recovery_1 summarize \
+  --results-root "$PERUN_RESULTS/recovery-1" --source-root "$PERUN_RESULTS" \
+  --accept-flags dense-int3 b-0.2-int4 swiglu-0.2
+```
+
+### 15.1 Locate the selection stream
+
+**Safe to re-run.** The same file as Recovery-1 (14.1). Pick one path whose hash is
+`85165ff8d0eb9711c1dc75de9a1b9f11f44f6d635abed340e5f81af342047d97`; if none prints, stop and
+tell the assistant.
+
+```bash
+find "$PERUN_RESULTS" -name 'long-context-selection.int32' -print0 2>/dev/null | xargs -0 -r sha256sum
+export RECOVERY2_SELECTION_STREAM=/mnt/project/...   # one of the paths above with the right hash
+```
+
+### 15.2 Pre-submission checks
+
+**Safe to re-run, except the `git pull`, which needs an empty queue.** Every hash line must
+print OK (hashing the 4 GB stream takes about a minute), the configuration must load and print
+the decay starts below, the `--test-only` line must be accepted, and no Recovery-2 output may
+exist yet.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+squeue -u "$USER"   # must list no job before the pull below
+git status --short
+git pull --ff-only origin "$PERUN_BRANCH"
+git log -1 --oneline
+# Every pinned input exists and matches the configuration.
+python - <<'EOF'
+import hashlib, json, os
+config = json.load(open("workflows/configs/model/recovery/recovery-2.json"))
+stacking = json.load(open("workflows/configs/model/stacking/stacking-1.json"))
+expected = {
+    "swiglu-8/prepare-001/result.json": config["sources"]["swiglu8_prepare_sha256"],
+    "swiglu-8/block-check-001/result.json": config["sources"]["swiglu8_block_check_sha256"],
+    "swiglu-8/fitted-target-0.2-run-001/result.json": stacking["sources"]["models"]["fitted-0.2-100m"]["result_sha256"],
+    "swiglu-8/prepare-001/prepared/kl-tokens.int32": config["streams"]["final_kl_sha256"],
+    "swiglu-8/prepare-001/prepared/local-evaluation-batches.pt": config["streams"]["monitoring_sha256"],
+    "swiglu-7/prepare-001/result.json": config["sources"]["swiglu7_prepare_sha256"],
+    "swiglu-7/prepare-001/prepared/recovery-tokens.int32": config["streams"]["recovery_sha256"],
+}
+for family in config["families"]:
+    for key in ("recorded_1b", "recovery_1"):
+        pin = family[key]
+        expected[f"{pin['workflow']}/{pin['run']}/result.json"] = pin["result_sha256"]
+paths = {relative: os.path.join(os.environ["PERUN_RESULTS"], relative) for relative in expected}
+paths["selection stream"] = os.environ["RECOVERY2_SELECTION_STREAM"]
+expected["selection stream"] = config["streams"]["selection_sha256"]
+for name, path in paths.items():
+    if not os.path.isfile(path):
+        print("MISSING ", name)
+        continue
+    sha = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            sha.update(block)
+    print("OK      " if sha.hexdigest() == expected[name] else "MISMATCH", name)
+EOF
+
+# Configuration, decay starts, launcher syntax, and whether Slurm would accept the job (nothing is submitted).
+# Expected: dense-int3 {20: 800006144, 50: 500006912}; b-0.2-int4 and swiglu-0.2 {20: 800006400, 50: 500007168}.
+PYTHONPATH=src python -c "from workflows.runs.model.recovery import recovery_2 as r; s, st, *unused = r.load_settings(r.DEFAULT_CONFIG); [print(f['name'], {p: v['tokens'] for p, v in r.decay_starts(s, st['recovery_1b'], f).items()}) for f in s['families']]"
+JOB=workflows/jobs/perun/recovery/recovery_2.sbatch
+bash -n "$JOB" && echo "launcher syntax OK"
+sbatch --test-only --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=30:00:00 --mem=128G --array=0-2 "$JOB" train
+perunfsusage    # PROJECT needs under 0.1 GB; SCRATCH about 1 GB per task
+ls "$PERUN_RESULTS/recovery-2" 2>/dev/null || echo "no Recovery-2 outputs yet"
+```
+
+### 15.3 Submit the three tasks
+
+**Submits jobs. Run once,** after 15.2 is clean, in the shell where `RECOVERY2_SELECTION_STREAM`
+is exported. It writes the job ID to `$PERUN_LOG_DIR/recovery-2_submission.txt`. If the ID prints
+empty, `sbatch` was refused: tell the assistant before submitting again.
+
+```bash
+cd "$PERUN_PROJECT/diploma-thesis-block-replacement"
+JOB=workflows/jobs/perun/recovery/recovery_2.sbatch
+EXISTING=$(find "$PERUN_RESULTS/recovery-2" -mindepth 1 -maxdepth 1 2>/dev/null)
+if [[ -n "$EXISTING" ]] || squeue -u "$USER" -h -n recovery-2 | grep -q .; then
+    echo "STOP: Recovery-2 outputs exist or a recovery-2 job is queued:"; echo "$EXISTING"
+else
+    SCREEN=$(sbatch --parsable --account="$PERUN_ACCOUNT" --qos="$PERUN_QOS" --time=30:00:00 --mem=128G \
+        --array=0-2 --output="$PERUN_LOG_DIR/%x_%A_%a.out" --error="$PERUN_LOG_DIR/%x_%A_%a.err" \
+        "$JOB" train)
+    printf 'SCREEN=%s\n' "${SCREEN%%;*}" | tee "$PERUN_LOG_DIR/recovery-2_submission.txt"
+    echo "<- record it in local/perun/runs/recovery-2.md"
+fi
+```
+
+Task map: 0 `dense-int3`, 1 `b-0.2-int4`, 2 `swiglu-0.2`.
+
+### 15.4 Watch the tasks
+
+**Safe to re-run.** Each task hashes the 4 GB stream, loads its models, and checks its start:
+the teacher's self-KL, the token-0 row against the recorded 1B run, and the token-0 selection KL
+against Recovery-1. A mismatch stops it with `AcceptanceFailure` in its `.err` file: stop and
+tell the assistant. A first `trunk tokens=10,002,432` line means all three checks passed; it
+should appear within about half an hour. Then one `trunk` line follows every 25M (about 20
+minutes apart for dense, 15 for SwiGLU), and after 1B one `decay=` line per branch row, 20%
+first. The `legacy` value should stay near the recorded run (the summary checks it against 1%;
+dense INT3 is expected to stray).
+
+```bash
+source "$PERUN_LOG_DIR/recovery-2_submission.txt"
+squeue -u "$USER" -n recovery-2 -o "%.18i %.10T %.10M %.11l %R"
+for TASK in 0 1 2; do
+    LOG="$PERUN_LOG_DIR/recovery-2_${SCREEN}_${TASK}"
+    grep -h '^family=' "$LOG.out" 2>/dev/null | tail -2
+    grep -q 'Verified persistent output' "$LOG.out" 2>/dev/null && echo "task $TASK: done"
+done
+grep -l -E 'AcceptanceFailure|Traceback' "$PERUN_LOG_DIR"/recovery-2_*.err 2>/dev/null
+gpu-status
+```
+
+### 15.5 Summary
+
+**Safe to re-run.** When all three tasks have finished, on the login node:
+
+```bash
+PYTHONPATH=src python -m workflows.runs.model.recovery.recovery_2 summarize \
+  --results-root "$PERUN_RESULTS/recovery-2"
+```
+
+It prints each family's decision, the median reference and its four rows, each decay's value
+and gain, the lowest-of-four outcome (reported only), and any flag. A flagged family is held
+and nothing is written: review the flag with the assistant, then rerun with
+`--accept-flags FAMILY`, which writes `summary-001` with the acceptance recorded. The rule is
+on the [experiment page](../../experiments/model/recovery/recovery-2.md#winner-rule). Right
+after the sitting, run section 7 for its job IDs, and copy the results home (section 6,
+`EXPERIMENT=recovery-2`).

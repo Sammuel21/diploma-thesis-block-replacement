@@ -127,7 +127,7 @@ Grey: historical or notebook-only.
 | [Heterogeneous-1](model/heterogenous/heterogeneous-1.md) | Done 2026-11-06: 59/59 completed; no new operator picked, no ranking swap | SwiGLU-8 (Part A protocol, streams, cost tables); block operator studies as background |
 | [Heterogeneous-2](model/heterogenous/heterogeneous-2.md) | Step 1 implemented 2026-11-06, not yet run; Steps 2 and 3 conditional | Heterogeneous-1, SwiGLU-8 (100M pairs), SwiGLU-7 and SwiGLU-9 (1B references) |
 | [Recovery-1](model/recovery/recovery-1.md) | Run 2026-11-07 (array 145625, 3/3 completed): dense INT3 adopts the 20% decay; B 20% INT4 and SwiGLU 20% keep constant; `summary-001` after flag acceptance | Quantization-2, Stacking-1, and SwiGLU-8 recorded runs and starts; SwiGLU-8 selection stream; 1B constant runs for the token-equivalent |
-| [Recovery-2](model/recovery/recovery-2.md) | Designed and decided 2026-11-08, not implemented; sets each family's 3B schedule | Recovery-1; the recorded 1B constant runs (Quantization-2, Stacking-1, SwiGLU-7); SwiGLU-8 selection stream |
+| [Recovery-2](model/recovery/recovery-2.md) | Implemented 2026-11-08, not run; sets each family's 3B schedule | Recovery-1; the recorded 1B constant runs (Quantization-2, Stacking-1, SwiGLU-7); SwiGLU-8 selection stream |
 | [Results 2026-11-01](../results/2026-11-01-results.md) | WIP for the 2026-11-06 meeting | SwiGLU-9, Stacking-1, Quantization-2; heterogeneous later |
 
 Invalid and excluded runs (decision log, 2026-10-25): Quantization-2

@@ -27,6 +27,7 @@ tied to one experiment class.
 | `heterogenous/heterogeneous_1.sbatch` | Runs every Heterogeneous-1 stage: recipe selection, the cost tables, single-block recovery, the knapsack solve, and token-0 assembly. |
 | `heterogenous/heterogeneous_2.sbatch` | Runs Heterogeneous-2's Step 1: task `0` is the control, and tasks `1-5` wait for it. |
 | `recovery/recovery_1.sbatch` | Runs Recovery-1's schedule screen: tasks `0-2`, one family each (dense INT3, B 20% INT4, SwiGLU 20%). |
+| `recovery/recovery_2.sbatch` | Runs Recovery-2's 1B decay-length screen: tasks `0-2`, one family each, in the same order. |
 
 `run_model.sbatch` defaults to the documented four-day `gpu_long` ceiling
 because the migrated studies contain long local-fitting loops. These are
@@ -334,6 +335,27 @@ submission needs the researcher's go. Pass the planned `--time` and `--mem` from
 [resource plan](../../../docs/experiments/model/recovery/recovery-1.md#pre-run-resource-plan).
 The copy-paste commands are in the
 [PERUN runbook](../../../docs/infrastructure/perun/perun-runbook.md#14-recovery-1).
+`summarize` runs on the login node once all three families are on PROJECT.
+
+## Recovery-2 workflow
+
+`recovery/recovery_2.sbatch` uses the Recovery-1 lock, scratch, explicit code staging, and
+verified stage-out contract, without a resume path. Its one mode, `train`, maps array tasks
+`0-2` onto the configuration's families (`dense-int3`, `b-0.2-int4`, `swiglu-0.2`); the three
+tasks are independent. Outputs go to `PROJECT/perun-results/recovery-2/<family>-run-001`. The
+pinned inputs are read in place from PROJECT:
+
+- SwiGLU-8's preparation, block check, and fitted 20% run;
+- SwiGLU-7's preparation and its 4 GB 1B stream;
+- the three recorded 1B runs (Quantization-2, Stacking-1, SwiGLU-7);
+- the three Recovery-1 runs.
+
+The 8K selection stream is read from the path in `RECOVERY2_SELECTION_STREAM`, which must lie
+inside PROJECT; the runner checks its sha256. Each submission needs the researcher's go. Pass the
+planned `--time` and `--mem` from the
+[resource plan](../../../docs/experiments/model/recovery/recovery-2.md#pre-run-resource-plan).
+The copy-paste commands are in the
+[PERUN runbook](../../../docs/infrastructure/perun/perun-runbook.md#15-recovery-2).
 `summarize` runs on the login node once all three families are on PROJECT.
 
 ## Results and logs

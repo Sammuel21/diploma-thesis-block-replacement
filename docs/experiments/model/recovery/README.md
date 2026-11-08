@@ -15,7 +15,7 @@ simulated quantization. Local fitting is not part of it (decision log,
 | Experiment | Main question | Status |
 | --- | --- | --- |
 | [Recovery-1](recovery-1.md) | Does a 1-sqrt learning-rate decay beat the constant 3e-5 recipe at 100M tokens, for dense INT3 QAT, B 20% INT4, and SwiGLU alone at 20%? | Run 2026-11-07 (array 145625): dense INT3 adopts the 20% decay; B and SwiGLU keep constant; `summary-001` after flag acceptance |
-| [Recovery-2](recovery-2.md) | At 1B, does a 20% or 50% decay beat constant for the same three families, setting each family's 3B schedule? | Designed and decided 2026-11-08; not implemented |
+| [Recovery-2](recovery-2.md) | At 1B, does a 20% or 50% decay beat constant for the same three families, setting each family's 3B schedule? | Designed 2026-11-08; implemented 2026-11-08, not run |
 
 | Area | Location |
 | --- | --- |
