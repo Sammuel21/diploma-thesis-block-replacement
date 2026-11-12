@@ -2,7 +2,7 @@
 title: Documentation
 status: active
 created: 2026-07-17
-modified: 2026-10-15
+modified: 2026-11-12
 ---
 
 # Documentation
@@ -84,6 +84,12 @@ Markdown files in this directory follow the
 - [Block experiments](experiments/block/README.md) explain the isolated
   operator-fitting and singleton-replacement studies.
 
+## Analyses
+
+- [Analyses](analyses/README.md) indexes dated, non-binding review snapshots
+  of the whole project, starting with the
+  [2026-11-12 deep analysis](analyses/2026-11-12-deep-analysis/README.md).
+
 ## Historical prototype
 
 - [MVP archive](prototype/mvp/README.md) records the completed prototype,
@@ -95,4 +101,6 @@ Material enters `docs/` only when it has been deliberately distilled for a
 human audience. Working ideas, source summaries, hypotheses, and evolving
 syntheses belong in `llm-wiki/`. Historical material belongs under
 `docs/prototype/` and must be clearly identified as historical rather than
-current methodology.
+current methodology. Dated review snapshots under `docs/analyses/` are an
+exception: they may contain hypotheses and recommendations, are written for a
+human reader, and are not binding until recorded in the decision log.
