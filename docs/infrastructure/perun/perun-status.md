@@ -2,7 +2,7 @@
 title: TUKE Perun Project Status
 status: active
 created: 2026-09-25
-modified: 2026-11-08
+modified: 2026-11-11
 ---
 
 # TUKE Perun Project Status
@@ -95,6 +95,7 @@ scheduler records.
 | Quantization-2 INT3 QAT reruns (`-002`), workflow timing | about 16.5 H200-hours | Jobs 132434 (100M, 1.80 h) and 142928 (1B, 14.71 h), both completed, from the [Quantization-2 page](../../experiments/model/baseline/quantization-2.md#fixed-reruns-recorded-2026-11-07) and its artifacts; workflow-timing proxy, not scheduler allocation |
 | Heterogeneous-1, all stages, workflow timing | about 79.8 H200-hours, plus 0.31 h CPU solve | Jobs 143434, 143435, 144574, 144575, 145235 (58 GPU tasks, no retries): select 45.9, baseline table 1.4, cost tables 23.2, recovery 4.4, assembly 4.9, from the job log and the [Heterogeneous-1 page](../../experiments/model/heterogenous/heterogeneous-1.md#measured-use); workflow-timing proxy, not scheduler allocation; assembly alone was 4.89 GPU-hours by scheduler allocation |
 | Recovery-1 schedule screen, three tasks, workflow timing | about 6.5 H200-hours | Job 145625 (tasks 145625-145627, no retries): dense INT3 2.49, B 20% INT4 2.13, SwiGLU 20% 1.87, from the job log and the [Recovery-1](../../experiments/model/recovery/recovery-1.md#measured-resource-use-2026-11-08) artifacts; workflow-timing proxy, not scheduler allocation (the scheduler record had expired) |
+| Recovery-2 decay length at 1B, three tasks, workflow timing | about 61.2 H200-hours | Job 146204 (tasks 146204-146206, no retries): dense INT3 23.31, B 20% INT4 20.30, SwiGLU 20% 17.60, from the job log and the [Recovery-2](../../experiments/model/recovery/recovery-2.md#measured-resource-use-2026-11-11) artifacts; workflow-timing proxy, not scheduler allocation (the scheduler record had expired) |
 
 ## Open questions
 

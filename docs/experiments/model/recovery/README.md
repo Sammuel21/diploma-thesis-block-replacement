@@ -2,7 +2,7 @@
 title: Recovery Recipe Experiments
 status: active
 created: 2026-11-07
-modified: 2026-11-08
+modified: 2026-11-11
 ---
 
 # Recovery Recipe Experiments
@@ -15,7 +15,7 @@ simulated quantization. Local fitting is not part of it (decision log,
 | Experiment | Main question | Status |
 | --- | --- | --- |
 | [Recovery-1](recovery-1.md) | Does a 1-sqrt learning-rate decay beat the constant 3e-5 recipe at 100M tokens, for dense INT3 QAT, B 20% INT4, and SwiGLU alone at 20%? | Run 2026-11-07 (array 145625): dense INT3 adopts the 20% decay; B and SwiGLU keep constant; flags accepted, `summary-001` written 2026-11-08 |
-| [Recovery-2](recovery-2.md) | At 1B, does a 20% or 50% decay beat constant for the same three families, setting each family's 3B schedule? | Running since 2026-11-08 (array 146204, commit `bb6c1cb`) |
+| [Recovery-2](recovery-2.md) | At 1B, does a 20% or 50% decay beat constant for the same three families, setting each family's 3B schedule? | Run 2026-11-08/09 (array 146204, 3/3 completed): dense INT3 adopts the 50% decay; B 20% INT4 and SwiGLU 20% the 20% decay (SwiGLU's marginal); flags accepted, `summary-001` written 2026-11-11 |
 
 | Area | Location |
 | --- | --- |

@@ -2,7 +2,7 @@
 title: TUKE Perun Experiment Log
 status: active
 created: 2026-09-25
-modified: 2026-11-08
+modified: 2026-11-11
 ---
 
 # TUKE Perun Experiment Log
@@ -599,3 +599,21 @@ Entries are appended below in submission order.
 - Variance: 6.49 h against 6.6-7.5 h expected, 2-13% below; each task at or just under the low end of its range. Peak RAM was below the estimate (39 against about 55 GB for dense; 14 against about 40 GB for B and SwiGLU, whose replacement-only snapshots are small).
 - Experiment document: [Recovery-1](../../experiments/model/recovery/recovery-1.md#results-2026-11-08).
 - Notes: the three tasks shared node gpu01, one GPU each, without a visible slowdown.
+
+## [2026-11-08 20:32 UTC] 146204 | Recovery-2 decay length at 1B, 3 tasks
+
+- Plan: 17.6-24.0 h per task (30-hour limit), 61-63 GPU-hours expected, ceiling 90 ([resource plan](../../experiments/model/recovery/recovery-2.md#pre-run-resource-plan)); high confidence on speed.
+- Outcome: all 3 tasks completed with structured status `completed`; no retries. Every stopping gate passed with no difference: every input sha256; `K3` (B, SwiGLU) and the token-0 rows against the recorded 1B runs (relative difference 0.0); `K6-start` (no fake-quantized projection differed from its deployed weight, dense and B); the selection-stream teacher self-KL (−1.2e-9); and the token-0 selection KL against Recovery-1 (exact). The recorded `trunk-curve` check flagged all three families (largest gaps 46.4%, 4.38%, 3.65%); B and SwiGLU also carried `legacy-disagrees`. All five flags were reviewed as noise or as not changing a decision, and were accepted ([results](../../experiments/model/recovery/recovery-2.md#results-2026-11-11)).
+- Submission: `recovery_2.sbatch train --array=0-2 --time=30:00:00 --mem=128G` (runbook 15.3), after 15.2 was clean (14 of 14 hashes OK, decay starts as designed, `--test-only` accepted). The checkout was fast-forwarded from `97a97a2` to `bb6c1cb` with an empty queue first. Task job IDs: 146205 (task 0, `dense-int3`), 146206 (task 1, `b-0.2-int4`), 146204 (task 2, `swiglu-0.2`).
+- Provenance: commit `bb6c1cb`, whose code equals the CPU-tested `7684337`; configuration sha256 `589236c4…`; recovery stream `f78bf805…`, selection stream `85165ff8…`, final stream `ee134d3d…`, and monitoring batches `058fd14e…`, equal to the pins; selection stream read from `swiglu-8/block-check-001-task-00/prepared/`.
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, and 128 GB per task, 30-hour limit; all three on gpu23. Started together at 21:32 local time (UTC+1) on 2026-11-08, minutes after submission; `AllocTRES` Unknown.
+- Consumption:
+  - Scheduler: Unknown; `scontrol` returned "Invalid job id" on 2026-11-11, about two days after the last task ended.
+  - Workflow timing (result `created` to last update): 23.31 h (dense), 20.30 h (B), 17.60 h (SwiGLU), 61.21 h in total; a lower bound that excludes code staging and stage-out. About 490 CPU core-hours (8 CPUs × workflow time, derived).
+- Efficiency: peak RAM (process high-water mark at the trunk's last row) 27.1, 10.4, and 10.3 GiB; peak VRAM allocated 49.6, 37.1, and 31.2 GiB. The decay phase has no memory record. CPU and GPU utilization Unknown.
+- Outputs: PROJECT `perun-results/recovery-2/{dense-int3,b-0.2-int4,swiglu-0.2}-run-001/`, 264 KB in total (JSON only); `result.json` sha256 `2f49cac6…` (dense), `393b938a…` (B), `f8f678ae…` (SwiGLU). `summary-001/` (`result.json` `f142651b…`) was written on 2026-11-11 after the researcher accepted the flags. PROJECT held 281 of 1,000 GB. Analysis copy on the PC (archive 53 KB).
+- Continuation: completed; no resume by design; trained models are not kept.
+- Verification: "Verified persistent output" logged for all 3; no `AcceptanceFailure` or traceback; the `.err` files hold library warnings only; no leftover lock.
+- Variance: 61.21 h against 61-63 h expected; each task at the low end of its range. Trunk speed within 1.5% of the planning basis. Peak RAM was below the estimate for B and SwiGLU (10 against about 14 GiB).
+- Experiment document: [Recovery-2](../../experiments/model/recovery/recovery-2.md#results-2026-11-11).
+- Notes: the three tasks shared node gpu23, one GPU each.

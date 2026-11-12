@@ -2,22 +2,22 @@
 title: Recovery-2 - Decay Length at 1B
 status: active
 created: 2026-11-08
-modified: 2026-11-08
+modified: 2026-11-11
 ---
 
 # Recovery-2 - decay length at 1B
 
-**Status (2026-11-08):** running. Designed in Recovery-1 session 2b; the plan session
-settled the reference (median of four), the update layout, the rows, and the time limit,
-and implemented the runner, configuration, job, CPU tests, and runbook section. Submitted
-on 2026-11-08 as array 146204 from commit `bb6c1cb` after a clean pre-submission check
-(14 of 14 hashes OK, decay starts as designed); all three tasks started together on
-`gpu23`. Expected 17.6-24.0 h per task. **Next step:** confirm the token-0 gates (first
-`trunk tokens=10,002,432` line per task), then, when all three finish, run the summary
-([runbook 15.4-15.5](../../../infrastructure/perun/perun-runbook.md#15-recovery-2)).
-3B runs (Stacking-2, Quantization-3) wait for this experiment's results. The binding
-decisions are the rows in the [shared decision log](../../../agents/decisions.md); if this
-page and the log disagree, the log wins.
+**Status (2026-11-11):** run and analysed. Array 146204 ran from commit `bb6c1cb` on
+2026-11-08/09 on `gpu23`; all three tasks completed, and every stopping gate passed with
+no difference ([results](#results-2026-11-11)). Under the fixed rule, **dense INT3 adopts
+the 50% decay, and B 20% INT4 and SwiGLU 20% adopt the 20% decay.** SwiGLU's decay clears
+the bar by 0.16 points and is within noise. The flags (three `trunk-curve`, two
+`legacy-disagrees`) were reviewed as noise or as not changing a decision. The researcher
+accepted all of them, and `summary-001` was written on PERUN on 2026-11-11. **Next step:**
+plan the 3B runs (Stacking-2, Quantization-3) with these schedules (decision log,
+2026-11-11). The binding decisions are the rows in the
+[shared decision log](../../../agents/decisions.md); if this page and the log disagree,
+the log wins.
 
 ## Question
 
@@ -275,7 +275,8 @@ Estimates, not measurements.
 
 ## Implementation
 
-Implemented on 2026-11-08; not committed, not run.
+Implemented on 2026-11-08 and committed as `7684337`; run from `bb6c1cb`, whose code is
+identical.
 
 | File | Role |
 | --- | --- |
@@ -335,3 +336,132 @@ still pass):
 Not tested: GPU execution, TorchAO and MSLK paths (TorchAO is not installed
 locally), the real token-0 gates, snapshot memory, and run time. The in-run
 gates of the real screen are the authority there. No smoke run (AGENTS.md).
+
+## Results (2026-11-11)
+
+Array 146204 ran from `bb6c1cb` on 2026-11-08/09 with no retries
+([job log](../../../infrastructure/perun/perun-log.md)). Every stopping gate passed with
+no difference:
+
+- each start reproduced its recorded 1B run's token-0 row and its Recovery-1 token-0
+  selection KL exactly (relative difference 0.0);
+- B and SwiGLU reproduced SwiGLU-8's token-0 row (`K3`, exact), and no fake-quantized
+  projection differed from its deployed weight (dense, B);
+- the teacher's self-KL on the selection stream was −1.2e-9.
+
+Selection-stream 8K KL at 1B. The reference is the median of the trunk at 750M, 800M,
+900M, and 1B; the gain is 1 − value / reference; the bar is 3.5%.
+
+| Family | Trunk at 750 / 800 / 900 / 1000M | Reference | 20% decay | 50% decay | Decision |
+| --- | --- | --- | --- | --- | --- |
+| `dense-int3` | 0.076416 / 0.082173 / 0.085636 / 0.084806 | 0.083490 | 0.060747 (+27.24%, qualifies) | 0.054196 (**+35.09%**, qualifies) | **50% decay** |
+| `b-0.2-int4` | 0.083472 / 0.082807 / 0.082030 / 0.080677 | 0.082418 | 0.077771 (**+5.64%**, qualifies) | 0.079235 (+3.86%, qualifies) | **20% decay** |
+| `swiglu-0.2` | 0.063895 / 0.063254 / 0.062591 / 0.061420 | 0.062923 | 0.060621 (**+3.66%**, qualifies) | 0.062093 (+1.32%) | **20% decay**, marginal |
+
+The other views, reported and never deciding:
+
+| Family | Old metric, median rule | Lowest-of-four rule | Decay against the trunk's own 1B row (20% / 50%) |
+| --- | --- | --- | --- |
+| `dense-int3` | 50% (+27.0% / +34.2%) | 50% | +28.4% / +36.1% |
+| `b-0.2-int4` | 20% (+4.4% / +2.3%) | 20% (+3.6% / +1.8%) | +3.6% / +1.8% |
+| `swiglu-0.2` | constant (+0.7% / +1.2%) | constant (+1.3% / −1.1%) | +1.3% / −1.1% |
+
+- **Dense INT3:** the 20% decay is not within 3.5% of the 50% decay (0.054196 × 1.035 =
+  0.05609, below 0.060747), so 50% wins; every view agrees. Against the trunk at the same
+  token, the 50% decay's gain grows from +0.1% at 525M to +17% at 625M and +36% at 1B.
+  The trunk itself swings 12% between rows from 750M on (0.0764 to 0.0856). At 100M the
+  gains were +5.8% and +7.6% ([Recovery-1](recovery-1.md#results-2026-11-08)).
+- **B 20% INT4:** the 20% decay is both the better and the shorter decay. The 50% decay's
+  gain against the trunk at the same token peaks at +3.1% near 775M and falls to +1.8% at
+  1B, while the trunk keeps falling (about −0.3% per 25M from 750M). At 100M no decay
+  passed the bar (best +0.63%).
+- **SwiGLU 20%:** the 20% decay clears the bar by 0.16 points. The trunk still falls
+  smoothly (0.0639 to 0.0614 from 750M, at most 0.9% per row), so the median sits 2.4%
+  above the trunk's own 1B row. Against that row the 20% decay gains 1.3% on the
+  selection stream and loses 0.8% on the old metric. Two runs of this model on one recipe
+  (SwiGLU-7, SwiGLU-8) already differ by up to 1.42%, so the decay neither helps nor hurts
+  SwiGLU measurably. The rule's answer stands because it was fixed before the results,
+  and the median's upward bias on a falling curve was foreseen ([winner rule](#winner-rule)).
+- **Interpretation, not tested here:** dense INT3's gains fit the view that constant-rate
+  INT3 QAT keeps oscillating and a falling rate lets it settle. For B and SwiGLU, a long
+  decay gives an early gain that the constant trunk catches up with. As in Recovery-1, the
+  screen cannot separate quantizer oscillation from ordinary learning-rate noise.
+- **Independent recomputation:** an offline script recomputed the rule from the
+  artifacts' rows and matched `summarize` in every value. It confirmed that each decay
+  starts at its trunk snapshot (tokens and update count), and that every decay row's rate
+  equals the 1-sqrt formula exactly. B and SwiGLU sit at update 12,208 at 100,000,000
+  tokens. All models end at 1B, at update 122,071 (dense) or 122,072 (B, SwiGLU).
+
+**Repeat of Recovery-1.** Over 0-100M each trunk repeats its Recovery-1 trunk: the same
+start, recipe, and computation. The data also match, because the 1B stream begins with
+SwiGLU-8's 100M stream, which Recovery-1 read (Stacking-1's `K7-stream` check). Signed gaps
+at the shared rows, measured offline:
+
+| Family | Rows compared | Largest gap, selection 8K KL | Largest gap, old metric |
+| --- | --- | ---: | ---: |
+| `dense-int3` | 10, 25, 50, 75M | 1.29% (75M) | 1.97% (75M) |
+| `b-0.2-int4` | 10, 25, 50, 75, 100M | 0.09% | 0.36% |
+| `swiglu-0.2` | 10, 25, 50, 75, 100M | 0.04% | 0.79% |
+
+The dense trunk's 100M row falls at 100,007,936 in its one-segment layout, so it has no
+shared 100M row. With the same code and data, B and SwiGLU repeat within 0.1% on the
+selection stream to 100M; only dense INT3 drifts by 1% within 75M. For B and SwiGLU the
+old metric moves 4 to 20 times as much as the selection stream for the same runs, which is
+consistent with their two `legacy-disagrees` flags.
+
+**Flags.** Each `trunk-curve` row is the trunk's signed gap from its recorded 1B run on the
+old metric, (trunk − recorded) / recorded, at every row from 10M to 1B.
+
+| Family | Flag | Evidence | Reading |
+| --- | --- | --- | --- |
+| `dense-int3` | `trunk-curve` | 11 of 41 rows within 1%; within 0.32% to 75M, then both signs, 15 sign changes; 750M-1B mean −1.9%, range −24% to +15%. The largest gap, 46.4% at 100M, is the recorded run's own spike (0.1484, against 0.0754 at 125M) | Changes sign: noise |
+| `b-0.2-int4` | `trunk-curve` | 42 of 48 rows within 1%; 26 sign changes; median gap per quarter of the run −0.2% to +0.1%; largest +4.38% at 925M | Changes sign: noise |
+| `b-0.2-int4` | `legacy-disagrees` | The 50% decay only (old metric +2.27%), which loses on both metrics | Does not change the decision |
+| `swiglu-0.2` | `trunk-curve` | 34 of 48 rows within 1%; 21 sign changes; median gap per quarter 0.0% to +0.6%, not growing; largest +3.65% at 950M | Changes sign: noise |
+| `swiglu-0.2` | `legacy-disagrees` | The deciding 20% decay: selection +3.66%, old metric +0.65% | Marginal decision (above) |
+
+- **First update:** the first-step gradient norms differ from Recovery-1's by relative
+  1.4e-4 (dense), 6e-5 (B), and 1.4e-4 (SwiGLU). That is within the range of earlier
+  same-code repeats (4e-5 to 3.3e-4), so the divergence is GPU nondeterminism. That it
+  also explains the larger late gaps against the older recorded runs is an inference; no
+  same-code repeat reaches 1B.
+- **Acceptance:** the researcher accepted all five flags on 2026-11-11; `summary-001`
+  records them.
+
+**3B schedules** (decision log, 2026-11-11):
+
+| Family | 3B run (names tentative) | Schedule |
+| --- | --- | --- |
+| Dense INT3 QAT | Quantization-3 | Constant 3e-5 to 1.5B, then 1-sqrt to 0 over the last 1.5B |
+| B 20% INT4 | Stacking-2 | Constant 3e-5 to 2.4B, then 1-sqrt to 0 over the last 600M |
+| SwiGLU 20% | Only if a SwiGLU-alone 3B run is planned | As B |
+
+Observation for the 3B planning, not a result: on the selection stream at 1B, the
+constant trunks end at 0.0848 (dense INT3) and 0.0807 (B 20% INT4). With each family's
+winning decay they end at 0.0542 and 0.0778. The two models differ in size, so this is not
+a matched comparison.
+
+## Measured resource use (2026-11-11)
+
+Workflow timing from the artifacts (result `created` to last update). The scheduler record
+had expired, so allocation time is Unknown and these are lower bounds.
+
+| Task | Job | Planned | Measured | Trunk / 50% / 20% decay training | Peak RAM, planned → measured | Peak VRAM, planned → measured |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 dense INT3 | 146205 | 23.3-24.0 h | 23.31 h | 13.59 / 6.79 / 2.72 h | ~27 → 27.1 GiB | ~50 → 49.6 GiB |
+| 1 B 20% INT4 | 146206 | 20.0-20.6 h | 20.30 h | 11.86 / 5.94 / 2.38 h | ~14 → 10.4 GiB | ~37 → 37.1 GiB |
+| 2 SwiGLU 20% | 146204 | 17.6-18.2 h | 17.60 h | 10.29 / 5.15 / 2.06 h | ~14 → 10.3 GiB | ~31 → 31.2 GiB |
+| **Total** | | 61-63 GPU-h | **61.21 GPU-h** | | | |
+
+- About 490 CPU core-hours (8 CPUs × workflow time, derived). CPU and GPU utilization
+  Unknown. One H200 per task; all three tasks shared gpu23 and started together at
+  21:32 local time (20:32 UTC) on 2026-11-08.
+- Peak RAM is the process high-water mark at the trunk's last row, when both snapshots
+  are held. The decay phase has no memory record.
+- Storage: 264 KB on PROJECT (JSON only), against the planned under 1 MB per family.
+- No failures or retries. The `.err` files hold only library warnings.
+- **Throughput:** 1.359, 1.186, and 1.029 h per 100M trunk tokens (74M, 84M, and 97M
+  tokens per GPU-hour), within 1.5% of the planning basis (1.356, 1.169, 1.024 h).
+- **For the next request:** time came in at the low end of every range, and the measured
+  speeds repeat Recovery-1's within 1.5%, a firm basis for the 3B estimates. RAM for B and
+  SwiGLU was below the estimate; 128 GB remains ample.
