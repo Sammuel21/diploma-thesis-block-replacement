@@ -1,0 +1,3 @@
+# Private by default: session quotes and local paths. Delete this file to track the folder.
+*
+!.gitignore
