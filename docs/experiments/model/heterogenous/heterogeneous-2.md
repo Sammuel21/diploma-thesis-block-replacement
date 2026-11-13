@@ -2,17 +2,20 @@
 title: Heterogeneous-2 - Forced Models After Recovery
 status: draft
 created: 2026-11-04
-modified: 2026-11-08
+modified: 2026-11-13
 ---
 
 # Heterogeneous-2 - Forced Models After Recovery
 
-**Status:** Step 1 is implemented and not yet run. Steps 2 and 3 are conditional and not
-built. The binding decisions are the 2026-11-06 entries in the
-[shared decision log](../../../agents/decisions.md), which win if the two disagree; this
-page explains them.
-**Next step:** the researcher commits, deploys, and submits the six runs of Step 1
-([commands](../../../infrastructure/perun/perun-runbook.md#13-heterogeneous-2)).
+**Status (2026-11-12):** Step 1 run and analysed. The control (job 145631) and the five runs
+(array 145856) ran on 2026-11-07/08 from commit `97a97a2`; all six completed, and every check
+passed ([results](#step-1-results-2026-11-08)). **20% and 50% stop; 80% is level and goes to
+1B by the rule.** The 1e-4 check does not favour new blocks, but SwiGLU 80% itself gains 9.8%
+at 1e-4, a limit of the 3e-5 recipe. Steps 2 and 3 are not built. The binding decisions are
+the 2026-11-06 entries in the [shared decision log](../../../agents/decisions.md), which win if
+the two disagree; this page explains them.
+**Next step:** the proposal to close heterogeneous replacement for dense SmolLM2 instead of
+running 80% at 1B goes to the 2026-11-13 supervisor meeting; no decision row yet.
 
 ## Why this experiment
 
@@ -166,7 +169,8 @@ matter.
 
 ## Implementation
 
-Implemented on 2026-11-06 without any run. Runner:
+Implemented on 2026-11-06, committed as `162bd16`, and run from `97a97a2`, which adds a
+schedule option to the shared `recovery.py` and leaves the constant path unchanged. Runner:
 [`heterogeneous_2.py`](../../../../workflows/runs/model/heterogenous/heterogeneous_2.py).
 Configuration:
 [`heterogeneous-2.json`](../../../../workflows/configs/model/heterogenous/heterogeneous-2.json).
@@ -239,6 +243,94 @@ each model's exact blocks, with boundary widths estimated from their nearest nei
 (257-360 s per 10M tokens), so the 4-hour limit leaves margin. `--dependency` has not been used
 on PERUN by this project; the fallback is to submit tasks 1-5 by hand after the control.
 
+## Step 1 results (2026-11-08)
+
+The control ran as job 145631 on 2026-11-07. Tasks 1-5 ran as array 145856 on 2026-11-08,
+submitted by hand after the control passed (task jobs 145857-145860 and 145856), with no
+retries ([job log](../../../infrastructure/perun/perun-log.md)). Every stopping check passed:
+data, streams, and neuron rankings; refit prices; the checkpoint schedule; trainable parameter
+counts; and token 0, where each model reproduced its recorded monitoring KL (forced 0.13334,
+0.43234, 1.13169; SwiGLU 80% 1.05148). The offline audit (2026-11-08) recomputed every gap from
+the raw curves and matched `summary-001` exactly.
+
+**Control.** SwiGLU-8's 80% model, retrained through the new path, stayed within 0.081% of
+SwiGLU-8's recorded curve at every checkpoint from 10M to 100M. Its 8K KL was 0.54320 against
+the recorded 0.54325 (0.010%). The new path reproduces SwiGLU-8's.
+
+**Main comparison** at 3e-5. Gap = forced / SwiGLU-8 − 1 on monitoring KL at the same token
+count; positive means forced is worse; the bar is 3.5%.
+
+| Target | Forced blocks | Token 0 | 10M | 50M | 100M | 50M → 100M | 8K KL gap | Outcome |
+| --- | --- | ---: | ---: | ---: | ---: | --- | ---: | --- |
+| 20% | 8 linear + SwiGLU | +20.5% | +18.7% | +18.1% | +16.9% | shrank 1.2 pts | +15.4% | **Stop** |
+| 50% | 7 linear + SwiGLU, 1 plain MLP | +8.9% | +8.1% | +7.9% | +8.2% | grew 0.3 pts | +7.2% | **Stop** |
+| 80% | 8 plain MLP | +7.6% | +3.1% | +2.4% | +2.1% | shrank 0.3 pts | +2.3% | **Go to 1B: level** |
+
+- **20% and 50%:** forced stays worse by more than the bar, and after 10M the gap hardly moves.
+  Recovery does not close what the token-0 prices predicted.
+- **80%:** inside the band from 10M on, and still worse at every checkpoint. "Level" means not
+  separable from SwiGLU under the bar, not better.
+- **8K KL** falls in the same band as monitoring KL at every target, so there is no flag.
+
+**The 1e-4 check (80%),** monitoring KL at 100M:
+
+| Model | 3e-5 | 1e-4 | Gain at 1e-4 (8K KL) |
+| --- | ---: | ---: | ---: |
+| SwiGLU-8 80% | 0.52442 (recorded) | 0.47307 | 9.8% (9.4%) |
+| Forced 80% | 0.53542 | 0.48780 | 8.9% (8.4%) |
+
+- Both families do better at 1e-4. At each family's better rate the gap is +3.1% (8K KL +3.4%),
+  against +2.1% at 3e-5: a shift of −1.0 point, away from new blocks. The 3e-5 results
+  therefore stand at all three targets, and no 1e-4 runs at 20% and 50% are triggered.
+- At 1e-4 the 80% pair is still level, but closer to the bar (+2.0% to +3.9% across
+  checkpoints).
+- **Recipe-limit flag:** SwiGLU 80% itself gains 9.8-12.1% at every checkpoint at 1e-4. As
+  planned, this is reported as a limit of the 3e-5 recipe at 80% and does not reopen the
+  homogeneous results. Recovery-1 and Recovery-2 kept the peak at 3e-5, so the peak rate stays
+  untested for every family.
+
+**What follows.** Only 80% goes on to Step 2. Two choices are open, and no decision row exists
+yet:
+
+1. **The rate.** At 3e-5 the forced 1B run faces the existing 3e-5 SwiGLU 1B models. At 1e-4 it
+   needs a SwiGLU partner at 1e-4, about 10-12 GPU-hours more, and a rate that wins at 100M may
+   not win at 1B.
+2. **Save and load for non-SwiGLU blocks,** which Step 2's evaluation needs and which is not
+   built.
+
+Proposed instead, for the 2026-11-13 meeting: close heterogeneous replacement for dense SmolLM2
+and report the 80% tie as unresolved at 1B. A tie cannot give a better SwiGLU-alone point, and the
+80% gap shrank only 0.3 points from 50M to 100M
+([Results 2026-11-13](../../../results/2026-11-13-results.md), question 2).
+
+The thesis sentence for 20% and 50% follows the plan: the allocator selected no hybrid on
+SmolLM2-1.7B, so hybrids were enforced in the eight layers predicted to be least harmful, and at
+20% and 50% they did not catch up with pure SwiGLU within 100M tokens. It must not claim that new
+operators cannot work.
+
+## Measured resource use (2026-11-08)
+
+Workflow timing from the artifacts (result `created` to last update), a lower bound; scheduler
+allocation Unknown.
+
+| Task | Job, node | Planned | Measured | Training | Peak VRAM | Peak RAM |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 0 control, SwiGLU 80% | 145631, gpu05 | ~1.75 h | 1.64 h | 0.90 h | 27.1 GiB | 38.7 GiB |
+| 1 forced 20% | 145857, gpu07 | ~1.2 h | 1.41 h | 1.29 h | 32.7 GiB | 38.7 GiB |
+| 2 forced 50% | 145858, gpu07 | ~1.55 h | 1.54 h | 1.10 h | 32.8 GiB | 38.8 GiB |
+| 3 forced 80% | 145859, gpu07 | ~1.85 h | 1.75 h | 0.91 h | 27.1 GiB | 38.9 GiB |
+| 4 forced 80% at 1e-4 | 145860, gpu08 | ~1.85 h | 1.77 h | 0.91 h | 27.1 GiB | 38.9 GiB |
+| 5 SwiGLU 80% at 1e-4 | 145856, gpu08 | ~1.75 h | 1.79 h | 0.91 h | 27.1 GiB | 38.6 GiB |
+| **Total** | | about 10 GPU-h | **9.90 GPU-h** | | | |
+
+- Within the 9-12 GPU-hour range; about 79 CPU core-hours (8 CPUs × workflow time, derived).
+- Forced 20% trained 25% longer than planned (1.29 against about 1.03 h). It trains 382.5M
+  parameters, against 221.5M at 80%.
+- Peak VRAM stayed under the 40 GiB estimate; peak RAM was 39 GiB, against at most about 60 GB.
+- The local analysis copy is 393 KB (JSON and logs).
+- `--dependency` was not used. The first submission of tasks 1-5 was refused with "your total
+  limit is 4 nodes", while Recovery-1's three tasks and the control were running.
+
 ## Limits
 
 - **20% is not perfectly paired.** Forced 20% replaces layer 4, which SwiGLU-8 keeps dense, so it
@@ -251,6 +343,16 @@ on PERUN by this project; the fallback is to submit tasks 1-5 by hand after the 
   measured noise are reported as unresolved.
 - **The forcing rule picks layers by predicted damage,** so these are the most favourable layers
   by that measure, not the only possible hybrids.
+- **The comparison favours operators that inherit teacher weights.** SwiGLU starts from the
+  teacher's most important neurons, linear + SwiGLU from a linear fit plus teacher neurons, and
+  plain MLP from random weights. Every block was fitted before scoring and the model then trained
+  for 100M tokens, so random-start blocks could learn, but the results answer the practical
+  question (with the teacher's weights available, which block to use), not which function type is
+  better in itself. Only Heterogeneous-1's operators were tested, and linear + plain MLP not fairly:
+  most of its block fits returned their starting weights, so its prices are not reliable; where it
+  trained (layers 11 and 19, 25%) it ranked last. The evidence that a linear part does not pay comes
+  from linear + SwiGLU, which trained normally. Other function classes, such as RBF or KAN-style
+  blocks, and other models, such as MoE, are untested.
 - **The forced layers are a ranking, not an optimum.** Each layer's extra damage was scored alone,
   before training, and the eight lowest were forced together (20%: layers 4, 8, 10-15; 50%: 3, 6,
   11, 13-16; 80%: 6, 10-16; from Heterogeneous-1's `assemble-001` results). A knapsack required to
@@ -265,8 +367,8 @@ on PERUN by this project; the fallback is to submit tasks 1-5 by hand after the 
 Both are conditional, and nothing is built for them.
 
 **Step 2** runs per target at 1B on forced models, with perplexity and tasks, under the rule above.
-It needs saving and loading of non-SwiGLU blocks, because `evaluate_final_model` exports and
-reloads a bundle and that path is SwiGLU-only.
+After Step 1 only the 80% target qualifies. It needs saving and loading of non-SwiGLU blocks,
+because `evaluate_final_model` exports and reloads a bundle and that path is SwiGLU-only.
 
 **Step 3** tests the three retraining scopes, the no-fit arm, and SwiGLU's S7-1 and S7-2 at 80%,
 only if 1B still looks competitive, and chosen from those results. See

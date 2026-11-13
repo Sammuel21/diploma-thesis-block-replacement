@@ -2,7 +2,7 @@
 title: Experiment Dependencies and Status
 status: active
 created: 2026-11-01
-modified: 2026-11-11
+modified: 2026-11-12
 ---
 
 # Experiment dependencies and status
@@ -63,7 +63,7 @@ flowchart LR
     BI[Block interaction<br/>notebook only]
   end
   subgraph hetero[model/heterogenous]
-    H1[Heterogeneous-1<br/>block level, done] --> H2[Heterogeneous-2<br/>model level, after H1]
+    H1[Heterogeneous-1<br/>block level, done] --> H2[Heterogeneous-2<br/>model level, Step 1 done]
   end
   subgraph recovery[model/recovery]
     RC1[Recovery-1<br/>schedule screen, 100M, done] --> RC2[Recovery-2<br/>decay length, 1B, done]
@@ -102,9 +102,9 @@ flowchart LR
   Q2 --> R2
   H1 -. planned section .-> R2
 
-  class S7,S8,S9,Q2,SP1,R1,ST1,ST1B,RC1,RC2 done
+  class S7,S8,S9,Q2,SP1,R1,ST1,ST1B,RC1,RC2,H1 done
   class Q1 running
-  class H1,H2,R2 planned
+  class H2,R2 planned
   class S26,BB,BO,CB,BI historical
 ```
 
@@ -125,10 +125,11 @@ Grey: historical or notebook-only.
 | [Stacking-1 order B 1B](model/stacking/stacking-1.md#order-b-at-1b-results-2026-11-02) | Done 2026-11-02: 6/6 completed; order B beats order A at 1B by 24-52% in 8K KL | Order-B `-002` runs at 100M (INT3, INT4), SwiGLU-7 1B stream, SwiGLU-8 starts |
 | [Block interaction](model/interaction/block-interaction.md) | Notebook artifact only | - |
 | [Heterogeneous-1](model/heterogenous/heterogeneous-1.md) | Done 2026-11-06: 59/59 completed; no new operator picked, no ranking swap | SwiGLU-8 (Part A protocol, streams, cost tables); block operator studies as background |
-| [Heterogeneous-2](model/heterogenous/heterogeneous-2.md) | Step 1 implemented 2026-11-06, not yet run; Steps 2 and 3 conditional | Heterogeneous-1, SwiGLU-8 (100M pairs), SwiGLU-7 and SwiGLU-9 (1B references) |
+| [Heterogeneous-2](model/heterogenous/heterogeneous-2.md) | Step 1 run 2026-11-07/08 (6/6 completed): 20% and 50% stop, 80% level (goes to 1B); Step 2 choices pending | Heterogeneous-1, SwiGLU-8 (100M pairs), SwiGLU-7 and SwiGLU-9 (1B references) |
 | [Recovery-1](model/recovery/recovery-1.md) | Run 2026-11-07 (array 145625, 3/3 completed): dense INT3 adopts the 20% decay; B 20% INT4 and SwiGLU 20% keep constant; flags accepted, `summary-001` written 2026-11-08 | Quantization-2, Stacking-1, and SwiGLU-8 recorded runs and starts; SwiGLU-8 selection stream; 1B constant runs for the token-equivalent |
 | [Recovery-2](model/recovery/recovery-2.md) | Run 2026-11-08/09 (array 146204, 3/3 completed): dense INT3 adopts the 50% decay, B 20% INT4 and SwiGLU 20% the 20% decay (SwiGLU's marginal); flags accepted, `summary-001` written 2026-11-11; sets each family's 3B schedule | Recovery-1; the recorded 1B constant runs (Quantization-2, Stacking-1, SwiGLU-7); SwiGLU-8 selection stream |
 | [Results 2026-11-01](../results/2026-11-01-results.md) | WIP for the 2026-11-06 meeting | SwiGLU-9, Stacking-1, Quantization-2; heterogeneous later |
+| [Results 2026-11-13](../results/2026-11-13-results.md) | Draft for the 2026-11-13 meeting | Recovery-1, Recovery-2, Heterogeneous-2 Step 1 |
 
 Invalid and excluded runs (decision log, 2026-10-25): Quantization-2
 `qat-int3-{100m,1b}-001` and Stacking-1 `b-fitted-*-100m-int3-001`.
@@ -140,7 +141,7 @@ The order of work inside each experiment is on its page.
 | Experiment | Question | Operators | Status | Depends on | Reused by |
 | --- | --- | --- | --- | --- | --- |
 | Heterogeneous-1 | How should each operator be fitted, which get picked, can pre-recovery prices be trusted? | Zero, mean, linear, plain MLP, linear + SwiGLU, linear + plain MLP | Done 2026-11-06: 59/59 completed; no new operator picked, no ranking swap | SwiGLU-8 | Heterogeneous-2, results snapshot |
-| Heterogeneous-2 | Do new blocks catch up after real training, when forced into the model? | Forced: linear + SwiGLU, plain MLP | Step 1 implemented 2026-11-06, not yet run | Heterogeneous-1, SwiGLU-7/8/9 | Results snapshot |
+| Heterogeneous-2 | Do new blocks catch up after real training, when forced into the model? | Forced: linear + SwiGLU, plain MLP | Step 1 run 2026-11-07/08: 20% and 50% stop, 80% level (goes to 1B) | Heterogeneous-1, SwiGLU-7/8/9 | Results snapshot |
 
 ## Active and planned runs
 
@@ -153,7 +154,7 @@ The order of work inside each experiment is on its page.
 | `qat-int3-1b-002` | Quantization-2 | SwiGLU-7 1B stream, Quantization-1 `prepare-001`, `qat-int3-100m-002` (twin rows) | INT3-1B session | 142928 | Completed 2026-11-04; 8K KL 0.0709 (100M: 0.0804), macro 64.78%; on all three frontiers near 51% |
 | `select-001`, `baseline-table-001` | Heterogeneous-1 | SwiGLU-8 `prepare-001` and `block-check-001` | Heterogeneous-1 session | 143434, 143435 | Completed 2026-11-04; recipes pinned in `cff64fd` |
 | `cost-table-001`, `recovery-001`, `solve-001`, `assemble-001`, `summary-001` | Heterogeneous-1 | Pinned recipes, `select-001`, `baseline-table-001` | Heterogeneous-1 session | 144574, 144575, 144734, 145235 | Completed 2026-11-06; no hybrid target, no swap, forced runs required |
-| `swiglu-0.8-control`, then `forced-{0.2,0.5,0.8}`, `forced-0.8-lr1e-4`, `swiglu-0.8-lr1e-4` | Heterogeneous-2 Step 1 | Heterogeneous-1 `assemble-001`, cost tables; SwiGLU-8 `prepare-001`, fitted runs | Heterogeneous-2 session | - | Implemented, not submitted |
+| `swiglu-0.8-control`, then `forced-{0.2,0.5,0.8}`, `forced-0.8-lr1e-4`, `swiglu-0.8-lr1e-4` | Heterogeneous-2 Step 1 | Heterogeneous-1 `assemble-001`, cost tables; SwiGLU-8 `prepare-001`, fitted runs | Heterogeneous-2 session | 145631 (control), 145856 (array 1-5) | Completed 2026-11-08 from `97a97a2`, 9.9 GPU-h; 20% and 50% stop, 80% level; SwiGLU 80% +9.8% at 1e-4 |
 | `dense-int3`, `b-0.2-int4`, `swiglu-0.2` (`-run-001`) | Recovery-1 | Recorded constant runs (Quantization-2, Stacking-1, SwiGLU-8), SwiGLU-8 `prepare-001` and selection stream | Recovery-1 session 2b | 145625 | Completed 2026-11-08; dense 20% decay, B and SwiGLU constant; flags accepted, `summary-001` written |
 | `dense-int3`, `b-0.2-int4`, `swiglu-0.2` (`-run-001`) | Recovery-2 | Recovery-1 runs (token-0 check); recorded 1B constant runs (Quantization-2, Stacking-1, SwiGLU-7); SwiGLU-7 1B stream; SwiGLU-8 `prepare-001` and selection stream | Recovery-2 session | 146204 (tasks 146205, 146206, 146204) | Completed 2026-11-09 from `bb6c1cb`, 61.2 GPU-h; dense 50% decay, B and SwiGLU 20% decay; flags accepted, `summary-001` written 2026-11-11 |
 | TorchAO INT3 upstream check | Quantization-2 | - | TorchAO session | - | Investigation, no GPU |

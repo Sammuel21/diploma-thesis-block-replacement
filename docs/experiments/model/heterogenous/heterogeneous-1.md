@@ -2,7 +2,7 @@
 title: Heterogeneous-1 - Operator Recipes, Cost Tables, and Hybrid Allocation
 status: draft
 created: 2026-11-04
-modified: 2026-11-06
+modified: 2026-11-13
 ---
 
 # Heterogeneous-1 - Operator Recipes, Cost Tables, and Hybrid Allocation
@@ -225,6 +225,34 @@ picked, although wide sizes were not tested. `c1e-3-128` is pinned as the rule's
 Its cost-table rows at stalled layers are not a fair price for the operator, so read
 `best_epoch` before quoting them; zero means the row is the start. The linear part's
 question is answered with linear + SwiGLU, which trained normally.
+
+**Follow-up analysis (2026-11-13, offline, no new run).** Read from `select-001` and the cost
+tables while preparing the [2026-11-13 results](../../../results/2026-11-13-results.md#21-the-linear--plain-mlp-hybrid-did-not-train).
+
+- **Freezing the linear part does not fix it.** The grid's `linear-first` setting trains only the
+  MLP part: it stalled in 6 of 6 fits at layer 3 and 3 of 6 at layer 11, and trained at layer 19.
+  The joint fits stalled in 43, 36, and 0 of 78. So the linear part being pushed off its fit is not
+  the cause.
+- **Reading (interpretation, not tested).** The start is a seeded random plain MLP plus the ridge fit
+  of what it leaves ([`hybrid_start`](../../../../workflows/runs/model/heterogenous/heterogeneous_1.py)),
+  so the linear part partly cancels the MLP's random output. Changing the MLP part breaks that
+  balance, and what is left to learn after the linear fit is small. The same random MLP trains alone
+  in every layer (0 of 78 stalled), and linear + SwiGLU, whose nonlinear part starts from teacher
+  neurons, never stalled.
+- **Same-width comparison.** With MLP width h, the hybrid lost to the next narrower plain MLP in 14
+  of 22 layers at h = 2048 and in 20-21 of 22 at h = 3584 to 9728. A hybrid that contains that
+  narrower MLP cannot lose when it trains, so this measures the stalled fits, not the linear part.
+- **Open question (researcher's, raised with the supervisor):** does a linear part add anything
+  next to an MLP of the same width? Unanswered for plain MLP. Two starts would avoid the
+  cancellation:
+  1. *Linear first:* the ridge fit, plus an MLP part whose output weights start at zero and learn
+     the remainder. This answers whether a nonlinear part helps on top of a linear map.
+  2. *MLP first:* train the plain MLP alone, then ridge-fit the linear part to what it misses. The
+     hybrid can then only match or beat the MLP alone at width h, and the gap measures the linear
+     part. This one answers the question; it also gives a fair equal-size price.
+
+  Neither is built. For linear + SwiGLU, whose start already has this order, the same-width
+  question can probably be answered offline from SwiGLU's stored prices.
 
 **Measured use.** Workflow timing, not scheduler allocation; the scheduler records had
 expired. `select` took 45.9 GPU-hours against 30-50 planned, 0.81-2.53 h per task, and

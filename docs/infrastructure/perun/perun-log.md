@@ -2,7 +2,7 @@
 title: TUKE Perun Experiment Log
 status: active
 created: 2026-09-25
-modified: 2026-11-11
+modified: 2026-11-12
 ---
 
 # TUKE Perun Experiment Log
@@ -599,6 +599,41 @@ Entries are appended below in submission order.
 - Variance: 6.49 h against 6.6-7.5 h expected, 2-13% below; each task at or just under the low end of its range. Peak RAM was below the estimate (39 against about 55 GB for dense; 14 against about 40 GB for B and SwiGLU, whose replacement-only snapshots are small).
 - Experiment document: [Recovery-1](../../experiments/model/recovery/recovery-1.md#results-2026-11-08).
 - Notes: the three tasks shared node gpu01, one GPU each, without a visible slowdown.
+
+## [2026-11-07 22:04 UTC] 145631 | Heterogeneous-2 Step 1 control `swiglu-0.8-control`
+
+*Recorded late, on 2026-11-12, from the job logs and the artifacts.*
+
+- Plan: about 1.75 h (4-hour limit); Step 1 in total about 10 GPU-hours, range 9-12, ceiling 24 ([resource plan](../../experiments/model/heterogenous/heterogeneous-2.md#pre-run-resource-plan)); medium confidence.
+- Outcome: COMPLETED with structured status `completed`; no retries. Every stopping check passed, token 0 exactly (monitoring KL 1.05148). The curve check passed: monitoring KL within 0.081% of SwiGLU-8's recorded 80% run at every checkpoint from 10M to 100M, and 8K KL 0.54320 against 0.54325.
+- Submission: `heterogeneous_2.sbatch train` as task 0 (runbook 13.2), submitted at about 23:03 local time on 2026-11-07, after Recovery-1's 145625.
+- Provenance: commit `97a97a2` (Heterogeneous-2 code as in `162bd16`); configuration sha256 `be384626…`; inputs read in place from `perun-results/swiglu-8/` and `perun-results/heterogeneous-1/`.
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, 128 GB requested memory, 4-hour limit; node gpu05.
+- Consumption: scheduler Unknown (record not read). Workflow timing 1.64 h (training 0.90 h); about 13 CPU core-hours (derived).
+- Efficiency: peak VRAM 27.1 GiB; peak RAM 38.7 GiB. CPU and GPU utilization Unknown.
+- Outputs: PROJECT `perun-results/heterogeneous-2/swiglu-0.8-control-run-001/` (JSON only); analysis copy on the PC.
+- Continuation: completed; no resume by design; the trained model is not kept.
+- Verification: "Verified persistent output" logged; no traceback; no leftover lock.
+- Variance: within plan (1.64 against about 1.75 h).
+- Experiment document: [Heterogeneous-2](../../experiments/model/heterogenous/heterogeneous-2.md#step-1-results-2026-11-08).
+
+## [2026-11-08 11:29 UTC] 145856 | Heterogeneous-2 Step 1, 5 tasks
+
+*Recorded late, on 2026-11-12, from the job logs and the artifacts.*
+
+- Plan: 1.2-1.85 h per task (4-hour limit), about 8.2 GPU-hours for the five ([resource plan](../../experiments/model/heterogenous/heterogeneous-2.md#pre-run-resource-plan)); medium confidence.
+- Outcome: all 5 tasks completed with structured status `completed`; no retries. Every stopping check passed, including token 0 exactly (forced 0.13334, 0.43234, 1.13169; SwiGLU 80% 1.05148). `summary-001` written on 2026-11-08 (results: 20% and 50% stop, 80% level); no 8K-KL disagreement, and the SwiGLU recipe-limit flag reported (SwiGLU 80% +9.8% at 1e-4).
+- Submission: array 1-5 of `heterogeneous_2.sbatch train` (runbook 13.2), by hand without `--dependency`, after the control passed. A first attempt while four jobs ran (Recovery-1's three tasks and the control) was refused with "your total limit is 4 nodes (you have 4 short + 0 long = 4, requesting 1)". A second attempt failed before submission because of a wrong job-script path in the commands the assistant gave; nothing was submitted. Task job IDs: 145857 (task 1, `forced-0.2`), 145858 (task 2, `forced-0.5`), 145859 (task 3, `forced-0.8`), 145860 (task 4, `forced-0.8-lr1e-4`), 145856 (task 5, `swiglu-0.8-lr1e-4`).
+- Provenance: commit `97a97a2`; configuration sha256 `be384626…`, as for the control.
+- Allocation: `gpu_short`; 1 NVIDIA H200, 8 CPUs, 128 GB per task, 4-hour limit; tasks 1-3 on gpu07, tasks 4-5 on gpu08.
+- Consumption: scheduler Unknown (record not read). Workflow timing 1.41, 1.54, 1.75, 1.77, and 1.79 h, 8.26 h in total (training 0.91-1.29 h per task); about 66 CPU core-hours (derived).
+- Efficiency: peak VRAM 27.1-32.8 GiB; peak RAM 38.6-38.9 GiB. CPU and GPU utilization Unknown.
+- Outputs: PROJECT `perun-results/heterogeneous-2/{forced-0.2,forced-0.5,forced-0.8,forced-0.8-lr1e-4,swiglu-0.8-lr1e-4}-run-001/` and `summary-001/` (JSON only); analysis copy on the PC (393 KB with the control and the logs).
+- Continuation: completed; no resume by design; trained models are not kept.
+- Verification: "Verified persistent output" logged for all 5; no traceback; no leftover lock.
+- Variance: within plan (8.26 against about 8.2 GPU-hours); forced 20% trained 25% longer than planned.
+- Experiment document: [Heterogeneous-2](../../experiments/model/heterogenous/heterogeneous-2.md#step-1-results-2026-11-08).
+- Notes: the "4 nodes" submission refusal, recorded as gone on 2026-10-25 in [perun-status](perun-status.md), returned on 2026-11-07/08. `perunfsusage` on 2026-11-11 listed "Nodes in use at once: unlimited".
 
 ## [2026-11-08 20:32 UTC] 146204 | Recovery-2 decay length at 1B, 3 tasks
 
