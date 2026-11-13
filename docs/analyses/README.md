@@ -2,7 +2,7 @@
 title: Analyses
 status: active
 created: 2026-11-12
-modified: 2026-11-12
+modified: 2026-11-13
 ---
 
 # Analyses
@@ -21,3 +21,4 @@ differ.
 | Date | Analysis | Status | Scope | Written by |
 | --- | --- | --- | --- | --- |
 | 2026-11-12 | [Deep analysis](2026-11-12-deep-analysis/README.md) | draft | Whole project: direction, reporting, future work, code, documentation, session history; open questions in `07-questions.md` | Fable 5.2 |
+| 2026-11-13 | [Deep analysis, part 2](2026-11-13-deep-analysis-part-2/README.md) | draft | After the 2026-11-13 meeting: whether the local fit predicts global damage (offline study on stored artifacts), mixture-of-experts prior work and pricing, a design from the annotation alone, what transfers and what is tuning, the reporting model and measured speed, the TorchAO defect; proposed decision rows in `01-meeting-3.md` | Fable 5.2 |

@@ -1,0 +1,3 @@
+# Private by default: raw sub-agent reports. Delete this file to track the folder.
+*
+!.gitignore
