@@ -2,7 +2,7 @@
 title: Deep Analysis Part 2 - Mixture-of-Experts
 status: draft
 created: 2026-11-13
-modified: 2026-11-13
+modified: 2026-11-14
 ---
 
 # 3. Mixture-of-experts: what is taken, what is open, and a design that scales
@@ -157,6 +157,11 @@ Configurations as read from the model cards and configuration files
 - **Experts hold over 90% of the parameters,** against 64.7% for the eligible
   MLPs of SmolLM2. Structural methods have more room here than on the dense
   model **[calc, on agent-read configurations]**.
+- **Added 2026-11-14.** OLMoE also matches SmolLM2 in shape: 8 active experts
+  of 1,024 neurons are 8,192 neurons per token at hidden size 2,048. The
+  other meanings of "comparable to SmolLM2", the Qwen pair, and what a dense
+  linear map costs per expert are in
+  [file 8](08-operators-losses-moe-model.md), sections 8.4 and 8.7.
 
 ## 3.7 What to expect, honestly
 

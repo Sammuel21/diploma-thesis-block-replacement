@@ -2,7 +2,7 @@
 title: Supervisor Meeting 2026-11-13 - Results-3 Feedback and Next Steps
 status: draft
 created: 2026-11-13
-modified: 2026-11-13
+modified: 2026-11-14
 ---
 
 # Supervisor meeting, 2026-11-13
@@ -28,6 +28,7 @@ heterogeneous models (Heterogeneous-2 Step 1).
 | 4 | Mixture-of-experts models | Hybrid workflows may collapse on a dense model and still be useful in MoE or MoNE-style models, where a layer has many experts instead of one MLP. Besides heterogeneous replacement, the SwiGLU workflow and any newly defined method could be run there. | MoE work moves up from a bonus; scope to be designed. Researcher's concern: pricing every expert for the knapsack may be too expensive, and local fitting may help there |
 | 5 | Inference speed | As in the previous meeting: a deployment environment such as vLLM, configured so that speed and latency are comparable across experiment classes, would allow a speed frontier (speed against quality) next to the size frontier. | Conflicts with the 2026-10-25 and 2026-11-01 decision rows (no speed comparisons between methods). To resolve; options in [file 6 of the analysis](../06-reporting-model.md) |
 | 6 | Other models | Running the defined methodology on several model families, sizes, and dense and MoE models, as a last step and a bonus that shows transferability. | Unchanged in priority (2026-11-07 row); now discussed with the supervisor, which that row left open |
+| 7 | Operator families (added 2026-11-14 from the researcher's later note) | Hybrid operators were discussed. So far only zero, mean, linear, plain MLP, and the two linear hybrids were tested; the supervisor encouraged more creative operators (wording from backlog item 4, to confirm). | [Backlog item 4](../../../backlog/backlog-ideas.md); candidates, local losses, and a matched MoE model in [file 8 of the analysis](../08-operators-losses-moe-model.md) |
 
 ## Not stated in the digest (to confirm)
 
@@ -45,3 +46,7 @@ heterogeneous models (Heterogeneous-2 Step 1).
 2. Return to local-fitting analyses to test the annotation's hypothesis. Rough
    idea: select by local loss, and compare with the knapsack.
 3. MoE workflows: test heterogeneous replacement on one or more MoE models.
+4. (Added 2026-11-14.) Widen the operator set and pick by local-fit loss,
+   with several losses beside MSE, on dense and MoE models. Use an MoE model
+   comparable to SmolLM2-1.7B as the MoE reference; other models afterwards
+   if compute remains.

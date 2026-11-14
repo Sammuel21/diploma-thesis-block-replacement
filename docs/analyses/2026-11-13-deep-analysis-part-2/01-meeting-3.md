@@ -2,7 +2,7 @@
 title: Deep Analysis Part 2 - The 2026-11-13 Meeting
 status: draft
 created: 2026-11-13
-modified: 2026-11-13
+modified: 2026-11-14
 ---
 
 # 1. The 2026-11-13 meeting: record, readings, and proposed decisions
@@ -38,6 +38,23 @@ ready to move to `docs/meetings/` once you have corrected it.
 | 1.4 | Mixture-of-experts | The right place for the mixed menu, as Part 1 argued. Since then a literature check found a crowded field; what still looks open is narrow and specific | New result possible; MOE-ONLY |
 | 1.5 | vLLM and a speed frontier | Feasible for part of the comparison, not all of it: [file 6](06-reporting-model.md) | PROTECTIVE for the fairness of the comparison |
 | 1.6 | Other model families | Last, as you say. [File 5](05-agnosticism-and-factors.md) lists which claims are worth replicating and which are settings | Generality |
+| 1.7 | More operator families, picked by local fit with several losses (added 2026-11-14) | Not for a better dense point: nothing in Heterogeneous-1 suggests one. Worth it as test items for the local-fit selector and as the MoE menu. On MoE a dense linear map costs 48-100% of one expert, so linear items must be low-rank. [File 8](08-operators-losses-moe-model.md) | NEUTRAL for the dense frontier; PROTECTIVE for the local-fit claim; enabling for MoE |
+
+### On 1.7: the point the first digest left out
+
+You added this on 2026-11-14: hybrid operators were discussed, and only zero,
+mean, linear, plain MLP, and the two linear hybrids have been tested. Three
+short answers; the detail is in [file 8](08-operators-losses-moe-model.md).
+
+- **Which operators:** low-rank linear, a slice with a low-rank correction, a
+  diagonal map, a conditional constant, and on MoE redirecting or sharing
+  experts. KAN, RBF, and structured matrices have no way in (8.2-8.3).
+- **Which losses:** inside a layer MSE already picks like KL in 163 of 176
+  cells, so new scores have little to gain there. The room is between layers
+  and between experts. Two scores could work there without a probe: error
+  relative to the residual stream, and a gradient-weighted error (8.5).
+- **Which MoE model:** OLMoE-1B-7B. Per token it runs 8 × 1,024 = 8,192
+  neurons at hidden size 2,048, the shape of SmolLM2's MLP (8.7).
 
 ### On 1.3: your question, answered directly
 
@@ -90,6 +107,8 @@ AGENTS.md asks me to point these out and not choose silently.
 | MoE as planned work | 2026-10-16: "a bonus if time allows" | Only if you now treat it as planned | Proposed row 3, if you agree |
 | Heterogeneous-2 Step 2 | 2026-11-06: a level target goes to 1B | Only if Step 2 is dropped | Your answer to question 1 below |
 | Return to local fitting | 2026-11-07: "Local fitting is not reopened for a new schedule" | None. That row is about schedules; this is a different question | Proposed row 2 makes the boundary explicit |
+| New operator families on dense SmolLM2 (added 2026-11-14) | 2026-11-13: heterogeneous replacement on dense SmolLM2 is closed | Only if they are meant as frontier candidates | Treat them as test items of the local-fit study; [file 8](08-operators-losses-moe-model.md), question 1 |
+| Low-rank linear items (added 2026-11-14) | 2026-11-04: "Low-rank linear is excluded" | Direct. New evidence: on MoE the dense map is not affordable | A row, if you agree; file 8, question 2 |
 
 ## 1.3 Proposed decision rows
 
@@ -138,6 +157,9 @@ These are the snapshot's own questions that your digest does not settle.
 | 3 | Was the evaluation-thesis framing discussed? | If not, raise it next time. The return to the annotation's hypothesis fits it well |
 | 4 | Weekly meetings, and the next date? | - |
 | 5 | Is the MLP-first retry of the stalled hybrid wanted? | Optional. It answers a narrow question at block level; I would not let it delay the local-fit study |
+
+Added 2026-11-14: six further questions on operators, losses, and the MoE
+model are in [file 8](08-operators-losses-moe-model.md), section 8.8.
 
 ## 1.5 What changes in the order of work
 

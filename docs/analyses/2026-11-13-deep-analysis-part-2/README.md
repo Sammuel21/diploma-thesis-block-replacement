@@ -2,7 +2,7 @@
 title: Deep Analysis Part 2, 2026-11-13 - Index and Summary
 status: draft
 created: 2026-11-13
-modified: 2026-11-13
+modified: 2026-11-14
 ---
 
 # Deep analysis of the thesis project, part 2 (2026-11-13)
@@ -18,6 +18,12 @@ dated 2026-11-13 were added to the [decision log](../../agents/decisions.md);
 [file 1](01-meeting-3.md), section 1.3, lists them. Apart from that and one
 index row in `docs/analyses/README.md`, nothing outside this folder was
 changed.
+
+**Update, 2026-11-14.** [File 8](08-operators-losses-moe-model.md) was added
+for a meeting point the first digest left out: more operator families, more
+local losses, and an MoE model that matches SmolLM2. It is point 11 below
+and point 1.7 of [file 1](01-meeting-3.md). Nothing was run for it and no
+decision row was added.
 
 ## The answer in one page
 
@@ -70,6 +76,13 @@ changed.
 10. **The TorchAO defect is real, still live on yesterday's upstream main,
     and apparently unreported.** Worth an issue now; a pull request is worth
     offering. [File 7](07-torchao-bug.md)
+11. **More operators will not move the dense frontier, and are still worth
+    adding** (added 2026-11-14): as test items for the local-fit selector and
+    as the MoE menu. On MoE a dense linear map costs 48-100% of one expert,
+    so linear items must be low-rank. New local scores have little to gain
+    inside a layer and much between layers and experts. OLMoE-1B-7B runs,
+    per token, an MLP of exactly SmolLM2's shape.
+    [File 8](08-operators-losses-moe-model.md)
 
 ## Files
 
@@ -82,6 +95,7 @@ changed.
 | [05-agnosticism-and-factors.md](05-agnosticism-and-factors.md) | What transfers; what separates a method from tuning | 4, 6, 1.6 |
 | [06-reporting-model.md](06-reporting-model.md) | What to track, three axes, measured speed, vLLM | 5, 1.5 |
 | [07-torchao-bug.md](07-torchao-bug.md) | Independent verification and a recommendation | 7 |
+| [08-operators-losses-moe-model.md](08-operators-losses-moe-model.md) | Added 2026-11-14: which further operators have a way in, local losses as scores and as objectives, which MoE model matches SmolLM2 | 1.7, 2 |
 | [drafts/2026-11-13-supervisor-feedback.md](drafts/2026-11-13-supervisor-feedback.md) | A meeting page in the style of `docs/meetings/`, for you to correct and move | 1 |
 | `figures/` | Two figures for file 2 | - |
 | `private/` | The scripts that produce every number of file 2 and file 7, the 2026-11-01 TorchAO issue draft, and three raw research reports from sub-agents with their links. The folder ignores itself in git, as in Part 1 | - |
@@ -139,12 +153,20 @@ resource plans.
 | 11 | Peak learning-rate screen for SwiGLU alone | INCREMENTAL (fairness) | MODEL-CONCRETE | 4-14 GPU-h | Part 1, idea F |
 | 12 | Transfer scorecard on a second model | Generality | That is its purpose | Last | File 5 |
 
+Added 2026-11-14, belonging with item 3 and not a separate experiment: more
+local scores and a small set of closed-form operators recorded in the
+local-fit study (PROTECTIVE on the dense model, enabling for MoE; about 8
+GPU-hours for six layers, rough; [file 8](08-operators-losses-moe-model.md),
+section 8.6).
+
 Unchanged from Part 1 and still cheap: sibling-model anchors (PROTECTIVE),
 the dense 2-bit baseline (PROTECTIVE).
 
 What I would not spend on **[view]**: Heterogeneous-2 Step 2 at 1B
-(NEUTRAL), further operator families on the dense model (NEUTRAL), INT3 in a
-serving engine (COSTLY), published pruning methods on your model (COSTLY).
+(NEUTRAL), further operator families on the dense model as candidates for
+the frontier (NEUTRAL; file 8 keeps a few as test items only), KAN or RBF
+blocks (COSTLY), INT3 in a serving engine (COSTLY), published pruning
+methods on your model (COSTLY).
 
 ## What Part 1 already covers
 
@@ -169,6 +191,7 @@ serving engine (COSTLY), published pruning methods on your model (COSTLY).
 | Ran, offline | `private/tools/local_fit_vs_kl.py` and `private/tools/make_figures.py` on stored artifacts of SwiGLU-7, SwiGLU-8, and Heterogeneous-1 (no GPU; the repository's own solver was loaded, not re-implemented) |
 | Ran, TorchAO | Two scripts on CPU against torchao 0.18.0 and the upstream main source of 2026-11-12, in a temporary environment outside the project; five searches of the upstream tracker |
 | Delegated | Four sub-agents on the same model: one design from the annotation alone, three web research tasks. The three research reports are saved in `private/agent-reports/` |
+| Added 2026-11-14 (file 8) | Read `heterogeneous-1.md`, `operator.md`, `operators/modules.py`, the backlog, and the hybrid wiki page; eleven web searches whose summaries were read, not the pages; arithmetic on parameter counts. No script and no GPU run |
 
 | Not done | Consequence |
 | --- | --- |
@@ -190,6 +213,10 @@ were resumed afterwards and finished.
   formalization.
 - The "differentiating" test in [file 5](05-agnosticism-and-factors.md) and
   the three MoE hypotheses in [file 3](03-moe.md) are project-proposed.
+- Two formulas in [file 8](08-operators-losses-moe-model.md), section 8.5: a
+  score relative to the residual stream (project-proposed) and a
+  gradient-weighted estimate of KL (the standard sampling estimate of the
+  form in file 2; derived in that session, not run).
 - Two figures, drawn from stored artifacts by `private/tools/make_figures.py`.
 
 ## Where praise is due
